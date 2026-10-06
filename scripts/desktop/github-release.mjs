@@ -19,14 +19,25 @@ for (const name of names) {
 }
 if (!catalog.mac || !catalog.win || !names.includes('latest.yml') || !names.includes('latest-mac.yml')) throw Error('Both platforms and updater metadata required');
 await writeFile('build/installers/SHA256SUMS', [...hashes].map(([name, hash]) => `${hash}  ${name}`).join('\n') + '\n');
-gh(['release', 'create', tag, '-R', repo, '--target', 'main', '--draft', '--title', `Bricks War ${version}`, '--notes', 'Windows: system Program Files installation, game icon, desktop shortcut and launch options together on the finish page. macOS: universal build. Unsigned builds; native platform acceptance remains pending.']);
-gh(['release', 'upload', tag, ...names.map(name => `build/installers/${name}`), 'build/installers/SHA256SUMS', '-R', repo]);
-const release = JSON.parse(gh(['api', `repos/${repo}/releases/tags/${tag}`]));
+const releases = () => JSON.parse(gh(['api', `repos/${repo}/releases`]));
+let release = releases().find(release => release.tag_name === tag);
+if (!release) {
+  gh(['release', 'create', tag, '-R', repo, '--target', 'main', '--draft', '--title', `Bricks War ${version}`, '--notes', 'Windows: system Program Files installation, game icon, desktop shortcut and launch options together on the finish page. macOS: universal build. Unsigned builds; native platform acceptance remains pending.']);
+  release = releases().find(release => release.tag_name === tag);
+}
+// Resume a draft safely: never replace an asset already carrying a different digest.
+for (const [name, hash] of hashes) {
+  const asset = release.assets.find(asset => asset.name === name);
+  if (asset && asset.digest !== `sha256:${hash}`) throw Error(`Existing release asset mismatch: ${name}`);
+}
+const missing = [...names, 'SHA256SUMS'].filter(name => !release.assets.some(asset => asset.name === name));
+if (missing.length) gh(['release', 'upload', tag, ...missing.map(name => `build/installers/${name}`), '-R', repo]);
+release = JSON.parse(gh(['api', `repos/${repo}/releases/${release.id}`]));
 for (const [name, hash] of hashes) {
   const asset = release.assets.find(asset => asset.name === name);
   if (asset?.digest !== `sha256:${hash}`) throw Error(`GitHub asset digest mismatch: ${name}; draft retained`);
 }
-gh(['release', 'edit', tag, '-R', repo, '--draft=false', '--latest']);
+if (release.draft) gh(['release', 'edit', tag, '-R', repo, '--draft=false', '--latest']);
 for (const file of Object.values(catalog)) {
   const response = await fetch(file.url, { method: 'HEAD' });
   if (!response.ok) throw Error('Public GitHub download unavailable; VPS untouched');
