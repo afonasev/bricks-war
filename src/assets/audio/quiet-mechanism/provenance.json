@@ -1,0 +1,42 @@
+{
+  "selected_audition_sha256": "de5670e58b4715ded3b1595706de7b7ebf831330282488306ec1c3cba4d02214",
+  "source": "Bub Block Sound Effects; provenance in ../realistic-sfx/LICENSE.md and audio-previews/open-cc0/LICENSES.md",
+  "segments": [
+    {
+      "file": "rotate-1.wav",
+      "start_seconds": 0.3,
+      "frames": 4189,
+      "pcm_sha256": "b0d37ab118d2ea9697ce82d9a3f3ee90025ede5caef8e794bfe8a451434066a6"
+    },
+    {
+      "file": "rotate-2.wav",
+      "start_seconds": 0.85,
+      "frames": 4189,
+      "pcm_sha256": "b8f30783552a50e92f535ea4b6e62c6886b37d84afecebcc34f1d3ea9358aa1f"
+    },
+    {
+      "file": "rotate-3.wav",
+      "start_seconds": 1.4,
+      "frames": 4189,
+      "pcm_sha256": "1d3627eefbcbaec1365db4623471b0c6928d3cd905fc026962b2146af2ea7d38"
+    },
+    {
+      "file": "lock-1.wav",
+      "start_seconds": 2.1,
+      "frames": 9702,
+      "pcm_sha256": "cc10763c964ae2586d0939ca868e6c7baed6f23f3d01449fd9baf5a0ed172202"
+    },
+    {
+      "file": "lock-2.wav",
+      "start_seconds": 2.75,
+      "frames": 9702,
+      "pcm_sha256": "ff274302b26286332665763fc69f8bbb37a25a19ae59e4f83512ec98d93aeb0a"
+    },
+    {
+      "file": "lock-3.wav",
+      "start_seconds": 3.4,
+      "frames": 9702,
+      "pcm_sha256": "cb2307a160aee9b9bfb628d5cc0cf32628db458362be4bb4eef4d05a4f3c9f23"
+    }
+  ]
+}

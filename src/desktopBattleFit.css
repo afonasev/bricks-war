@@ -1,0 +1,246 @@
+/* Keep the Battle setup inside the finite desktop viewport supplied by the app shell. */
+#app[data-layout="desktop"] .mode-setup-screen .setup-scroll {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  align-content: stretch;
+  gap: clamp(6px, 6.4px, 12px);
+  padding: 0 12px 8px;
+  overflow: hidden;
+}
+
+#app[data-layout="desktop"] .mode-setup-screen .release-heading {
+  min-height: 0;
+  margin-bottom: 0;
+  gap: 16px;
+}
+
+#app[data-layout="desktop"] .mode-setup-screen .release-heading h1 {
+  font-size: clamp(31.5px, 33.6px, 54px);
+}
+
+#app[data-layout="desktop"] .mode-setup-screen .release-heading > div > p:last-child {
+  margin-block: 3px 0;
+  font-size: 15.3px;
+  line-height: 1.25;
+}
+
+#app[data-layout="desktop"] .mode-setup-screen .mode-setup-content,
+#app[data-layout="desktop"] .mode-setup-screen .battle-setup-layout,
+#app[data-layout="desktop"] .mode-setup-screen .battle-setup-roster,
+#app[data-layout="desktop"] .mode-setup-screen .mode-rules {
+  min-height: 0;
+  height: 100%;
+}
+
+#app[data-layout="desktop"] .mode-setup-screen .battle-setup-layout {
+  grid-template-columns: minmax(220px, .58fr) minmax(0, 1.42fr);
+  gap: clamp(8px, 14.56px, 18px);
+}
+
+#app[data-layout="desktop"] .mode-setup-screen .mode-rules {
+  display: flex;
+  flex-direction: column;
+  padding: clamp(10px, 15.68px, 18px);
+}
+
+#app[data-layout="desktop"] .mode-setup-screen .mode-rules h2 {
+  margin-bottom: 8px;
+  font-size: clamp(20.7px, 19.04px, 27.9px);
+}
+
+#app[data-layout="desktop"] .mode-setup-screen .mode-rules ul {
+  gap: 0;
+}
+
+#app[data-layout="desktop"] .mode-setup-screen .mode-rules li {
+  min-height: 0;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 15.75px;
+  line-height: 1.2;
+}
+
+#app[data-layout="desktop"] .mode-setup-screen .mode-rules li b {
+  width: 26px;
+  height: 26px;
+}
+
+#app[data-layout="desktop"] .mode-setup-screen .mode-rules-board {
+  width: 84px;
+  height: 54px;
+  flex: 0 0 auto;
+  margin-block: auto 0;
+}
+
+#app[data-layout="desktop"] .mode-setup-screen .battle-setup-roster {
+  padding: clamp(10px, 15.68px, 18px);
+}
+
+#app[data-layout="desktop"] .mode-setup-screen .battle-player > .eyebrow {
+  margin-bottom: 4px !important;
+}
+
+#app[data-layout="desktop"] .mode-setup-screen .battle-player > h2 {
+  margin-bottom: 8px;
+  font-size: clamp(20.7px, 19.04px, 27.9px);
+}
+
+#app[data-layout="desktop"] .mode-setup-screen .battle-setup-layout .battle-lobby {
+  min-height: 0;
+  height: calc(100% - 46px);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: clamp(6px, 10.08px, 12px);
+}
+
+#app[data-layout="desktop"] .mode-setup-screen .battle-setup-layout .participant-card {
+  min-height: 0;
+  padding: clamp(7px, 9.52px, 11px);
+  border-radius: 14px;
+}
+
+#app[data-layout="desktop"] .mode-setup-screen .battle-setup-layout .participant-card header {
+  min-height: 28px;
+  margin-bottom: 3px;
+  gap: 5px;
+}
+
+#app[data-layout="desktop"] .mode-setup-screen .battle-setup-layout .participant-card .player-name {
+  font-size: 18px;
+}
+
+#app[data-layout="desktop"] .mode-setup-screen .battle-setup-layout .participant-card label {
+  gap: 3px;
+  margin-top: 5px;
+  font-size: 13.5px;
+}
+
+#app[data-layout="desktop"] .mode-setup-screen .battle-setup-layout .menu-select-trigger {
+  min-height: 34px;
+  grid-template-columns: minmax(0, 1fr) 18px;
+  gap: 4px;
+  padding: 5px 7px;
+  border-bottom-width: 3px;
+  border-radius: 9px;
+  font-size: 14.76px;
+}
+
+#app[data-layout="desktop"] .mode-setup-screen .team-lobby {
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  align-items: stretch;
+  gap: clamp(4px, 7.84px, 10px);
+}
+
+#app[data-layout="desktop"] .mode-setup-screen .team-group {
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto repeat(2, minmax(0, 1fr));
+  align-content: stretch;
+  padding: clamp(5px, 7.28px, 9px);
+  gap: 5px;
+  border-radius: 15px;
+}
+
+#app[data-layout="desktop"] .mode-setup-screen .team-group > header {
+  min-height: 22px;
+  margin: 0;
+  font-size: 14.76px;
+}
+
+#app[data-layout="desktop"] .mode-setup-screen .team-lobby .versus {
+  align-self: center;
+  font-size: 14.76px;
+}
+
+#app[data-layout="desktop"] .mode-setup-screen .team-group .participant-card {
+  min-height: 0;
+  padding: 5px;
+}
+
+#app[data-layout="desktop"] .mode-setup-screen .team-group .participant-card header {
+  min-height: 24px;
+  margin-bottom: 2px;
+}
+
+#app[data-layout="desktop"] .mode-setup-screen .team-group .participant-card label {
+  margin-top: 3px;
+}
+
+#app[data-layout="desktop"] .mode-setup-screen .team-group .editable-player-name {
+  padding-block: 4px;
+}
+
+#app[data-layout="desktop"] .mode-setup-screen .mode-settings {
+  min-height: 0;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 0;
+}
+
+#app[data-layout="desktop"] .mode-setup-screen .mode-settings label {
+  min-height: 0;
+  padding: 6px 9px;
+  border-radius: 12px;
+}
+
+#app[data-layout="desktop"] .mode-setup-screen .mode-settings small {
+  margin-bottom: 3px;
+  font-size: 12.96px;
+}
+
+#app[data-layout="desktop"] .mode-setup-screen .mode-settings .menu-select-trigger {
+  min-height: 32px;
+  padding-block: 4px;
+  font-size: 14.76px;
+}
+
+#app[data-layout="desktop"] .mode-setup-screen .setup-error {
+  min-height: 0;
+  margin: 0;
+  font-size: 14.4px;
+  line-height: 1.15;
+}
+
+@container desktop-stage (max-height: 620px) {
+  #app[data-layout="desktop"] .mode-setup-screen .setup-scroll { gap: 4px; padding-inline: 8px; padding-bottom: 4px; }
+  #app[data-layout="desktop"] .mode-setup-screen .release-heading { gap: 10px; }
+  #app[data-layout="desktop"] .mode-setup-screen .release-heading h1 { font-size: 29.7px; }
+  #app[data-layout="desktop"] .mode-setup-screen .screen-back { min-height: 34px; padding: 5px 9px; }
+  #app[data-layout="desktop"] .mode-setup-screen .mode-rules { padding: 7px 9px; }
+  #app[data-layout="desktop"] .mode-setup-screen .mode-rules .eyebrow { margin-bottom: 3px !important; }
+  #app[data-layout="desktop"] .mode-setup-screen .mode-rules h2 { margin-bottom: 4px; font-size: 19.8px; }
+  #app[data-layout="desktop"] .mode-setup-screen .mode-rules li { grid-template-columns: 24px minmax(0, 1fr); gap: 5px; padding-block: 2px; font-size: 15.75px; }
+  #app[data-layout="desktop"] .mode-setup-screen .mode-rules li b { width: 22px; height: 22px; font-size: 13.5px; }
+  #app[data-layout="desktop"] .mode-setup-screen .mode-rules-board { width: 40px; height: 26px; }
+  #app[data-layout="desktop"] .mode-setup-screen .battle-setup-roster { padding: 7px 9px; }
+  #app[data-layout="desktop"] .mode-setup-screen .battle-player > .eyebrow { margin-bottom: 2px !important; }
+  #app[data-layout="desktop"] .mode-setup-screen .battle-player > h2 { margin-bottom: 4px; font-size: 19.8px; }
+  #app[data-layout="desktop"] .mode-setup-screen .battle-setup-layout .battle-lobby { height: calc(100% - 38px); gap: 5px; }
+  #app[data-layout="desktop"] .mode-setup-screen .battle-setup-layout .participant-card { padding: 5px; }
+  #app[data-layout="desktop"] .mode-setup-screen .battle-setup-layout .participant-card label { margin-top: 3px; }
+  #app[data-layout="desktop"] .mode-setup-screen .mode-settings label { padding: 4px 7px; }
+}
+
+@container desktop-stage (min-width: 981px) and (max-height: 500px) {
+  #app[data-layout="desktop"] .mode-setup-screen .release-heading h1 { font-size: 25.2px; }
+  #app[data-layout="desktop"] .mode-setup-screen .release-heading > div > p:last-child { font-size: 13.5px; line-height: 1.1; }
+  #app[data-layout="desktop"] .mode-setup-screen .battle-setup-layout { grid-template-columns: minmax(190px, .5fr) minmax(0, 1.5fr); }
+  #app[data-layout="desktop"] .mode-setup-screen .mode-rules li { font-size: 15.75px; line-height: 1.1; }
+  #app[data-layout="desktop"] .mode-setup-screen .battle-setup-layout .participant-card header { min-height: 22px; }
+  #app[data-layout="desktop"] .mode-setup-screen .battle-setup-layout .menu-select-trigger { min-height: 30px; font-size: 14.04px; }
+  #app[data-layout="desktop"] .mode-setup-screen .team-group .participant-card .player-name { font-size: 15.84px; }
+}
+#app[data-layout="desktop"] .battle-setup-layout .participant-card:not(.empty) { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); grid-template-rows: auto minmax(0,1fr); gap: 4px 6px; align-content: start; }
+#app[data-layout="desktop"] .battle-setup-layout .participant-card:not(.empty) > header { grid-column: 1 / -1; margin: 0; min-height: 28px; }
+#app[data-layout="desktop"] .battle-setup-layout .participant-card .editable-player-name { padding: 4px 28px 4px 8px; min-height: 28px; }
+#app[data-layout="desktop"] .battle-setup-layout .participant-card label { margin: 0; align-content: start; }
+#app[data-layout="desktop"] .battle-setup-layout .participant-card.empty { gap: 4px; padding: 5px; }
+#app[data-layout="desktop"] .battle-setup-layout .participant-card.empty > div::before { width: 20px; height: 20px; margin: 0 4px 0 0; font-size: 16px; border-radius: 5px; display: inline-grid; vertical-align: middle; }
+#app[data-layout="desktop"] .battle-setup-layout .participant-card.empty small { margin-top: 3px; font-size: 12px; }
+#app[data-layout="desktop"] .battle-setup-layout .join-actions { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 4px; }
+#app[data-layout="desktop"] .battle-setup-layout .join-actions button { min-height: 30px; padding: 3px; font-size: 12px; }
+#app[data-layout="desktop"] .team-lobby { height: 100%; }
+#app[data-layout="desktop"] .mode-setup-screen .team-lobby .versus { width: 36px; height: 36px; border-radius: 10px; }
+#app[data-layout="desktop"] .team-group { grid-template-rows: repeat(2,minmax(0,1fr)); }

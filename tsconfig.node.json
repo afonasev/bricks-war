@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "composite": true,
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
+    "skipLibCheck": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "allowImportingTsExtensions": true,
+    "strict": true,
+    "noEmit": true
+  },
+  "include": ["vite.config.ts", "playwright.config.ts", "vite-node-shim.d.ts", "src/domain/gameTuning.ts", "src/domain/types.ts", "src/runtime/compat.ts"]
+}

@@ -1,0 +1,47 @@
+{
+  "tests/arenaCardPalette.test.ts": [
+    "arena card palette gives every free-for-all slot its own card colour",
+    "arena card palette groups teammates by a shared card colour",
+    "arena card palette keeps eliminated cards visibly muted without losing their team grouping"
+  ],
+  "tests/arenaLayout.test.ts": [
+    "adaptive arena layout keeps the network fields within the viewport for 'mobile 360x800'",
+    "adaptive arena layout keeps the network fields within the viewport for 'mobile 390x844'",
+    "adaptive arena layout keeps the network fields within the viewport for 'mobile 844x390'",
+    "adaptive arena layout keeps the network fields within the viewport for 'desktop 800x900'",
+    "adaptive arena layout keeps the network fields within the viewport for 'desktop 1600x900'",
+    "adaptive arena layout keeps four players in one horizontal row on a landscape arena when that makes cells larger",
+    "adaptive arena layout uses a 2x2 grid only when a tall arena makes its cells larger",
+    "adaptive arena layout applies the same maximum-cell rule to three players",
+    "adaptive arena layout always keeps two players side by side",
+    "adaptive arena layout wraps a solo card tightly around its maximum-height board",
+    "adaptive arena layout derives every tight card from the board cell size",
+    "adaptive arena layout gives the mobile player a dominant board between compact side opponents",
+    "adaptive arena layout fits three compact opponents into the right rail on a portrait phone",
+    "adaptive arena layout uses the full height for the player board on a compact landscape phone"
+  ],
+  "tests/hudIdentity.test.ts": [
+    "participant HUD identity uses one stable palette per free-for-all slot",
+    "participant HUD identity groups fixed teammates by palette and label"
+  ],
+  "tests/menuSelect.test.ts": [
+    "menu select state helpers opens only on confirmation and maps expanded navigation",
+    "menu select state helpers wraps around disabled options without selecting them"
+  ],
+  "tests/mobileSettings.test.ts": [
+    "mobile settings keeps three AI opponents and normalizes invalid values",
+    "mobile settings starts with defaults when the browser blocks localStorage access",
+    "mobile settings defaults legacy preferences to reduced tilt sensitivity",
+    "mobile settings persists buttons and the three-AI roster"
+  ],
+  "tests/screenRouter.test.ts": [
+    "production screen routing returns mode screens to the main menu and nested screens to their parent",
+    "production screen routing supports Pause-owned Settings and restores a remembered selection safely",
+    "shared menu input maps arrows, WASD, confirm, and back consistently",
+    "shared menu input accepts D-pad and stick navigation from any connected gamepad",
+    "shared menu input emits one action per deliberate input and ignores stick drift or inactive screens",
+    "shared menu input keeps non-owner gamepads out of menu navigation while reporting their A press",
+    "independent Y press edges processes both devices in one frame regardless of navigation owner and holds",
+    "independent Y press edges does not convert a held gameplay Y into a lobby press and clears disconnected devices"
+  ]
+}

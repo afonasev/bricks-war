@@ -1,0 +1,56 @@
+{
+  "battleDifficulties": {
+    "family": { "startingGravityMs": 1250, "accelerationPercent": 5, "piecesPerLevel": 20 },
+    "normal": { "startingGravityMs": 1000, "accelerationPercent": 8, "piecesPerLevel": 15 },
+    "sport": { "startingGravityMs": 750, "accelerationPercent": 10, "piecesPerLevel": 10 }
+  },
+  "minimumGravityMs": 200,
+  "softDropIntervalMs": 50,
+  "horizontalRepeatDelayMs": 140,
+  "horizontalRepeatIntervalMs": 45,
+  "lockDelayMs": 100,
+  "maxLockResets": 1,
+  "spawnPreparationMs": 400,
+  "spawnRotationExtensionMs": 200,
+  "spawnPreparationMaxMs": 1000,
+  "pressurePhasePercent": 25,
+  "pressureIntervalMs": 10000,
+  "conflictWarningMs": 3000,
+  "mobileTilt": { "horizontalThreshold": 14, "rotateThreshold": 18, "dropThreshold": 18, "deadZone": 6, "smoothing": 0.28, "rotateRearmMs": 280 },
+  "ai": {
+    "easy": {
+      "reactionMs": 250,
+      "dropTapIntervalMs": null,
+      "errorChance": 0.3,
+      "conflictIntentChance": 0.05
+    },
+    "medium": {
+      "reactionMs": 180,
+      "dropTapIntervalMs": 650,
+      "errorChance": 0.2,
+      "conflictIntentChance": 0.1
+    },
+    "hard": {
+      "reactionMs": 75,
+      "dropTapIntervalMs": 150,
+      "errorChance": 0.08,
+      "conflictIntentChance": 0.5
+    },
+    "expert": {
+      "reactionMs": 58,
+      "dropTapIntervalMs": 115,
+      "errorChance": 0.03,
+      "conflictIntentChance": 0.9
+    }
+  },
+  "messages": {
+    "roundStart": "Поехали!",
+    "levelUp": "Уровень {level} · Ждите Аномалию",
+    "finalPushTitle": "Финальный рывок",
+    "finalPushHint": "Держитесь!",
+    "incomingAttack": "Вас атакует {senders} +{rows}",
+    "attackImpact": "ПОЛУЧЕНО · +{rows} СЕРЫХ РЯДОВ",
+    "activeDefense": "Блок!",
+    "shieldBlock": "Сработал щит!"
+  }
+}

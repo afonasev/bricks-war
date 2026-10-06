@@ -1,0 +1,64 @@
+import { _electron as electron } from '@playwright/test';
+import assert from 'node:assert/strict';
+import { mkdir, readFile, writeFile, cp, rm } from 'node:fs/promises';
+import { join } from 'node:path';
+import { homedir } from 'node:os';
+import { sign } from 'node:crypto';
+import { digest } from '../../electron/content.mjs';
+const output = 'evidence/add-desktop-distribution/native';
+await mkdir(output, { recursive:true });
+const profile = join(process.cwd(),'build','smoke-profile');
+await rm(profile,{recursive:true,force:true});await mkdir(profile,{recursive:true});
+const feed = join(process.cwd(),'build','smoke-feed');await rm(feed,{recursive:true,force:true});await mkdir(feed,{recursive:true});
+const base=JSON.parse(await readFile('build/desktop-content/manifest.json','utf8'));
+const manifest=JSON.parse(base.payload);manifest.sequence+=1;
+await cp('build/desktop-content',join(feed,String(manifest.sequence)),{recursive:true});
+const indexPath=join(feed,String(manifest.sequence),'index.html');
+const index=Buffer.from((await readFile(indexPath,'utf8')).replace('</head>','<meta name="qa-content-release" content="B"></head>'));
+await writeFile(indexPath,index);const f=manifest.files.find(f=>f.path==='index.html');f.size=index.length;f.sha256=digest(index);
+const payload=JSON.stringify(manifest);const key=await readFile(process.env.BRICKS_CONTENT_PRIVATE_KEY??join(homedir(),'.config','bricks-war','content-private-key.pem'),'utf8');
+await writeFile(join(feed,'latest.json'),JSON.stringify({payload,signature:sign(null,Buffer.from(payload),key).toString('base64')}));
+const env={...process.env,BRICKS_DESKTOP_QA_PROFILE:profile,BRICKS_DESKTOP_QA_OFFLINE:'1',BRICKS_DESKTOP_QA_FEED:feed};
+const app=await electron.launch({args:['.'],env});
+const report={};
+try {
+ const page=await app.firstWindow();const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.locator('#desktop-exit').waitFor();
+ report.networkUnavailable=await page.evaluate(async()=>{try{await fetch('/api/network/health');return false}catch{return true}});assert.equal(report.networkUnavailable,true);
+ await page.waitForFunction(async()=> (await window.bricksDesktop.updateState()).available);
+ await page.evaluate(()=>localStorage.setItem('qa-retained','yes'));
+ await page.locator('[data-destination="survival"]').click();
+ assert.equal(await page.evaluate(()=>window.bricksDesktop.apply()),false,'Update cannot apply outside safe menu');
+ await page.getByRole('button',{name:'Удалить Игрок 2',exact:true}).click();
+ await page.locator('#start-match').click();await page.locator('canvas').waitFor();
+ await page.waitForFunction(() => document.querySelector('#match-clock')?.textContent !== '00:00');
+ await page.keyboard.down('s');await page.waitForTimeout(4000);await page.keyboard.up('s');
+ report.offlineClock = await page.locator('#match-clock').textContent();
+ assert.notEqual(report.offlineClock,'00:00');
+ assert.equal(await page.evaluate(()=>window.bricksDesktop.apply()),false,'Update cannot interrupt match');
+ await page.screenshot({path:`${output}/offline-survival.png`});
+ await page.keyboard.press('Escape');await page.locator('#return-to-menu').click();
+ await page.getByRole('button',{name:'Обновить',exact:true}).click();
+ await page.locator('meta[name="qa-content-release"]').waitFor({state:'attached'});
+ assert.equal(await page.evaluate(()=>localStorage.getItem('qa-retained')),'yes');report.contentUpdate=true;
+ await page.screenshot({path:`${output}/updated-menu.png`});
+ await page.locator('[data-destination="settings"]').click();
+ await page.getByRole('combobox',{name:/Разрешение окна/}).click();await page.getByRole('option',{name:'960 × 540',exact:true}).click();
+ await page.waitForTimeout(500);await page.screenshot({path:`${output}/settings-960x540.png`});
+ await page.getByRole('combobox',{name:/Режим экрана/}).click();await page.getByRole('option',{name:'Полный экран',exact:true}).click();
+ await page.waitForFunction(async()=> (await window.bricksDesktop.display()).fullscreen);
+ await page.getByRole('combobox',{name:/Режим экрана/}).click();await page.getByRole('option',{name:'Оконный',exact:true}).click();
+ await page.waitForFunction(async()=> !(await window.bricksDesktop.display()).fullscreen);
+ report.display=await page.evaluate(()=>window.bricksDesktop.display());assert.equal(report.display.width,960);
+ await page.locator('#settings-back').click();await page.screenshot({path:`${output}/menu-960x540.png`});
+ assert.deepEqual(errors,[]);report.pageErrors=errors;
+ await page.locator('#desktop-exit').click();await app.waitForEvent('close');report.exit=true;
+} finally {await app.close().catch(()=>{});}
+// Relaunch the same profile with the transport disconnected; B and preferences must persist.
+const restored=await electron.launch({args:['.'],env});try{
+ const page=await restored.firstWindow();await page.locator('#desktop-exit').waitFor();
+ await page.locator('meta[name="qa-content-release"]').waitFor({state:'attached'});
+ assert.equal(await page.evaluate(()=>localStorage.getItem('qa-retained')),'yes');
+ assert.equal((await page.evaluate(()=>window.bricksDesktop.display())).width,960);report.restart=true;
+}finally{await restored.close();}
+await writeFile(`${output}/smoke-report.json`,JSON.stringify(report,null,2));console.log(report);

@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#080b18" />
+    <meta name="description" content="Локальная Tetris-арена для людей и ИИ" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Bricks War" />
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png?v=__BRICKS_WAR_ASSET_REVISION__" />
+    <link rel="icon" href="__BRICKS_WAR_FAVICON__" />
+    <title>Bricks War — локальная Tetris-арена</title>
+  </head>
+  <body>
+    <div id="app">
+      <main style="min-height:100vh;display:grid;place-items:center;padding:24px;background:#eaf8ff;color:#173d73;font:700 18px/1.4 system-ui,sans-serif;text-align:center">
+        <p>Загружаем Bricks War…</p>
+      </main>
+    </div>
+    <script>
+      if (window.location.protocol === 'file:' && !window.location.pathname.includes('/dist/')) {
+        window.location.replace(new URL('./dist/index.html', window.location.href).href);
+      }
+    </script>
+    <script type="module">
+      const root = document.querySelector('#app');
+      const showStartupError = (error) => {
+        if (!root) return;
+        root.innerHTML = '<main style="min-height:100vh;display:grid;place-items:center;padding:24px;background:#eaf8ff;color:#173d73;font:700 18px/1.4 system-ui,sans-serif;text-align:center"><div style="max-width:640px"><h1 style="margin:0 0 12px">Игра не запустилась</h1><p style="margin:0 0 16px">Сделайте скриншот отчёта ниже и отправьте его мне.</p><pre id="startup-error" style="max-height:45vh;overflow:auto;margin:0 0 20px;padding:12px;border-radius:10px;background:#fff;color:#55708f;font:600 12px/1.45 ui-monospace,monospace;text-align:left;white-space:pre-wrap;overflow-wrap:anywhere"></pre><button type="button" style="padding:10px 16px;border:2px solid #247cf0;border-radius:10px;background:#fff;color:#174d7c;font:800 16px system-ui">Обновить</button></div></main>';
+        const failure = error instanceof Error ? error : new Error(String(error || 'Неизвестная ошибка'));
+        const details = root.querySelector('#startup-error');
+        let webgl = 'неизвестно';
+        try { webgl = document.createElement('canvas').getContext('webgl') ? 'доступен' : 'недоступен'; } catch { webgl = 'ошибка проверки'; }
+        const audioContext = Object.getOwnPropertyDescriptor(window, 'AudioContext');
+        const report = [
+          `Ошибка: ${failure.name}: ${failure.message}`,
+          `Стек: ${failure.stack || 'не передан браузером'}`,
+          `URL: ${location.href}`,
+          `Web Audio: AudioContext=${typeof window.AudioContext}, webkitAudioContext=${typeof window.webkitAudioContext}`,
+          `AudioContext descriptor: ${audioContext ? `writable=${Boolean(audioContext.writable)}, configurable=${Boolean(audioContext.configurable)}` : 'нет'}`,
+          `WebGL: ${webgl}`,
+          `User-Agent: ${navigator.userAgent}`,
+        ].join('\n\n');
+        if (details) details.textContent = report;
+        const reload = root.querySelector('button');
+        if (reload) reload.addEventListener('click', () => window.location.reload());
+      };
+      const handleRuntimeError = (event) => {
+        // These browser layout notices defer delivery; they are not fatal exceptions.
+        if (!event.error && (
+          event.message === 'ResizeObserver loop completed with undelivered notifications.'
+          || event.message === 'ResizeObserver loop limit exceeded'
+        )) return;
+        window.removeEventListener('error', handleRuntimeError);
+        showStartupError(event.error || event.message);
+      };
+      window.addEventListener('error', handleRuntimeError);
+      window.addEventListener('unhandledrejection', (event) => showStartupError(event.reason), { once: true });
+      import('/src/main.ts').catch(showStartupError);
+    </script>
+  </body>
+</html>
