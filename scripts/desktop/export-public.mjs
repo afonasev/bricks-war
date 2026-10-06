@@ -7,7 +7,7 @@ const files = execFileSync('git', ['ls-files', '-z'], { encoding: 'utf8' }).spli
 const selected = files.filter(file => /^(src|server|electron|public|scripts|tests|config)\//.test(file)
   || /^tools\//.test(file) && !/^tools\/(flow|test_flow)\.py$/.test(file)
   || !file.includes('/') && /^(package.*\.json|tsconfig.*\.json|vite.*\.ts|vitest.*\.ts|playwright.*\.ts|index\.html|\.gitignore|Makefile)$/.test(file)
-  || file === 'docs/desktop-distribution.md');
+  || file === 'electron-builder.yml' || file === 'docs/desktop-distribution.md');
 for (const file of selected) {
   const target = resolve(destination, file); await mkdir(dirname(target), { recursive: true }); await copyFile(file, target);
 }

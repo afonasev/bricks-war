@@ -1,0 +1,41 @@
+appId: tech.afonasev.brickswar
+productName: Bricks War
+directories:
+  output: build/installers
+files:
+  - electron/**
+  - build/desktop-content/**
+  - package.json
+extraMetadata:
+  main: electron/main.mjs
+  version: 1.1.1
+asar: true
+artifactName: Bricks-War-${version}-${os}-${arch}.${ext}
+publish:
+  provider: github
+  owner: afonasev
+  repo: bricks-war
+  releaseType: release
+mac:
+  category: public.app-category.games
+  target:
+    - target: dmg
+      arch: universal
+    - target: zip
+      arch: universal
+  icon: public/pwa-512.png
+win:
+  target:
+    - target: nsis
+      arch: x64
+  icon: public/pwa-512.png
+  signExecutable: false
+nsis:
+  oneClick: false
+  perMachine: true
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: always
+  shortcutName: Bricks War
+  uninstallDisplayName: Bricks War
+  runAfterFinish: true
+  include: scripts/desktop/installer-options.nsh
