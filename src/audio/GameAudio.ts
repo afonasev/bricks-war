@@ -60,6 +60,8 @@ export function conflictSoundProfile(rows: number): ConflictSoundProfile {
   return { tier: 1, gain: 0.075, root: 220, duration: 0.3 };
 }
 
+const ARRIVAL_FIRE = Symbol('shared-arrival-fire');
+
 export class GameAudio {
   private context: AudioContext | null = null;
   private master: GainNode | null = null;
@@ -70,7 +72,7 @@ export class GameAudio {
   private noiseBuffer: AudioBuffer | null = null;
   private clearImpactBuffer: AudioBuffer | null = null;
   private clearFireBuffer: AudioBuffer | null = null;
-  private readonly activeFires = new Map<string, { serial: number; source: AudioBufferSourceNode; gain: GainNode }>();
+  private readonly activeFires = new Map<string | symbol, { serial: number; source: AudioBufferSourceNode; gain: GainNode }>();
   private foley: Readonly<Record<FoleyKind, readonly AudioBuffer[]>> | null = null;
   private softToyBuffers: Readonly<Record<SoftToyAssetId, AudioBuffer>> | null = null;
   private softToyLoad: Promise<boolean> | null = null;
@@ -233,7 +235,11 @@ export class GameAudio {
 
   /** Network arena uses full authoritative state; reconnect establishes a silent baseline. */
   syncNetworkAnomalies(state: MatchState, baseline = false): void {
-    if (baseline) this.networkAnomalyTracker.reset();
+    if (baseline) {
+      this.networkAnomalyTracker.reset();
+      this.stopClearFire(ARRIVAL_FIRE);
+    }
+    this.syncArrivalFire(state);
     const events = this.networkAnomalyTracker.sync(state);
     if (!baseline) for (const event of events) if (event.type === 'anomaly-spawn') this.playEvent(event);
   }
@@ -244,6 +250,7 @@ export class GameAudio {
     this.finalPush = state.finalPushActive;
     const events = this.tracker.sync(state);
     this.syncClearFires(state);
+    this.syncArrivalFire(state);
     if (state.phase === 'paused') {
       if (this.mode !== 'paused') {
         this.mode = 'paused';
@@ -505,7 +512,7 @@ export class GameAudio {
     this.playBufferedFoley(this.clearImpactBuffer, start, pan, impactGainForLines(lines) * CLEAR_EFFECT_GAIN_SCALE);
   }
 
-  private stopClearFire(participantId: string): void {
+  private stopClearFire(participantId: string | symbol): void {
     const playing = this.activeFires.get(participantId);
     if (!playing) return;
     this.activeFires.delete(participantId);
@@ -530,25 +537,44 @@ export class GameAudio {
       return;
     }
     for (const burn of state.anomalyBurnEvents) {
-      const existing = this.activeFires.get(burn.participantId);
-      if (existing?.serial === burn.serial) continue;
-      if (existing) this.stopClearFire(burn.participantId);
       const index = state.participants.findIndex((participant) => participant.config.id === burn.participantId);
       const pan = state.participants.length <= 1 ? 0 : -0.72 + 1.44 * Math.max(0, index) / (state.participants.length - 1);
-      const source = context.createBufferSource();
-      const gain = context.createGain();
-      const panner = context.createStereoPanner();
-      source.buffer = buffer;
-      gain.gain.value = 0.55 * CLEAR_EFFECT_GAIN_SCALE;
-      panner.pan.value = pan;
-      source.connect(gain); gain.connect(panner); panner.connect(destination);
-      const playback = { serial: burn.serial, source, gain };
-      this.activeFires.set(burn.participantId, playback);
-      source.onended = () => {
-        if (this.activeFires.get(burn.participantId) === playback) this.activeFires.delete(burn.participantId);
-      };
-      source.start(context.currentTime + 0.008, Math.min(buffer.duration - 0.01, Math.max(0, (1_000 - burn.pulseMs) / 1_000)));
+      this.startClearFire(burn.participantId, burn.serial, burn.pulseMs, pan);
     }
+  }
+
+  private syncArrivalFire(state: MatchState): void {
+    const burn = state.anomalyTransition;
+    if (state.phase === 'paused' || state.phase === 'results' || state.pauseReasons.length > 0
+      || burn?.phase !== 'burning' || burn.targets.length === 0) {
+      this.stopClearFire(ARRIVAL_FIRE);
+      return;
+    }
+    // One shared source at row-fire gain, even when all eight boards burn together.
+    this.startClearFire(ARRIVAL_FIRE, burn.serial, burn.remainingMs, 0);
+  }
+
+  private startClearFire(key: string | symbol, serial: number, remainingMs: number, pan: number): void {
+    const context = this.context;
+    const buffer = this.clearFireBuffer;
+    const destination = this.sfxBus;
+    if (!context || !buffer || !destination) return;
+    const existing = this.activeFires.get(key);
+    if (existing?.serial === serial) return;
+    if (existing) this.stopClearFire(key);
+    const source = context.createBufferSource();
+    const gain = context.createGain();
+    const panner = context.createStereoPanner();
+    source.buffer = buffer;
+    gain.gain.value = 0.55 * CLEAR_EFFECT_GAIN_SCALE;
+    panner.pan.value = pan;
+    source.connect(gain); gain.connect(panner); panner.connect(destination);
+    const playback = { serial, source, gain };
+    this.activeFires.set(key, playback);
+    source.onended = () => {
+      if (this.activeFires.get(key) === playback) this.activeFires.delete(key);
+    };
+    source.start(context.currentTime + 0.008, Math.min(buffer.duration - 0.01, Math.max(0, (1_000 - remainingMs) / 1_000)));
   }
 
   private playFoley(kind: FoleyKind, variation: number, start: number, pan: number, volume: number): void {

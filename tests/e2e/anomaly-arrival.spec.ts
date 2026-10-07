@@ -35,7 +35,7 @@ for (const viewport of [{width:1440,height:960},{width:390,height:844}]) {
 
 test('records one actual runtime alarm at shared spawn and retains mute-independent event identity', async ({page},testInfo) => {
   await page.addInitScript(() => {
-    const capture={tones:[] as {frequency:number;at:number}[],chunks:[] as Blob[],recorder:null as MediaRecorder|null};
+    const capture={tones:[] as {frequency:number;at:number}[],fires:[] as {at:number;offset:number;phase:string|null}[],chunks:[] as Blob[],recorder:null as MediaRecorder|null};
     (window as unknown as {alarmCapture:typeof capture}).alarmCapture=capture;
     const originalConnect=AudioNode.prototype.connect;
     const streams=new WeakMap<BaseAudioContext,MediaStreamAudioDestinationNode>();
@@ -52,6 +52,19 @@ test('records one actual runtime alarm at shared spawn and retains mute-independ
       }
       return result;
     } as typeof AudioNode.prototype.connect;
+    const createSource=AudioContext.prototype.createBufferSource;
+    AudioContext.prototype.createBufferSource=function(this: AudioContext) {
+      const source=createSource.call(this);const start=source.start.bind(source);
+      source.start=(at=0,offset=0,duration?:number)=>{
+        if(source.buffer && Math.abs(source.buffer.duration-1.72)<0.001) {
+          const fire={at,offset,phase:null as string|null};capture.fires.push(fire);
+          // Audio sync precedes HUD commit; inspect the phase after that commit.
+          queueMicrotask(()=>{fire.phase=document.querySelector('#game-stage')?.getAttribute('data-arrival-phase')??null;});
+        }
+        if(duration===undefined) start(at,offset);else start(at,offset,duration);
+      };
+      return source;
+    };
     const create=AudioContext.prototype.createOscillator;
     AudioContext.prototype.createOscillator=function(this: AudioContext) {
       const oscillator=create.call(this);const set=oscillator.frequency.setValueAtTime.bind(oscillator.frequency);
@@ -75,15 +88,18 @@ test('records one actual runtime alarm at shared spawn and retains mute-independ
     const recorder=capture.recorder as MediaRecorder;
     await new Promise<void>(done=>{recorder.onstop=()=>done();recorder.stop();});
     const bytes=new Uint8Array(await new Blob(capture.chunks).arrayBuffer());
-    return {tones:capture.tones,bytes:Array.from(bytes)};
+    return {tones:capture.tones,fires:capture.fires,bytes:Array.from(bytes)};
   });
   expect(recording.tones.filter((t:any)=>t.frequency===620)).toHaveLength(3);
   expect(recording.tones.filter((t:any)=>t.frequency===310)).toHaveLength(3);
+  expect(recording.fires).toHaveLength(1);
+  expect(recording.fires[0].phase).toBe('burning');
+  expect(recording.fires[0].at).toBeLessThan(recording.tones[0].at);
   const path=testInfo.outputPath('runtime-alarm.webm');await writeFile(path,Buffer.from(recording.bytes));
   await testInfo.attach('actual runtime alarm',{path,contentType:'audio/webm'});
   if(process.env.BRICKS_ANOMALY_AUDIO_EVIDENCE) {
     const folder=resolve(process.env.BRICKS_ANOMALY_AUDIO_EVIDENCE);await mkdir(folder,{recursive:true});
     await writeFile(resolve(folder,'runtime-alarm.webm'),Buffer.from(recording.bytes));
-    await writeFile(resolve(folder,'runtime-alarm.json'),JSON.stringify({seed:4217,tones:recording.tones,source:'actual GameAudio WebAudio output',viewport:await page.viewportSize()},null,2));
+    await writeFile(resolve(folder,'runtime-alarm.json'),JSON.stringify({seed:4217,tones:recording.tones,fires:recording.fires,source:'actual GameAudio WebAudio output',viewport:await page.viewportSize()},null,2));
   }
 });
