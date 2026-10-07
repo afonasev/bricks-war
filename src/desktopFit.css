@@ -25,7 +25,7 @@ html:has(#app[data-layout="desktop"]), body:has(#app[data-layout="desktop"]), #a
 #app[data-layout="desktop"] .main-menu-screen .mode-choice { min-height: 50px; grid-template-columns: 42px minmax(0,1fr) 18px; gap: 10px; padding: 6px; }
 #app[data-layout="desktop"] .main-menu-screen .mode-icon { font-size: 24px; }
 #app[data-layout="desktop"] .main-menu-screen .mode-copy strong { font-size: clamp(16px,16px,24px); }
-#app[data-layout="desktop"] .main-menu-screen .mode-copy small { font-size: 12px; margin-top: 4px; }
+#app[data-layout="desktop"] .main-menu-screen .mode-copy small { font-size: 12px; }
 #app[data-layout="desktop"] .showcase-content { grid-template-rows: minmax(0,1fr) auto; height: 100%; }
 #app[data-layout="desktop"] .showcase-visual { min-height: 0; max-height: 100%; }
 #app[data-layout="desktop"] .showcase-callouts { padding: 8px; gap: 5px; }

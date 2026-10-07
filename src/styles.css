@@ -93,7 +93,7 @@ button { color: inherit; }
 .main-menu-screen .mode-icon-team i:nth-child(2) { transform: translateY(-6px); }
 .main-menu-screen .mode-copy { min-width: 0; }
 .main-menu-screen .mode-copy strong { color: #123564; font-size: clamp(1.28rem, 2vw, 2rem); line-height: 1; }
-.main-menu-screen .mode-copy small { margin-top: 7px; color: #33547e; font-size: clamp(.68rem, .94vw, .92rem); font-weight: 700; line-height: 1.2; }
+.main-menu-screen .mode-copy small { margin-top: 2px; color: #33547e; font-size: clamp(.68rem, .94vw, .92rem); font-weight: 700; line-height: 1.2; }
 .main-menu-screen .mode-forward { color: #247cf0; font-size: 2.8rem; font-weight: 950; line-height: 1; opacity: 0; transform: translateX(-5px); transition: opacity .15s ease, transform .15s ease; }
 .main-menu-screen [data-ui-focus].is-ui-selected, .main-menu-screen [data-ui-focus]:focus-visible { outline: none; border-color: #247cf0; background: #eaf4ff; box-shadow: 0 0 0 3px #247cf0, 0 5px 0 #0e58ba, 0 12px 24px #247cf044; }
 .main-menu-screen .mode-choice.is-ui-selected::before, .main-menu-screen .mode-choice.is-ui-selected::after, .main-menu-screen .mode-choice:focus-visible::before, .main-menu-screen .mode-choice:focus-visible::after { opacity: 1; }
@@ -188,7 +188,7 @@ button { color: inherit; }
   .main-menu-screen .mode-menu { gap: 7px; }
   .main-menu-screen .mode-choice { min-height: 70px; grid-template-columns: 56px minmax(0, 1fr) 24px; }
   .main-menu-screen .mode-copy strong { font-size: 1.25rem; }
-  .main-menu-screen .mode-copy small { margin-top: 3px; font-size: .63rem; }
+  .main-menu-screen .mode-copy small { font-size: .63rem; }
   .menu-showcase { padding-top: 28px; }
   .showcase-content { grid-template-rows: minmax(300px, 1fr) auto; }
   .showcase-visual { min-height: 300px; }
@@ -1185,7 +1185,7 @@ html:fullscreen .mode-setup-screen.premium-surface { width: 100%; height: 100%; 
   .main-menu-screen .mode-menu { grid-template-columns: 1fr; gap: clamp(12px, 1.8vh, 18px); }
   .main-menu-screen .mode-choice { min-height: 76px; grid-template-columns: 60px minmax(0, 1fr) 22px; gap: 12px; padding: 7px 12px 7px 7px; }
   .main-menu-screen .mode-copy strong { font-size: 1.2rem; }
-  .main-menu-screen .mode-copy small { margin-top: 3px; font-size: .66rem; }
+  .main-menu-screen .mode-copy small { font-size: .66rem; }
   .main-menu-screen .release-guidance-footer { z-index: 5; min-height: 62px; padding: 7px 12px calc(7px + env(safe-area-inset-bottom)); }
   .main-menu-screen .release-footer-inner { display: grid; gap: 3px; }
   .main-menu-screen .release-guidance-footer small { font-size: .55rem; line-height: 1.25; }
@@ -1520,7 +1520,7 @@ html:fullscreen .mode-setup-screen.premium-surface { width: 100%; height: 100%; 
   #app[data-layout="mobile"] .main-menu-screen .mode-choice { min-height: 58px; grid-template-columns: 44px minmax(0, 1fr) 18px; gap: 9px; padding: 5px 9px 5px 5px; }
   #app[data-layout="mobile"] .main-menu-screen .mode-icon { min-width: 44px; font-size: 1.65rem; }
   #app[data-layout="mobile"] .main-menu-screen .mode-copy strong { font-size: .95rem; }
-  #app[data-layout="mobile"] .main-menu-screen .mode-copy small { margin-top: 2px; font-size: .58rem; line-height: 1.2; }
+  #app[data-layout="mobile"] .main-menu-screen .mode-copy small { font-size: .58rem; line-height: 1.2; }
   #app[data-layout="mobile"] .main-menu-screen .mode-forward { width: 18px; height: 18px; }
   #app[data-layout="mobile"] .main-menu-screen .release-guidance-footer { min-height: 54px; padding: 5px 10px calc(5px + env(safe-area-inset-bottom)); }
   #app[data-layout="mobile"] .main-menu-screen .release-footer-inner { gap: 2px; }
