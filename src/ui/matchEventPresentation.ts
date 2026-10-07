@@ -9,7 +9,7 @@ import {
   ROUND_START_PULSE_MS,
   SHIELD_CHARGE_NOTICE_MS,
 } from '../simulation/match';
-import { formatMatchMessage, levelUpMessage } from './matchMessages';
+import { formatMatchMessage } from './matchMessages';
 
 export type MatchEventKind =
   | 'round-start'
@@ -70,19 +70,13 @@ export function globalMatchEvent(
     const baseDetail = acceleratingPressure
       ? 'Серый ряд каждые 15 → 5 секунд'
       : messages.finalPushHint;
-    const detail = hold?.level === undefined
-      ? baseDetail
-      : `${baseDetail}\n${levelUpMessage(messages, hold.level)}`;
+    const detail = baseDetail;
     return descriptor(
       'final-push',
       'global',
       acceleratingPressure ? 'Фаза давления' : messages.finalPushTitle,
       detail,
     );
-  }
-  if (!state.isSurvival && (hold?.kind === 'level-up' || (state.levelUpEvent?.pulseMs ?? 0) > 0)) {
-    const level = hold?.level ?? state.levelUpEvent?.level;
-    return level === undefined ? null : descriptor('level-up', 'global', levelUpMessage(messages, level), 'Аномалия следующая');
   }
   if (state.roundStartPulseMs > 0) return descriptor('round-start', 'global', messages.roundStart);
   return null;
@@ -94,12 +88,6 @@ export function participantMatchEvent(
   messages: MatchMessageTemplates,
   senderNames: readonly string[],
 ): MatchEventDescriptor | null {
-  const levelUp = state.participants.find((participant) => participant.config.id === participantId)?.levelUpEvent;
-  if (levelUp && levelUp.pulseMs > 0) return {
-    ...descriptor('level-up', participantId, levelUpMessage(messages, levelUp.level), 'Аномалия следующая'),
-    hold: 'none',
-    lifetimeMs: levelUp.pulseMs,
-  };
   const burn = state.anomalyBurnEvents.find((event) => event.participantId === participantId);
   if (burn) return {
     ...descriptor('anomaly-burn', participantId, 'Аномальный удар!', `Сгорит рядов: ${burn.rows.length}`),

@@ -33,7 +33,7 @@ describe('match event presentation', () => {
     expect(globalMatchEvent(engine.state, DEFAULT_GAME_TUNING.messages)).toBeNull();
   });
 
-  it('coalesces Final Push and level-up copy into the priority plaque', () => {
+  it('retains Final Push without adding an anomaly-arrival notice', () => {
     const engine = new MatchEngine(humanPair(), 4, 2);
     engine.step(COUNTDOWN_MS);
     engine.state.elapsedMs = engine.state.pressureStartMs - 1;
@@ -42,7 +42,7 @@ describe('match event presentation', () => {
     engine.step(1);
     const event = globalMatchEvent(engine.state, DEFAULT_GAME_TUNING.messages);
     expect(event).toMatchObject({ kind: 'final-push', lifetimeMs: FINAL_PUSH_PULSE_MS, hold: 'global' });
-    expect(event?.detail).toContain('Уровень 2');
+    expect(event?.detail).not.toContain('Уровень');
   });
 
   it('presents the Survival final push with pressure-phase copy', () => {
@@ -93,7 +93,7 @@ describe('match event presentation', () => {
     expect(participantMatchEvent(engine.state, 'p2', DEFAULT_GAME_TUNING.messages, ['Аня'])).toBeNull();
   });
 
-  it('keeps Survival level-up notices on the progressing participant only', () => {
+  it('removes Survival level-up notices from every participant', () => {
     const engine = new MatchEngine(humanPair(), 71, 5, {}, null, true);
     engine.step(COUNTDOWN_MS);
     engine.step(1_100);
@@ -101,9 +101,7 @@ describe('match event presentation', () => {
     engine.step(FIXED_STEP_MS);
 
     expect(globalMatchEvent(engine.state, DEFAULT_GAME_TUNING.messages)).toBeNull();
-    expect(participantMatchEvent(engine.state, 'p1', DEFAULT_GAME_TUNING.messages, [])).toMatchObject({
-      kind: 'level-up', scope: 'p1', hold: 'none', title: 'Уровень 2 · Ждите Аномалию',
-    });
+    expect(participantMatchEvent(engine.state, 'p1', DEFAULT_GAME_TUNING.messages, [])).toBeNull();
     expect(participantMatchEvent(engine.state, 'p2', DEFAULT_GAME_TUNING.messages, [])).toBeNull();
   });
 

@@ -35,3 +35,24 @@ it('partial, mismatched, duplicate and superseded assemblies never commit partia
   a.clear();a.accept(manifest);expect(()=>a.accept({...part,total:121})).toThrow();
   expect(()=>a.accept({...part,data:'a'.repeat(4096)})).toThrow();
 });
+
+it('publishes an eight-board shared burn within snapshot limits and preserves its identity',async()=>{
+  const service=new RoomService(()=>0);const credentials=[await service.create('Burn','Host')];
+  for(let i=1;i<8;i++)credentials.push(await service.join(credentials[0]!.roomId,`Player ${i}`));
+  const links=credentials.map(c=>service.connect(c,PROTOCOL_VERSION,RULES_VERSION));
+  const room=links[0]!.room;
+  const {MatchEngine}=await import('../src/simulation/match');
+  const engine=new MatchEngine(credentials.map((_,i)=>({id:`p${i}`,label:`Player ${i}`,controller:'mobile-touch' as const})),92,5,{},null,false,'network');
+  engine.step(3000);engine.state.participants[0]!.placedPieces=engine.options.piecesPerLevel;engine.step(1);engine.step(400);
+  room.engine=engine;room.revision++;
+  const publisher=new SnapshotPublisher();const pub=publisher.prepare(service,room);
+  expect(pub.commonBytes).toBeLessThan(256*1024-512);
+  for(const link of links){
+    const assembly=new SnapshotAssembly();assembly.accept(JSON.parse(publisher.manifest(pub,link.seat)));
+    let snapshot:ReturnType<SnapshotAssembly['accept']>=null;
+    for(const frame of pub.frames)snapshot=assembly.accept(JSON.parse(frame))??snapshot;
+    expect(snapshot?.state?.anomalyTransition).toEqual(engine.state.anomalyTransition);
+    expect(snapshot?.state?.anomalyTransition?.remainingMs).toBe(600);
+    expect(snapshot?.state?.participants).toHaveLength(8);
+  }
+});

@@ -1,3 +1,4 @@
+import { prepareAnomalyArrivalPlaytest } from './anomalyArrivalPlaytest';
 import { rulesScreenMarkup, bindRulesScreen } from './visualRules';
 import './visualRules.css';
 import { desktop, installerDownload, type DisplayPreferences } from '../platform/desktop';
@@ -509,7 +510,7 @@ export class BricksWarApp {
     this.root.querySelector('[data-network-entry]')?.addEventListener('click', () => {
       this.menuFocus.suspend(); this.router.open('network'); this.destroyGame();
       desktop?.setSafeMenu(false);
-      this.network = new NetworkApp(this.root, () => {this.router.open('main-menu'); this.renderMainMenu();});
+      this.network = new NetworkApp(this.root, () => {this.router.open('main-menu'); this.renderMainMenu();}, this.audio);
     });
     this.root.querySelector('.client-update-button')?.addEventListener('click', () => { clientUpdate.apply(); });
     this.root.querySelector('#desktop-exit')?.addEventListener('click', () => { clientUpdate.refresh(); void desktop?.exit(); });
@@ -1383,9 +1384,10 @@ export class BricksWarApp {
     this.menuFocus.suspend();
     const configs = this.configs();
     const mobileMatch = configs[0]?.controller === 'mobile-touch';
-    const seed = this.createSeed();
+    const seed = isLocalPlaytestFlag('playtest-anomaly-arrival') ? 4217 : this.createSeed();
     const activeTuning = this.tuning;
     const engine = new MatchEngine(configs, seed, this.durationMinutes, this.pacing, activeTuning, this.selectedMode === 'survival');
+    if (isLocalPlaytestFlag('playtest-anomaly-arrival')) prepareAnomalyArrivalPlaytest(engine);
     if (isLocalPlaytestFlag('playtest-clear')) {
       const match = /^((?:normal|fire))-([1-4])$/.exec(new URLSearchParams(window.location.search).get('playtest-clear') ?? '');
       const participant = engine.state.participants[0];
@@ -1424,7 +1426,7 @@ export class BricksWarApp {
     input.configure(configs);
     const aiControllers = new Map<string, AiController>();
     for (const config of configs) {
-      if (config.controller === 'ai' && config.difficulty) {
+      if (config.controller === 'ai' && config.difficulty && !isLocalPlaytestFlag('playtest-anomaly-arrival')) {
         aiControllers.set(config.id, new AiController(seed, config.id, config.difficulty, engine.state.options.conflictEnabled, activeTuning ?? undefined));
       }
     }
@@ -1482,6 +1484,8 @@ export class BricksWarApp {
       onFinished: (state) => this.showResults(state),
       mobileSolo: mobileMatch,
       mobileTiltControls: false,
+      captureAnomalyBurnAtMs: isLocalPlaytestFlag('playtest-anomaly-arrival')
+        ? localPlaytestNumber('playtest-arrival-capture') ?? undefined : undefined,
     });
     this.game = new Phaser.Game({
       type: Phaser.AUTO,
@@ -1697,6 +1701,16 @@ export class BricksWarApp {
   private updateHud(state: MatchState): void {
     this.latestHudState = state;
     if (this.countdownReady || state.phase !== 'countdown') this.audio.sync(state);
+    if (isLocalPlaytestFlag('playtest-anomaly-arrival')) {
+      const stage = this.root.querySelector<HTMLElement>('#game-stage');
+      if (stage) {
+        stage.dataset.seed = String(state.seed);
+        stage.dataset.arrivalPhase = state.anomalyTransition?.phase ?? '';
+        stage.dataset.arrivalRemainingMs = String(state.anomalyTransition?.remainingMs ?? 0);
+        stage.dataset.arrivalSerial = String(state.anomalyArrivalSerial);
+        stage.dataset.arrivalTargets = state.anomalyTransition?.targets.map(t => t.participantId).join(',') ?? '';
+      }
+    }
     if (isLocalPlaytestFlag('playtest-clear')) {
       const stage = this.root.querySelector<HTMLElement>('#game-stage');
       if (stage) {

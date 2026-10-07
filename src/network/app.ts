@@ -21,6 +21,8 @@ import { MODE_LABELS, NETWORK_MODES, roomRules, balancedNetworkTeams, type Resol
 import { loadPersonal, savePersonal, loadCreator, loadCreatorRules, saveCreatorRules, saveCreatorRoom, saveCreatorBots, type NetworkControls } from './setupPersistence';
 import type { NetworkMode } from './protocol';
 import { teamScores } from '../simulation/competition';
+import { decodeMatchState } from '../simulation/match';
+import type { GameAudio } from '../audio/GameAudio';
 import './lobbyRoster.css';
 const escape=(v:string)=>v.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));
 const aiLabels={easy:'Лёгкий',medium:'Средний',hard:'Сложный',expert:'Эксперт'};
@@ -29,6 +31,7 @@ const phaseLabel={waiting:'Ожидание',countdown:'Старт',playing:'И�
 type Controls = NetworkControls;
 export class NetworkApp {
   private session:NetworkMatchSession|null=null;
+  private audioGeneration:string|null=null;
   private credential=loadCredential();
   private game:Phaser.Game|null=null;
   private arenaElement:HTMLElement|null=null;
@@ -50,7 +53,7 @@ export class NetworkApp {
   private listBusy=false;
   private listOffset=0;
   private storageAvailable=true;
-  constructor(private root:HTMLElement,private onMenu:()=>void) {
+  constructor(private root:HTMLElement,private onMenu:()=>void,private audio?:Pick<GameAudio,'syncNetworkAnomalies'>) {
     this.root.classList.add('network-root');
     window.addEventListener('keydown',this.keyDown);window.addEventListener('keyup',this.keyUp);
     window.addEventListener('deviceorientation',this.sensor);
@@ -209,6 +212,11 @@ export class NetworkApp {
     if(!session.active){this.destroyArena();this.view='ended';this.credential=null;
       this.shell('Сессия завершена',`<p>${escape(session.status)}</p>${this.button('Список лобби','list')}`);return;}
     if(!snapshot){this.status(session.status);return;}
+    if(snapshot.state) {
+      const generation=`${snapshot.matchId}:${snapshot.connectionEpoch}`;
+      this.audio?.syncNetworkAnomalies(decodeMatchState(snapshot.state),generation!==this.audioGeneration);
+      this.audioGeneration=generation;
+    } else this.audioGeneration=null;
     if(snapshot.state && snapshot.state.phase!=='results') {
       if(this.view!=='arena')this.arena();
       this.updateArena();return;

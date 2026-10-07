@@ -4,6 +4,7 @@ import {
   COUNTDOWN_MS,
   CONFLICT_WARNING_MS,
   ANOMALY_BURN_PULSE_MS,
+  ANOMALY_ARRIVAL_BURN_MS,
   DEFAULT_DURATION_MINUTES,
   FINAL_PUSH_PULSE_MS,
   FIXED_STEP_MS,
@@ -758,7 +759,7 @@ describe('match engine', () => {
     expect(engine.state.participants.every((participant) => participant.board.nextPiece.source === 'anomaly')).toBe(true);
   });
 
-  it('queues the same anomaly next for every survivor without changing active pieces or the regular queue', () => {
+  it('freezes active pieces for the shared burn without consuming the deferred regular queue', () => {
     const engine = createFixture();
     engine.step(COUNTDOWN_MS);
     const activeIds = engine.state.participants.map((participant) => participant.board.active?.definition.id);
@@ -797,9 +798,6 @@ describe('match engine', () => {
     const anomaly = participant.board.nextPiece;
     engine.step(LEVEL_UP_PULSE_MS);
 
-    participant.board.active = activePiece('O', 0, 3, BOARD_HEIGHT - 2);
-    participant.board.lockElapsedMs = LOCK_DELAY_MS - FIXED_STEP_MS;
-    engine.step(FIXED_STEP_MS);
     expect(participant.board.active?.definition.id).toBe(anomaly.id);
     expect(participant.board.regularPieceIndex).toBe(1);
     expect(participant.board.nextPiece.classicKind).toBe(deferredRegular);
@@ -835,15 +833,12 @@ describe('match engine', () => {
     engine.state.participants[1]!.placedPieces = 15;
     engine.step(FIXED_STEP_MS);
     const anomaly = participant.board.nextPiece;
-    engine.step(LEVEL_UP_PULSE_MS);
     const spawnX = Math.floor((10 - (Math.max(...anomaly.rotations[0]!.map((cell) => cell.x)) + 1)) / 2);
     for (const cell of anomaly.rotations[0] ?? []) {
       const row = participant.board.grid[1 + cell.y];
       if (row) row[spawnX + cell.x] = 'J';
     }
-    participant.board.active = activePiece('O', 0, 3, BOARD_HEIGHT - 2);
-    participant.board.lockElapsedMs = LOCK_DELAY_MS - FIXED_STEP_MS;
-    engine.step(FIXED_STEP_MS);
+    engine.step(ANOMALY_ARRIVAL_BURN_MS);
     expect(participant.board.alive).toBe(false);
     expect(participant.eliminatedAtMs).toBe(engine.state.elapsedMs);
   });
@@ -863,85 +858,57 @@ describe('match engine', () => {
     expect(serializableState(first.state)).toBe(before);
   });
 
-  it('holds every board and gameplay clock for the complete shared level-up presentation', () => {
-    const engine = createFixture();
-    engine.step(COUNTDOWN_MS);
+  it('holds every board and gameplay clock for the complete one-second arrival burn', () => {
+    const engine = createFixture(); engine.step(COUNTDOWN_MS);
     const participant = engine.state.participants[0]!;
-    participant.board.softDrop = true;
-    participant.board.softDropElapsedMs = 40;
-    participant.placedPieces = 15;
-    const elapsedBeforeLevel = engine.state.elapsedMs;
-    const xBeforeHold = participant.board.active!.x;
-
+    participant.board.softDrop = true; participant.placedPieces = 15;
     engine.step(FIXED_STEP_MS);
-    expect(engine.state.globalEventHold).toMatchObject({ kind: 'level-up', remainingMs: LEVEL_UP_PULSE_MS, level: 1 });
-    expect(engine.state.phase).toBe('playing');
-    expect(engine.state.pauseReasons).toEqual([]);
+    expect(engine.state.anomalyTransition).toMatchObject({ phase: 'burning', remainingMs: 1000 });
+    expect(engine.acceptsGameplayInput()).toBe(false);
     expect(participant.board.softDrop).toBe(false);
-    const elapsedAtHold = engine.state.elapsedMs;
-    expect(elapsedAtHold).toBe(elapsedBeforeLevel + FIXED_STEP_MS);
-
-    engine.step(600, new Map([['p1', ['move-left']]]));
-    expect(engine.state.globalEventHold?.remainingMs).toBe(600);
-    expect(engine.state.elapsedMs).toBe(elapsedAtHold);
-    expect(participant.board.active?.x).toBe(xBeforeHold);
-
-    engine.pause('manual');
-    const pausedHold = engine.state.globalEventHold?.remainingMs;
-    engine.step(5_000);
-    expect(engine.state.globalEventHold?.remainingMs).toBe(pausedHold);
-    engine.resume('manual');
-    engine.step(600, new Map([['p1', ['move-left']]]));
-    expect(engine.state.globalEventHold).toBeNull();
-    expect(engine.state.elapsedMs).toBe(elapsedAtHold);
-    expect(participant.board.active?.x).toBe(xBeforeHold);
-
+    const elapsed = engine.state.elapsedMs; const x = participant.board.active!.x;
+    engine.step(500, new Map([['p1', ['move-left']]]));
+    expect(engine.state.anomalyTransition?.remainingMs).toBe(500);
+    expect(engine.state.elapsedMs).toBe(elapsed); expect(participant.board.active?.x).toBe(x);
+    engine.pause('manual'); engine.step(5000);
+    expect(engine.state.anomalyTransition?.remainingMs).toBe(500);
+    engine.resume('manual'); engine.step(500, new Map([['p1', ['move-left']]]));
+    expect(engine.state.anomalyTransition).toBeNull();
+    expect(engine.state.elapsedMs).toBe(elapsed);
+    expect(participant.board.active?.definition.source).toBe('anomaly');
+    const spawnX = participant.board.active!.x;
     engine.step(FIXED_STEP_MS, new Map([['p1', ['move-left']]]));
-    expect(engine.state.elapsedMs).toBe(elapsedAtHold + FIXED_STEP_MS);
-    expect(participant.board.active?.x).toBe(xBeforeHold - 1);
+    expect(participant.board.active?.x).toBe(spawnX - 1);
+    expect(engine.state.elapsedMs).toBe(elapsed + FIXED_STEP_MS);
   });
 
-  it('suspends an automatic event hold under the independent hidden pause reason', () => {
-    const engine = createFixture();
-    engine.step(COUNTDOWN_MS);
-    engine.state.participants[0]!.placedPieces = 15;
-    engine.step(FIXED_STEP_MS);
-    engine.step(200);
-    const remaining = engine.state.globalEventHold?.remainingMs;
-    engine.pause('hidden');
-    engine.step(10_000);
-    expect(engine.state.globalEventHold?.remainingMs).toBe(remaining);
-    expect(engine.state.phase).toBe('paused');
-    engine.resume('hidden');
-    expect(engine.state.phase).toBe('playing');
-    engine.step(remaining ?? 0);
-    expect(engine.state.globalEventHold).toBeNull();
+  it('suspends anomaly burn under the independent hidden pause reason', () => {
+    const engine = createFixture(); engine.step(COUNTDOWN_MS);
+    engine.state.participants[0]!.placedPieces = 15; engine.step(FIXED_STEP_MS); engine.step(200);
+    const remaining = engine.state.anomalyTransition!.remainingMs;
+    engine.pause('hidden'); engine.step(10000);
+    expect(engine.state.anomalyTransition?.remainingMs).toBe(remaining);
+    engine.resume('hidden'); engine.step(remaining);
+    expect(engine.state.anomalyTransition).toBeNull();
   });
 
-  it('holds Final Push for two seconds, delays its first row, and coalesces a simultaneous level-up', () => {
-    const engine = new MatchEngine(humanPair(), 83, 2);
-    engine.step(COUNTDOWN_MS);
+  it('retains the separate Final Push hold when anomaly arrival coincides', () => {
+    const engine = new MatchEngine(humanPair(), 83, 2); engine.step(COUNTDOWN_MS);
     engine.state.elapsedMs = engine.state.pressureStartMs - 1;
-    engine.state.remainingMs = engine.state.durationMs - engine.state.elapsedMs;
     engine.state.participants[0]!.placedPieces = 15;
-    const nextPressureAtMs = engine.state.nextPressureAtMs;
-
+    const nextPressure = engine.state.nextPressureAtMs;
     engine.step(1);
-    expect(engine.state.globalEventHold).toEqual({
-      kind: 'final-push', remainingMs: FINAL_PUSH_PULSE_MS, durationMs: FINAL_PUSH_PULSE_MS, level: 1,
-    });
-    expect(engine.state.finalPushPulseMs).toBe(FINAL_PUSH_PULSE_MS);
-    const elapsedAtHold = engine.state.elapsedMs;
-
-    engine.step(FINAL_PUSH_PULSE_MS - 1);
-    expect(engine.state.globalEventHold?.remainingMs).toBe(1);
-    expect(engine.state.elapsedMs).toBe(elapsedAtHold);
-    expect(engine.state.nextPressureAtMs).toBe(nextPressureAtMs);
-    engine.step(1);
+    expect(engine.state.globalEventHold).toMatchObject({ kind: 'final-push', remainingMs: FINAL_PUSH_PULSE_MS });
+    expect(engine.state.anomalyTransition?.phase).toBe('burning');
+    const elapsed = engine.state.elapsedMs;
+    engine.step(ANOMALY_ARRIVAL_BURN_MS);
+    expect(engine.state.anomalyTransition).toBeNull();
+    expect(engine.state.globalEventHold?.remainingMs).toBe(FINAL_PUSH_PULSE_MS);
+    engine.step(FINAL_PUSH_PULSE_MS);
     expect(engine.state.globalEventHold).toBeNull();
-    expect(engine.state.finalPushPulseMs).toBe(0);
-
-    engine.step(nextPressureAtMs - elapsedAtHold - 1);
+    expect(engine.state.elapsedMs).toBe(elapsed);
+    expect(engine.state.nextPressureAtMs).toBe(nextPressure);
+    engine.step(nextPressure - elapsed - 1);
     expect(engine.state.pressureRows).toBe(0);
     engine.step(1);
     expect(engine.state.pressureRows).toBe(1);

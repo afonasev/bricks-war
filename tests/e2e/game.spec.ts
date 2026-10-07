@@ -76,19 +76,14 @@ test('keeps a one-player Survival surface tightly around the maximum-height boar
   await expect(page.locator('#results-layer')).toBeHidden();
 });
 
-test('keeps a Survival anomaly notice mounted while its event timer counts down', async ({ page }) => {
+test('does not mount a Survival anomaly-arrival notice', async ({ page }) => {
   await page.goto('/?muted=1&playtest-survival-level-up=1');
   await page.getByRole('button', { name: /^Выживание/ }).click();
   await page.getByRole('button', { name: 'Начать' }).click();
-
-  const notice = page.locator('.player-event-notice').first();
-  await expect(notice).toContainText('Ждите Аномалию');
-  const initialHandle = await notice.elementHandle();
-  expect(initialHandle).not.toBeNull();
-  if (!initialHandle) throw new Error('Survival anomaly notice did not mount');
+  await expect(page.locator('#countdown')).toBeHidden({ timeout: 6000 });
   await page.waitForTimeout(450);
-
-  expect(await initialHandle.evaluate((element) => element.isConnected)).toBe(true);
+  await expect(page.locator('[data-event-kind="level-up"]')).toHaveCount(0);
+  await expect(page.locator('.player-event-notice')).toHaveCount(0);
 });
 
 test('counts down the selected duration in competitive modes and freezes on pause', async ({ page }) => {
@@ -144,7 +139,7 @@ test('uses approved sender-colored attack copy without resizing a field', async 
   expect(await target.boundingBox()).toEqual(before);
 });
 
-test('coalesces Final Push and level-up into one timed global plaque without opening pause UI', async ({ page }) => {
+test('shows Final Push without anomaly copy in the timed global plaque without opening pause UI', async ({ page }) => {
   await resetAndOpen(page, 'Битва', '?muted=1&playtest-global-combined');
   await page.getByRole('combobox', { name: 'Длительность матча', exact: true }).click();
   await page.getByRole('option', { name: /5 мин$/ }).click();
@@ -155,7 +150,7 @@ test('coalesces Final Push and level-up into one timed global plaque without ope
   const plaque = page.locator('#arena-event-notice');
   await expect(plaque).toBeVisible({ timeout: 6_000 });
   await expect(plaque).toContainText('Финальный рывок');
-  await expect(plaque).toContainText('Уровень 2');
+  await expect(plaque).not.toContainText('Уровень');
   await expect(plaque.locator('.match-event-icon')).toHaveAttribute('data-icon', 'pressure');
   await expect(page.locator('#pause-overlay')).toBeHidden();
   const clock = await page.locator('#match-clock').textContent();

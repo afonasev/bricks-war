@@ -145,6 +145,16 @@ export interface LevelUpEventState {
   pulseMs: number;
 }
 
+/** Authoritative shared arrival; unfinished pieces remain frozen until removal. */
+export interface AnomalyTransitionState {
+  serial: number;
+  phase: 'clearing' | 'burning';
+  remainingMs: number;
+  durationMs: number;
+  levels: number[];
+  targets: { participantId: string; piece: ActivePiece }[];
+}
+
 export interface LockEventState {
   participantId: string;
   lines: number;
@@ -257,6 +267,9 @@ export interface MatchState {
   finalPushPulseMs: number;
   globalEventHold: GlobalEventHoldState | null;
   levelUpEvent: LevelUpEventState | null;
+  anomalyTransition: AnomalyTransitionState | null;
+  anomalyTransitionSerial: number;
+  anomalyArrivalSerial: number;
   lockEvents: LockEventState[];
   pendingConflict: ConflictBatchState | null;
   conflictImpactEvent: ConflictImpactEventState | null;

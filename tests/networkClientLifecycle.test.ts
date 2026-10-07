@@ -95,3 +95,20 @@ it('snapshot between heartbeat ticks resets the exact six-second downstream dead
     vi.advanceTimersByTime(5999);expect(close).not.toHaveBeenCalled();vi.advanceTimersByTime(1);expect(close).toHaveBeenCalledOnce();
   }finally{session.dispose();setNetworkParticipation(false);vi.unstubAllGlobals();vi.useRealTimers();}
 });
+
+it('does not replay pending prediction or held controls over an authoritative arrival freeze',async()=>{
+  const f=await playingSession();
+  try {
+    f.session.controls({left:true,right:false,down:true});
+    const snapshot=f.service.snapshot(f.guest.room,f.guest.seat);
+    const state=snapshot.state!;const participant=state.participants.find(p=>p.config.id===snapshot.ownId)!;
+    const pose=structuredClone(participant.board.active!);
+    state.anomalyTransition={serial:1,phase:'burning',remainingMs:500,durationMs:1000,levels:[1],targets:[{participantId:snapshot.ownId,piece:pose}]};
+    f.raw.confirm(snapshot);
+    expect(f.session.acceptsGameplayInput()).toBe(false);
+    expect(f.session.state.participants[0]!.board.active).toEqual(pose);
+    const sent=f.sent.length;f.session.controls({left:false,right:true,down:false});f.session.step();
+    expect(f.sent).toHaveLength(sent);
+    f.raw.confirm(snapshot);expect(f.session.state.participants[0]!.board.active).toEqual(pose);
+  } finally {f.cleanup();}
+});

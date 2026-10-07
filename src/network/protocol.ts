@@ -1,7 +1,7 @@
 import type { AiDifficulty, BattleDifficulty, SoftDropPreset, TileStyleSelection, MatchOptionSelections, TeamId } from '../domain/types';
 import type { EncodedMatchState } from '../simulation/match';
 export const PROTOCOL_VERSION = 2;
-export const RULES_VERSION = 'network-modes-5';
+export const RULES_VERSION = 'network-modes-6';
 export const RETURN_WINDOW_MS = 30_000;
 export const HEARTBEAT_MS = 2_000;
 export const HEALTH_TIMEOUT_MS = 6_000;

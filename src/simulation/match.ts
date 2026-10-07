@@ -61,6 +61,7 @@ export const SOLO_PRESSURE_INTERVAL_DECREMENT_MS = 1_000;
 export const PRESSURE_PULSE_MS = 650;
 export const ROUND_START_PULSE_MS = 1100;
 export const LEVEL_UP_PULSE_MS = 1200;
+export const ANOMALY_ARRIVAL_BURN_MS = 1000;
 export const CONFLICT_WARNING_MS = 3000;
 export const CONFLICT_IMPACT_PULSE_MS = 700;
 export const MIN_CONFLICT_NOTICE_MS = 2_000;
@@ -177,7 +178,7 @@ export function decodeMatchState(state: EncodedMatchState): MatchState {
 }
 
 export interface EngineCheckpoint {
-  version: 3;
+  version: 4;
   execution: 'local' | 'network';
   state: EncodedMatchState;
   sequence: ReturnType<PieceSequence['checkpoint']>;
@@ -208,6 +209,8 @@ export class MatchEngine {
   private resolvedClearParticipantIds = new Set<string>();
   private pendingClears = new Map<string, PendingClear>();
   private deferredPressureRows = new Map<string, number>();
+  // Exists only inside one synchronous step; checkpoints never capture an unfinished step.
+  private stepSpawns = new Map<string, ParticipantState['board']['nextPiece']>();
 
   constructor(
     configs: readonly ParticipantConfig[],
@@ -261,6 +264,9 @@ export class MatchEngine {
       finalPushPulseMs: 0,
       globalEventHold: null,
       levelUpEvent: null,
+      anomalyTransition: null,
+      anomalyTransitionSerial: 0,
+      anomalyArrivalSerial: 0,
       lockEvents: [],
       pendingConflict: null,
       conflictImpactEvent: null,
@@ -300,7 +306,7 @@ export class MatchEngine {
   }
 
   checkpoint(): EngineCheckpoint {
-    return structuredClone({ version: 3, execution: this.execution, state: encodeMatchState(this.state),
+    return structuredClone({ version: 4, execution: this.execution, state: encodeMatchState(this.state),
       sequence: this.sequence.checkpoint(), phaseBeforePause: this.phaseBeforePause,
       nonAttackLockIds: [...this.nonAttackLockIds], resolvedAnomalyBurnParticipantIds: [...this.resolvedAnomalyBurnParticipantIds],
       resolvedClearParticipantIds: [...this.resolvedClearParticipantIds], pendingClears: [...this.pendingClears],
@@ -308,7 +314,7 @@ export class MatchEngine {
   }
 
   static restore(checkpoint: EngineCheckpoint): MatchEngine {
-    if (checkpoint.version !== 3) throw new Error('Unsupported checkpoint version');
+    if (checkpoint.version !== 4) throw new Error('Unsupported checkpoint version');
     const state = decodeMatchState(checkpoint.state);
     const engine = new MatchEngine(state.participants.map((p) => p.config), state.seed,
       Number.isFinite(state.durationMs) ? state.durationMs / 60_000 : DEFAULT_DURATION_MINUTES,
@@ -348,6 +354,11 @@ export class MatchEngine {
       return;
     }
 
+    if (this.state.anomalyTransition) {
+      this.advanceAnomalyTransition(deltaMs);
+      return;
+    }
+
     if (this.state.globalEventHold) {
       this.advanceGlobalEventHold(deltaMs);
       return;
@@ -357,12 +368,18 @@ export class MatchEngine {
       this.nonAttackLockIds.clear();
       this.state.lockEvents = this.tickPresentation(deltaMs).sort((a, b) => a.participantId.localeCompare(b.participantId));
       this.collectConflictAttacks(this.state.lockEvents);
+      for (const [id, next] of this.stepSpawns) {
+        const p = this.state.participants.find((p) => p.config.id === id);
+        if (p?.board.alive) this.spawnAfterLock(p, next);
+      }
+      this.stepSpawns.clear();
       this.advancePendingConflict(deltaMs);
       this.updateSurvivalTimes();
       this.resolveOutcomeWhenReady();
       return;
     }
 
+    this.stepSpawns.clear();
     const previousElapsedMs = this.state.elapsedMs;
     this.state.elapsedMs = this.state.isSurvival ? this.state.elapsedMs + deltaMs : Math.min(this.state.durationMs, this.state.elapsedMs + deltaMs);
     this.state.remainingMs = Math.max(0, this.state.durationMs - this.state.elapsedMs);
@@ -395,9 +412,12 @@ export class MatchEngine {
 
     this.state.maxPlacedPieces = Math.max(
       this.state.maxPlacedPieces,
-      ...this.state.participants.map((participant) => participant.placedPieces),
+      ...this.state.participants.map((participant) => participant.placedPieces
+        + (!this.state.isSurvival && this.pendingClears.get(participant.config.id)?.stage === 'playable' ? 1 : 0)),
     );
     const nextGravityLevel = Math.floor(this.state.maxPlacedPieces / this.options.piecesPerLevel);
+    // Preserve the ordinary spawn-before-pressure order outside a shared level transition.
+    if (nextGravityLevel <= previousGravityLevel) this.flushStepSpawns();
 
     while (
       (this.state.isSurvival || this.state.nextPressureAtMs < this.state.durationMs)
@@ -438,6 +458,8 @@ export class MatchEngine {
     this.state.gravityLevel = nextGravityLevel;
     this.state.gravityIntervalMs = gravityIntervalFor(nextGravityLevel, this.options);
 
+    if (!this.state.anomalyTransition) this.flushStepSpawns();
+    this.stepSpawns.clear();
     this.updateSurvivalTimes();
     this.resolveOutcomeWhenReady();
   }
@@ -467,7 +489,7 @@ export class MatchEngine {
   }
 
   acceptsGameplayInput(): boolean {
-    return this.state.phase === 'playing' && this.state.globalEventHold === null;
+    return this.state.phase === 'playing' && this.state.globalEventHold === null && this.state.anomalyTransition === null;
   }
 
   private startGlobalEventHold(kind: GlobalEventKind, durationMs: number, level?: number): void {
@@ -623,9 +645,22 @@ export class MatchEngine {
     }
     participant.placedPieces += 1;
     this.recordLineClearStreak(participant, 0, source);
-    this.spawnAfterLock(participant, current);
+    this.scheduleSpawnAfterLock(participant, current);
     if (underAttack || cleanupCapacity > 0 || source === 'anomaly') this.nonAttackLockIds.add(participant.config.id);
     return { participantId: participant.config.id, lines, source };
+  }
+
+  private scheduleSpawnAfterLock(participant: ParticipantState, current: ParticipantState['board']['nextPiece']): void {
+    if (this.state.isSurvival) this.spawnAfterLock(participant, current);
+    else this.stepSpawns.set(participant.config.id, current);
+  }
+
+  private flushStepSpawns(): void {
+    for (const [id, next] of this.stepSpawns) {
+      const participant = this.state.participants.find((p) => p.config.id === id);
+      if (participant?.board.alive) this.spawnAfterLock(participant, next);
+    }
+    this.stepSpawns.clear();
   }
 
   private spawnAfterLock(participant: ParticipantState, current: ParticipantState['board']['nextPiece']): void {
@@ -764,7 +799,7 @@ export class MatchEngine {
     const pressureRows = this.deferredPressureRows.get(participantId) ?? 0;
     this.deferredPressureRows.delete(participantId);
     if (pressureRows > 0) addGrayRows(participant.board, pressureRows);
-    if (participant.board.alive) this.spawnAfterLock(participant, pending.nextPiece);
+    if (participant.board.alive && !this.state.anomalyTransition) this.scheduleSpawnAfterLock(participant, pending.nextPiece);
   }
 
   private beginClearPresentation(
@@ -944,6 +979,11 @@ export class MatchEngine {
   }
 
   private resolveOutcomeWhenReady(): void {
+    this.resolveOutcome();
+    if (this.state.phase === 'results') this.state.anomalyTransition = null;
+  }
+
+  private resolveOutcome(): void {
     if (this.pendingClears.size > 0) return;
     if (this.hasPendingImpactForAliveParticipant()) return;
     if (this.state.isSurvival) {
@@ -1011,7 +1051,7 @@ export class MatchEngine {
       const board = participant.board;
       if (!board.alive) continue;
       board.pendingAnomalies.push(anomaly);
-      if (board.pendingAnomalies.length === 1 && !this.pendingClears.has(participant.config.id)) {
+      if (board.pendingAnomalies.length === 1 && (!this.state.isSurvival || !this.pendingClears.has(participant.config.id))) {
         board.nextPiece = anomaly;
         board.staticRenderRevision += 1;
       }
@@ -1033,7 +1073,64 @@ export class MatchEngine {
         };
       }
     }
-    if (!this.state.isSurvival) this.startGlobalEventHold('level-up', LEVEL_UP_PULSE_MS, level);
+    if (!this.state.isSurvival) {
+      if (this.state.anomalyTransition) this.state.anomalyTransition.levels.push(level);
+      else {
+        this.state.anomalyTransitionSerial += 1;
+        this.state.anomalyTransition = {
+          serial: this.state.anomalyTransitionSerial,
+          phase: 'clearing', remainingMs: ANOMALY_ARRIVAL_BURN_MS, durationMs: ANOMALY_ARRIVAL_BURN_MS,
+          levels: [level],
+          targets: this.state.participants.filter((p) => p.board.alive && p.board.active)
+            .map((p) => ({ participantId: p.config.id, piece: structuredClone(p.board.active!) })),
+        };
+        for (const p of this.state.participants) { p.board.softDrop = false; p.board.softDropElapsedMs = 0; }
+        this.beginAnomalyBurnWhenReady();
+      }
+    }
+  }
+
+  private beginAnomalyBurnWhenReady(): void {
+    const transition = this.state.anomalyTransition;
+    if (!transition || this.pendingClears.size > 0 || this.state.cleanupEvents.length > 0) return;
+    transition.targets = this.state.participants.filter((p) => p.board.alive && p.board.active)
+      .map((p) => ({ participantId: p.config.id, piece: structuredClone(p.board.active!) }));
+    transition.phase = 'burning';
+    transition.remainingMs = transition.durationMs;
+  }
+
+  private advanceAnomalyTransition(deltaMs: number): void {
+    const transition = this.state.anomalyTransition;
+    if (!transition) return;
+    if (transition.phase === 'clearing') {
+      this.nonAttackLockIds.clear();
+      this.resolvedClearParticipantIds.clear();
+      this.resolvedAnomalyBurnParticipantIds.clear();
+      this.state.lockEvents = this.tickPresentation(deltaMs);
+      this.collectConflictAttacks(this.state.lockEvents);
+      this.beginAnomalyBurnWhenReady();
+      this.updateSurvivalTimes();
+      this.resolveOutcomeWhenReady();
+      return;
+    }
+    transition.remainingMs = Math.max(0, transition.remainingMs - deltaMs);
+    if (transition.remainingMs > 0.001) return;
+    let appeared = false;
+    for (const participant of this.state.participants) {
+      if (!participant.board.alive) continue;
+      participant.board.active = null;
+      const anomaly = participant.board.pendingAnomalies[0];
+      if (anomaly) {
+        this.spawnAfterLock(participant, anomaly);
+        appeared ||= participant.board.alive;
+      }
+    }
+    if (appeared) this.state.anomalyArrivalSerial += 1;
+    this.state.anomalyTransition = null;
+    if (this.state.levelUpEvent) this.state.levelUpEvent.pulseMs = 0;
+    this.state.lockEvents = [];
+    this.updateSurvivalTimes();
+    this.resolveOutcomeWhenReady();
   }
 
   private resolveSurvivalOutcome(): void {

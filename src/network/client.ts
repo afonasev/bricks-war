@@ -123,7 +123,9 @@ export class NetworkMatchSession implements MatchSession {
     this.pending=this.pending.filter(p=>p.input.sequence>snapshot.inputAck);
     if(this.recoverySequence!==null&&snapshot.inputAck>=this.recoverySequence)this.recoverySequence=null;
     this.predicted = snapshot.state ? decodeMatchState(snapshot.state) : null;
-    this.applyPrediction(this.journal.reconcile(snapshot.inputAck,snapshot.repeatSequence,snapshot.repeatOrdinal));
+    if (snapshot.state?.anomalyTransition || snapshot.state?.globalEventHold) {
+      this.journal.reset();this.repeat.reset();this.held={...EMPTY_HELD};this.onResetInput();
+    } else this.applyPrediction(this.journal.reconcile(snapshot.inputAck,snapshot.repeatSequence,snapshot.repeatOrdinal));
     this.repeat.acknowledge(snapshot.repeatSequence,snapshot.repeatOrdinal);
     for (const event of snapshot.events) this.seenEvents.add(event.id);
     if (this.seenEvents.size>128) this.seenEvents=new Set(snapshot.events.map(e=>e.id));
@@ -141,7 +143,7 @@ export class NetworkMatchSession implements MatchSession {
   acceptsGameplayInput(): boolean {
     const s=this.snapshot;
     return !document.hidden && this.socket?.readyState===WebSocket.OPEN && this.status==='Подключено'
-      && s?.state?.phase==='playing' && !s.state.globalEventHold
+      && s?.state?.phase==='playing' && !s.state.globalEventHold && !s.state.anomalyTransition
       && !!s.seats.find(p=>p.id===s.ownId)?.connected
       && !!s.state.participants.find(p=>p.config.id===s.ownId)?.board.alive;
   }
@@ -164,6 +166,7 @@ export class NetworkMatchSession implements MatchSession {
     this.journal.record(actions,this.repeat.holdSequence,ordinal,now);this.applyPrediction(actions);
   }
   private applyPrediction(actions: readonly string[]): void {
+    if (this.predicted?.anomalyTransition || this.predicted?.globalEventHold) return;
     const board=this.predicted?.participants.find(p=>p.config.id===this.credential.participantId)?.board;
     if (!board?.active) return;
     for (const action of actions) {

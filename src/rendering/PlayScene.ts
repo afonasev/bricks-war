@@ -1,3 +1,4 @@
+import { airborneBurnCells } from './airborneBurn';
 import * as Phaser from 'phaser/dist/phaser.esm.js';
 import { HumanInputRouter, isCapturedGameKey, isManualPauseKey } from '../controllers/input';
 import { connectedGamepads, gamepadControls } from '../controllers/gamepads';
@@ -76,6 +77,8 @@ export interface PlayRuntime {
   onFinished: (state: MatchState) => void;
   mobileSolo?: boolean;
   mobileTiltControls?: boolean;
+  /** Local visual QA stops after reaching this real burn progress; no pause overlay. */
+  captureAnomalyBurnAtMs?: number;
 }
 
 function playtestSimulationScale(): number {
@@ -147,7 +150,11 @@ export class PlayScene extends Phaser.Scene {
       return;
     }
     const state = this.runtime.engine.state;
-    this.runtime.input.setEnabled(this.runtime.engine.acceptsGameplayInput(), state.globalEventHold !== null);
+    if (this.runtime.captureAnomalyBurnAtMs !== undefined && state.anomalyTransition?.phase === 'burning'
+      && state.anomalyTransition.remainingMs <= this.runtime.captureAnomalyBurnAtMs) {
+      this.runtime.onState(state);this.renderState();return;
+    }
+    this.runtime.input.setEnabled(this.runtime.engine.acceptsGameplayInput(), state.globalEventHold !== null || state.anomalyTransition !== null);
     this.pollGamepads();
     const wallClockMs = Date.now();
     const wallDeltaMs = Math.max(0, Math.min(1_000, wallClockMs - this.lastWallClockMs));
@@ -170,6 +177,7 @@ export class PlayScene extends Phaser.Scene {
     const catchUp = fixedStepCatchUp(this.accumulator, FIXED_STEP_MS, MAX_FIXED_STEPS_PER_RENDER * this.simulationScale);
     for (let step = 0; step < catchUp.steps; step += 1) {
       const before = this.activePieceInterpolation.snapshot(state.participants);
+      this.runtime.input.setEnabled(this.runtime.engine.acceptsGameplayInput(), !!state.globalEventHold || !!state.anomalyTransition);
       this.runtime.input.step(FIXED_STEP_MS);
       const actions = this.collectActions();
       this.runtime.engine.step(FIXED_STEP_MS, actions);
@@ -425,9 +433,16 @@ export class PlayScene extends Phaser.Scene {
       }
     }
 
-    if (participant.board.active) {
+    const arrival = this.runtime.engine.state.anomalyTransition;
+    const burnTarget = arrival?.phase === 'burning'
+      ? arrival.targets.find((target) => target.participantId === participant.config.id)?.piece
+      : null;
+    if (burnTarget && participant.board.alive) {
+      this.drawAirborneBurn(burnTarget, participant, boardX, boardY, cellSize, 1 - arrival!.remainingMs / arrival!.durationMs);
+    }
+    if (participant.board.active && !burnTarget) {
       const ghost = landingPiece(participant.board.grid, participant.board.active);
-      if (ghost && ghost.y !== participant.board.active.y) {
+      if (!arrival && ghost && ghost.y !== participant.board.active.y) {
         for (const cell of pieceCells(ghost)) {
           const visibleY = cell.y - HIDDEN_ROWS;
           if (visibleY >= 0 && visibleY < VISIBLE_HEIGHT) {
@@ -444,7 +459,7 @@ export class PlayScene extends Phaser.Scene {
           }
         }
       }
-      const renderedActive = this.activePieceInterpolation.renderPiece(
+      const renderedActive = arrival ? participant.board.active : this.activePieceInterpolation.renderPiece(
         participant,
         this.accumulator / FIXED_STEP_MS,
         this.calmEffects,
@@ -543,6 +558,34 @@ export class PlayScene extends Phaser.Scene {
       this.drawFireBand(participant.config.id, boardX, bandY, cellSize, burn.rows.length, progress);
     } else {
       this.fireBands.get(participant.config.id)?.image.setVisible(false);
+    }
+  }
+
+  private drawAirborneBurn(piece: NonNullable<ParticipantState['board']['active']>, participant: ParticipantState,
+    boardX: number, boardY: number, size: number, progress: number): void {
+    for (const cell of airborneBurnCells(piece, progress, this.calmEffects)) {
+      const y = cell.y - HIDDEN_ROWS;
+      if (y < 0 || y >= VISIBLE_HEIGHT) continue;
+      const x = boardX + cell.x * size;
+      const py = boardY + y * size;
+      if (cell.remaining > 0) drawStyledTile(this.graphics, {
+        style: participant.resolvedTileStyle, kind: piece.definition.settledKind,
+        x, y: py, size, color: pieceColor(piece.definition), alpha: cell.remaining, state: 'active',
+      });
+      if (cell.heat <= 0 || (this.calmEffects && cell.remaining === 0)) continue;
+      const heat = cell.heat;
+      const frontY = py + size * cell.remaining;
+      this.graphics.fillStyle(0xff6b16, heat * 0.32);
+      this.graphics.fillRoundedRect(x - size * 0.08, py - size * 0.06, size * 1.16, size * 1.12, size * 0.22);
+      this.graphics.fillStyle(0xffa325, heat * 0.95);
+      this.graphics.fillRoundedRect(x + size * 0.08, Math.min(py + size * 0.7, frontY - size * 0.2), size * 0.84, size * 0.3, size * 0.12);
+      this.graphics.fillStyle(0xfff0a4, heat);
+      this.graphics.fillRect(x + size * 0.15, Math.min(py + size * 0.88, frontY - size * 0.08), size * 0.7, size * 0.09);
+      if (!this.calmEffects) for (let ember = 0; ember < 3; ember += 1) {
+        const rise = (progress * 3 + ember * 0.31 + cell.x * 0.13) % 1;
+        this.graphics.fillStyle(ember === 0 ? 0xffef9c : 0xff8730, heat * (1 - rise));
+        this.graphics.fillCircle(x + size * (0.2 + ember * 0.29), Math.max(boardY, py - rise * size * 0.6), size * 0.035);
+      }
     }
   }
 

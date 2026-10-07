@@ -36,6 +36,7 @@ interface AudioSnapshot {
   countdownSecond: number;
   finalSecond: number;
   levelEventSerial: number;
+  anomalyArrivalSerial: number;
   participants: Map<string, ParticipantAudioSnapshot>;
   phase: MatchPhase;
   pressureRows: number;
@@ -58,6 +59,7 @@ function takeSnapshot(state: MatchState): AudioSnapshot {
     countdownSecond: state.countdownMs > 0 ? Math.max(1, Math.ceil(state.countdownMs / 1000)) : 0,
     finalSecond: Math.ceil(state.remainingMs / 1000),
     levelEventSerial: state.levelUpEvent?.serial ?? 0,
+    anomalyArrivalSerial: state.anomalyArrivalSerial,
     participants: new Map(state.participants.map((participant) => [participant.config.id, {
       alive: participant.board.alive,
       placedPieces: participant.placedPieces,
@@ -102,11 +104,8 @@ export class AudioEventTracker {
     }
     if (previous.phase === 'countdown' && current.phase === 'playing') events.push({ type: 'round-start' });
 
-    if (!state.isSurvival && current.levelEventSerial > previous.levelEventSerial) {
-      for (let serial = previous.levelEventSerial + 1; serial <= current.levelEventSerial; serial += 1) {
-        const levelsBehind = current.levelEventSerial - serial;
-        events.push({ type: 'level-up', level: Math.max(1, state.gravityLevel - levelsBehind), pan: 0 });
-      }
+    if (!state.isSurvival && current.anomalyArrivalSerial > previous.anomalyArrivalSerial) {
+      events.push({ type: 'anomaly-spawn', pan: 0 });
     }
     if (current.pressureRows > previous.pressureRows) events.push({ type: 'pressure' });
     if (current.finalPushSerial > previous.finalPushSerial) events.push({ type: 'final-push' });
@@ -177,12 +176,6 @@ export class AudioEventTracker {
       const before = previous.participants.get(participant.config.id);
       if (!before) return;
       const pan = participantPan(index, state.participants.length);
-      if (state.isSurvival && participant.levelUpEvent && before.levelUpEventSerial < participant.levelUpEvent.serial) {
-        for (let serial = before.levelUpEventSerial + 1; serial <= participant.levelUpEvent.serial; serial += 1) {
-          const levelsBehind = participant.levelUpEvent.serial - serial;
-          events.push({ type: 'level-up', level: Math.max(1, participant.levelUpEvent.level - levelsBehind), pan });
-        }
-      }
       const active = participant.board.active;
       if (
         active
@@ -196,7 +189,7 @@ export class AudioEventTracker {
         events.push({ type: 'lock', pan });
       }
       if (
-        active?.definition.source === 'anomaly'
+        state.isSurvival && active?.definition.source === 'anomaly'
         && participant.board.spawnSerial > before.spawnSerial
       ) {
         events.push({ type: 'anomaly-spawn', pan });

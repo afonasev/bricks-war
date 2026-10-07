@@ -78,15 +78,16 @@ describe('game audio events', () => {
     engine.state.pressureRows = 1;
     engine.state.levelUpEvent = { serial: 1, level: 1, anomalyId: 'anomaly-1', pulseMs: 1000 };
     engine.state.gravityLevel = 1;
+    engine.state.anomalyArrivalSerial = 1;
 
     const eventTypes = tracker.sync(engine.state).map((event) => event.type);
     expect(eventTypes).toEqual(expect.arrayContaining([
-      'lock', 'clear-impact', 'anomaly-spawn', 'pressure', 'level-up', 'eliminated',
+      'lock', 'clear-impact', 'anomaly-spawn', 'pressure', 'eliminated',
     ]));
     expect(tracker.sync(engine.state).filter((event) => event.type === 'clear-impact')).toEqual([]);
   });
 
-  it('pans a Survival level-up cue to the participant who triggered it', () => {
+  it('waits for actual Survival anomaly spawn before sounding the alarm', () => {
     const engine = new MatchEngine(configs, 27, 5, {}, null, true);
     engine.step(3_000);
     const tracker = new AudioEventTracker();
@@ -94,7 +95,11 @@ describe('game audio events', () => {
     engine.state.participants[1]!.placedPieces = 15;
     engine.step(1);
 
-    expect(tracker.sync(engine.state)).toContainEqual({ type: 'level-up', level: 1, pan: 0.72 });
+    const queued = tracker.sync(engine.state);
+    expect(queued.some((e) => e.type === 'level-up' || e.type === 'anomaly-spawn')).toBe(false);
+    const p = engine.state.participants[1]!;
+    p.board.active!.definition = generateAnomaly(engine.state.seed, 1);p.board.spawnSerial += 1;
+    expect(tracker.sync(engine.state)).toContainEqual({ type: 'anomaly-spawn', pan: 0.72 });
   });
 
   it('emits conflict launch, impact, and cleanup once from their serials', () => {

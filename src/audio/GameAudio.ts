@@ -95,6 +95,7 @@ export class GameAudio {
   private previewing = false;
   private readonly previewSources: AudioScheduledSourceNode[] = [];
   private readonly tracker = new AudioEventTracker();
+  private readonly networkAnomalyTracker = new AudioEventTracker();
 
   constructor(initialMuted = false, levels: { music?: number; effects?: number; sfxPreset?: SfxPresetId } = {}) {
     this.muted = initialMuted;
@@ -228,6 +229,13 @@ export class GameAudio {
       this.playCountdown(start + 2.26, 3, false); this.playRoundStart(start + 2.56);
     }
     this.previewing = false;
+  }
+
+  /** Network arena uses full authoritative state; reconnect establishes a silent baseline. */
+  syncNetworkAnomalies(state: MatchState, baseline = false): void {
+    if (baseline) this.networkAnomalyTracker.reset();
+    const events = this.networkAnomalyTracker.sync(state);
+    if (!baseline) for (const event of events) if (event.type === 'anomaly-spawn') this.playEvent(event);
   }
 
   sync(state: MatchState): void {
@@ -581,12 +589,12 @@ export class GameAudio {
   }
 
   private playAnomaly(start: number, pan: number): void {
-    if (this.playPackEvent('anomaly-spawn', start, pan)) return;
-    [880, 1174.66, 1567.98].forEach((frequency, index) => {
-      this.tone(frequency, start + index * 0.052, 0.5 - index * 0.06, 0.065, 'sine', pan, 4200, undefined, 0.018);
-    });
-    this.tone(220, start, 0.46, 0.045, 'sawtooth', pan, 980, undefined, 0.02, 440);
-    this.noise(start + 0.04, 0.38, 0.028, 'bandpass', 3100, pan);
+    // One common alarm motif across presets; all tones still use the Effects bus.
+    for (let index = 0; index < 3; index += 1) {
+      const at = start + index * 0.28;
+      this.tone(620, at, 0.24, 0.085, 'triangle', pan, 2400, undefined, 0.015, 980, false);
+      this.tone(310, at, 0.24, 0.032, 'sine', pan, 1400, undefined, 0.015, 490, false);
+    }
   }
 
   private playPressure(start: number): void {

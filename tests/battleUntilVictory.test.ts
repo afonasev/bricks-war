@@ -84,7 +84,7 @@ describe('Battle until victory', () => {
     engine.step(1);
     expect(engine.state.participants.map((participant) => participant.gravityLevel)).toEqual([1, 1]);
     expect(engine.state.participants.every((participant) => participant.board.pendingAnomalies.length === 1)).toBe(true);
-    expect(engine.state.globalEventHold?.kind).toBe('level-up');
+    expect(engine.state.anomalyTransition?.phase).toBe('burning');
   });
 
   it('retains attacks and waits for their pending impact before declaring victory', () => {

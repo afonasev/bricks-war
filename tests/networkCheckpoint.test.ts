@@ -14,9 +14,9 @@ function continueBoth(engine: MatchEngine, restored: MatchEngine, steps = 500) {
   }
 }
 describe('complete engine checkpoint', () => {
-  it('rejects checkpoints from the old shield rules', () => {
+  it.each([2, 3])('rejects checkpoint version %s before the shared arrival contract', (version) => {
     const engine = new MatchEngine(humanPair(), 1);
-    const old = { ...engine.checkpoint(), version: 2 };
+    const old = { ...engine.checkpoint(), version };
     expect(() => MatchEngine.restore(old as unknown as ReturnType<MatchEngine['checkpoint']>)).toThrow('Unsupported checkpoint version');
   });
   it('round trips countdown, preparation, progression/anomaly, pressure and pause', () => {

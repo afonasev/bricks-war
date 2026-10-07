@@ -103,7 +103,7 @@ it('network mixed validation and checkpoint replay preserve seeded AI decisions'
   expect(validateNetworkSurvivalParticipants([configs[2]!])).not.toEqual([]);
   const a=new MatchEngine(configs,9,5,{},null,true,'network');
   const bot=a.state.participants[2]!;bot.board.maneuverRemainingMs=600;bot.board.maneuverSpentMs=400;bot.board.maneuverCancelled=true;
-  const checkpoint=a.checkpoint();expect(checkpoint.version).toBe(3);
+  const checkpoint=a.checkpoint();expect(checkpoint.version).toBe(4);
   const b=MatchEngine.restore(checkpoint);
   expect(b.state.participants[2]).toMatchObject({config:{id:'bot',label:'Bot',controller:'ai',difficulty:'expert'},board:{maneuverRemainingMs:600,maneuverSpentMs:400,maneuverCancelled:true}});
   const left=new AiController(9,'bot','expert',false),right=new AiController(9,'bot','expert',false);

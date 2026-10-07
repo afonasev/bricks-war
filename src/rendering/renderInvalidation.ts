@@ -41,6 +41,7 @@ export function playfieldRenderKey(
     staticPlayfieldRenderKey(state, layoutKey, width, height),
     state.phase,
     `${state.globalEventHold?.kind ?? ''}:${effectFrame(state.globalEventHold?.remainingMs)}`,
+    `${state.anomalyTransition?.serial ?? 0}:${state.anomalyTransition?.phase ?? ""}:${effectFrame(state.anomalyTransition?.remainingMs)}`,
     effectFrame(state.roundStartPulseMs),
     effectFrame(state.pressurePulseMs),
     `${state.levelUpEvent?.serial ?? 0}:${effectFrame(state.levelUpEvent?.pulseMs)}:${state.participants.map((participant) => `${participant.levelUpEvent?.serial ?? 0}:${effectFrame(participant.levelUpEvent?.pulseMs)}`).join(',')}`,
