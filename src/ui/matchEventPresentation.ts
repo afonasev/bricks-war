@@ -95,11 +95,6 @@ export function participantMatchEvent(
   };
 
   const impactActive = (state.conflictImpactEvent?.pulseMs ?? 0) > 0;
-  const shieldBlocked = impactActive && (state.conflictImpactEvent?.incomingRows[participantId] ?? 0) === 0 && (state.conflictImpactEvent?.shieldedRecipientIds?.includes(participantId) ?? false);
-  if (shieldBlocked) return {
-    ...descriptor('shield-block', participantId, messages.shieldBlock),
-    lifetimeMs: state.conflictImpactEvent?.pulseMs ?? CONFLICT_IMPACT_PULSE_MS,
-  };
 
   const defended = impactActive && (state.conflictImpactEvent?.defendedRecipientIds?.includes(participantId) ?? false);
   if (defended) return {

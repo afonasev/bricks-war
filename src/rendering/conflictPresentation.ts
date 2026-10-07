@@ -41,6 +41,7 @@ export function conflictPresentationForParticipant(
     .filter((sender) => sender.recipientIds.includes(participantId))
     .map((sender) => sender.participantId)
     .sort();
+  const shield = state.shieldPresentations.find((e) => e.participantId === participantId);
   const participant = state.participants.find((candidate) => candidate.config.id === participantId);
   const impactRows = state.conflictImpactEvent?.incomingRows[participantId] ?? 0;
   const cleanupEvent = state.cleanupEvents
@@ -58,7 +59,7 @@ export function conflictPresentationForParticipant(
     cleanupProgress: cleanupEvent ? cleanupEvent.pulseMs / CLEANUP_PULSE_MS : 0,
     shieldReady: incomingRows > 0 && (participant?.shieldCount ?? 0) >= incomingRows,
     activelyDefended: state.conflictImpactEvent?.defendedRecipientIds?.includes(participantId) ?? false,
-    shieldBlocked: impactRows === 0 && (state.conflictImpactEvent?.pulseMs ?? 0) > 0
+    shieldBlocked: (!shield || shield.remainingRows === 0) && impactRows === 0 && (state.conflictImpactEvent?.pulseMs ?? 0) > 0
       && (state.conflictImpactEvent?.shieldedRecipientIds?.includes(participantId) ?? false),
     senderIds,
   };

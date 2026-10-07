@@ -1382,7 +1382,8 @@ export class BricksWarApp {
     this.menuFocus.suspend();
     const configs = this.configs();
     const mobileMatch = configs[0]?.controller === 'mobile-touch';
-    const seed = isLocalPlaytestFlag('playtest-anomaly-arrival') ? 4217 : this.createSeed();
+    const seed = isLocalPlaytestFlag('playtest-anomaly-arrival') ? 4217
+      : isLocalPlaytestFlag('playtest-shield-impact') ? 173 : this.createSeed();
     const activeTuning = this.tuning;
     const engine = new MatchEngine(configs, seed, this.durationMinutes, this.pacing, activeTuning, this.selectedMode === 'survival');
     if (isLocalPlaytestFlag('playtest-anomaly-arrival')) prepareAnomalyArrivalPlaytest(engine);
@@ -1482,6 +1483,7 @@ export class BricksWarApp {
       onFinished: (state) => this.showResults(state),
       mobileSolo: mobileMatch,
       mobileTiltControls: false,
+      captureShieldAtMs: playtestShieldImpact !== null ? localPlaytestNumber('playtest-shield-capture') ?? undefined : undefined,
       captureAnomalyBurnAtMs: isLocalPlaytestFlag('playtest-anomaly-arrival')
         ? localPlaytestNumber('playtest-arrival-capture') ?? undefined : undefined,
     });
@@ -1569,8 +1571,15 @@ export class BricksWarApp {
           const recipient = engine.state.participants[0]!;
           recipient.shieldCount = playtestShieldImpact;
           recipient.shieldReady = true;
-          engine.state.pendingConflict = { serial: 1, remainingWarningMs: 1,
-            incomingRows: { [recipient.config.id]: 4 }, senders: [] };
+          // A real engine attack over a recognizable low stack for visual review.
+          const colors = ['J', 'L', 'O', 'S', 'T'] as const;
+          recipient.board.grid.slice(-3).forEach((row, r) => row.forEach((_cell, x) => {
+            if (x !== 4 && x < 8 - r) row[x] = colors[(x + r) % colors.length]!;
+          }));
+          recipient.board.staticRenderRevision += 1;
+          if (isLocalPlaytestFlag('playtest-shield-pressure')) engine.state.nextPressureAtMs = engine.state.elapsedMs + 1;
+          else engine.state.pendingConflict = { serial: 1, remainingWarningMs: 1,
+            incomingRows: { [recipient.config.id]: localPlaytestNumber('playtest-shield-rows') ?? 4 }, senders: [] };
           engine.step(2);
           for (const event of engine.state.shieldInventoryEvents) event.pulseMs = 12_000;
           if (engine.state.conflictImpactEvent) engine.state.conflictImpactEvent.pulseMs = 12_000;
@@ -1720,7 +1729,7 @@ export class BricksWarApp {
     const pauseKey = state.pauseReasons.join(',');
     const impactActive = (state.conflictImpactEvent?.pulseMs ?? 0) > 0;
     const cardConflictKey = `${state.pendingConflict?.serial ?? 0}:${state.pendingConflict?.senders.map((sender) => `${sender.participantId}:${sender.rows}`).join(',') ?? ''}:${Object.entries(state.pendingConflict?.incomingRows ?? {}).map(([id, rows]) => `${id}:${rows}`).join(',')}:${state.conflictImpactEvent?.serial ?? 0}:${impactActive}:${Object.entries(state.conflictImpactEvent?.incomingRows ?? {}).map(([id, rows]) => `${id}:${rows}`).join(',')}:${state.conflictImpactEvent?.defendedRecipientIds?.join(',') ?? ''}:${state.conflictImpactEvent?.shieldedRecipientIds?.join(',') ?? ''}:${state.cleanupSerial}:${state.cleanupEvents.map((event) => `${event.participantId}:${event.rows}`).join(',')}:${state.anomalyBurnSerial}:${state.anomalyBurnEvents.map((event) => `${event.participantId}:${event.rows.length}`).join(',')}:${state.shieldChargeEvents.map((event) => `${event.serial}:${event.participantId}:${event.kind}`).join(',')}`;
-    const transitionKey = shieldInventoryKey(state);
+    const transitionKey = shieldInventoryKey(state) + ':' + state.shieldPresentations.map(e => `${e.serial}:${Math.ceil(e.remainingMs / 50)}:${e.deferredImpacts.map(i => i.rows).join(',')}`).join('|');
     const hudKey = `${cardConflictKey}:${transitionKey}:${state.participants.map((participant) => `${participant.board.alive}:${participant.placement}:${participant.score}:${participant.placedPieces}:${participant.shieldCount}:${participant.shieldCharge}:${participant.shieldReady}:${participant.lineClearStreak}:${participantLevelUpNoticeKey(participant.levelUpEvent)}:${participant.board.active?.definition.source ?? '-'}:${participant.board.nextPiece.id}`).join('|')}`;
     const hud = this.root.querySelector<HTMLElement>('#hud-grid');
     const mobileSoloMatch = this.root.querySelector('.mobile-solo-arena') !== null;
@@ -1744,7 +1753,8 @@ export class BricksWarApp {
         const defended = impactActive && (state.conflictImpactEvent?.defendedRecipientIds?.includes(participant.config.id) ?? false);
         const shieldBlocked = impactActive && (state.conflictImpactEvent?.shieldedRecipientIds?.includes(participant.config.id) ?? false);
         const cleanupRows = state.cleanupEvents.find((event) => event.participantId === participant.config.id)?.rows ?? 0;
-        const participantEvent = participantMatchEvent(state, participant.config.id, this.tuning.messages, senderNames);
+        const reflecting = state.shieldPresentations.some((event) => event.participantId === participant.config.id && event.remainingMs > 0);
+        const participantEvent = reflecting ? null : participantMatchEvent(state, participant.config.id, this.tuning.messages, senderNames);
         const noticeEventKey = participantEvent
           ? `${participantEvent.kind}:${participant.levelUpEvent?.serial ?? 0}:${state.anomalyBurnSerial}:${state.shieldChargeSerial}:${state.cleanupSerial}:${state.pendingConflict?.serial ?? state.conflictImpactEvent?.serial ?? 0}:${participant.config.id}`
           : null;
@@ -1765,7 +1775,7 @@ export class BricksWarApp {
           ? `<div class="mobile-player-summary">${identityMarkup}${statsMarkup}</div>${shieldInventory}${nextPiecePreviewMarkup(participant.board.nextPiece)}`
           : `${identityMarkup}${statsMarkup}${shieldInventory}${compactMobileAi ? '' : nextPiecePreviewMarkup(participant.board.nextPiece)}`;
         return `
-        <article class="hud-card ${mobileSoloMatch && index === 0 ? 'mobile-player-card' : ''} ${compactMobileAi ? 'mobile-ai-card' : ''} hud-palette-${identity.palette} ${participant.board.alive ? '' : 'is-out'} ${participant.board.active?.definition.source === 'anomaly' ? 'has-active-anomaly' : ''} ${senderRows ? 'is-conflict-sender' : ''} ${incomingRows ? 'is-conflict-target' : ''} ${impactRows ? 'is-conflict-impact' : ''} ${defended || shieldBlocked ? 'is-conflict-defense' : ''} ${cleanupRows ? 'is-cleaning' : ''} ${participant.shieldReady ? 'has-shield' : ''} ${participantEvent ? 'has-player-event' : ''}" style="--player-name-color:${playerAccentForSlot(index)};--sender-color:${senderAccent};${mobileStyle}" data-team="${identity.teamLabel ? identity.palette : ''}" data-tile-style="${participant.resolvedTileStyle}" data-next-piece="${participant.board.nextPiece.id}" data-active-y="${participant.board.active?.y ?? ''}" data-attack-rows="${senderRows}" data-incoming-rows="${incomingRows || impactRows}" data-event-kind="${participantEvent?.kind ?? ''}">
+        <article class="hud-card ${mobileSoloMatch && index === 0 ? 'mobile-player-card' : ''} ${compactMobileAi ? 'mobile-ai-card' : ''} hud-palette-${identity.palette} ${participant.board.alive ? '' : 'is-out'} ${participant.board.active?.definition.source === 'anomaly' ? 'has-active-anomaly' : ''} ${senderRows ? 'is-conflict-sender' : ''} ${incomingRows ? 'is-conflict-target' : ''} ${impactRows ? 'is-conflict-impact' : ''} ${defended || shieldBlocked ? 'is-conflict-defense' : ''} ${cleanupRows ? 'is-cleaning' : ''} ${participant.shieldReady ? 'has-shield' : ''} ${participantEvent ? 'has-player-event' : ''}" style="--player-name-color:${playerAccentForSlot(index)};--sender-color:${senderAccent};${mobileStyle}" data-team="${identity.teamLabel ? identity.palette : ''}" data-tile-style="${participant.resolvedTileStyle}" data-next-piece="${participant.board.nextPiece.id}" data-active-y="${participant.board.active?.y ?? ''}" data-attack-rows="${senderRows}" data-incoming-rows="${incomingRows || impactRows}" data-event-kind="${participantEvent?.kind ?? ''}" data-shield-remaining-ms="${state.shieldPresentations.find(e => e.participantId === participant.config.id)?.remainingMs ?? 0}" data-shield-debt="${state.shieldPresentations.filter(e => e.participantId === participant.config.id).reduce((n,e) => n + e.deferredImpacts.reduce((m,i) => m + i.rows, 0), 0)}" data-gray-rows="${participant.board.grid.filter(row => row.some(cell => cell === 'garbage')).length}">
           ${mobilePlayerMarkup}
           ${senderRows ? `<b class="conflict-chip is-send">АТАКА · ${senderRows}</b>` : ''}
           ${participantEvent ? `<span class="player-event-symbol" data-kind="${participantEvent.kind}" data-accent="${participantEvent.accent}" style="--event-duration:${participantEvent.lifetimeMs}ms" aria-hidden="true">${matchEventIconMarkup(participantEvent.icon)}</span><div class="match-event-plaque player-event-notice is-${noticeRegion}" data-kind="${participantEvent.kind}" data-accent="${participantEvent.accent}" style="--event-duration:${participantEvent.lifetimeMs}ms" role="status" aria-label="${escapeHtml([participantEvent.title, participantEvent.detail].filter(Boolean).join('. '))}">${matchEventPlaqueMarkup(participantEvent, participantEvent.template && participantEvent.values ? formatParticipantEventMarkup(participantEvent.template, participantEvent.values) : escapeHtml(participantEvent.title))}</div>` : ''}

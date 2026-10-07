@@ -3,6 +3,7 @@ import { BOARD_HEIGHT, type ParticipantState, type PieceDefinition } from '../sr
 import {
   COUNTDOWN_MS,
   CONFLICT_WARNING_MS,
+  SHIELD_PRESENTATION_MS,
   ANOMALY_BURN_PULSE_MS,
   ANOMALY_ARRIVAL_BURN_MS,
   DEFAULT_DURATION_MINUTES,
@@ -194,6 +195,8 @@ describe('match engine', () => {
         {participantId:'p2', rows:1, recipientIds:['p1']}, {participantId:'p2', rows:rows-1, recipientIds:['p1']},
       ], incomingRows: { p1: rows } };
       engine.step(2);
+      expect(grayRows(p)).toBe(shields > 0 ? 0 : rows);
+      if (shields > 0) engine.step(SHIELD_PRESENTATION_MS);
       expect(grayRows(p)).toBe(Math.max(0, rows - shields));
       expect(p.shieldCount).toBe(Math.max(0, shields - rows));
       expect(p.shieldReady).toBe(p.shieldCount > 0);
@@ -211,6 +214,8 @@ describe('match engine', () => {
     expect(grayRows(p)).toBe(0); expect(p.shieldCount).toBe(1);
     expect(engine.state.pendingConflict).not.toBeNull();
     finishPlayableClear(engine, 1); engine.step(2);
+    expect(grayRows(p)).toBe(0);
+    engine.step(SHIELD_PRESENTATION_MS);
     expect(grayRows(p)).toBe(2); expect(p.shieldCount).toBe(0);
     expect(engine.state.shieldInventoryEvents.filter(e => e.kind === 'burn')).toHaveLength(1);
   });
@@ -423,10 +428,13 @@ describe('match engine', () => {
     engine.step(FIXED_STEP_MS);
     finishPlayableClear(engine, 3);
     engine.step(CONFLICT_WARNING_MS + 1);
-    expect(grayRows(engine.state.participants[1]!)).toBe(2);
+    expect(grayRows(engine.state.participants[1]!)).toBe(0);
     expect(grayRows(engine.state.participants[2]!)).toBe(3);
     expect(engine.state.participants[1]!.shieldReady).toBe(false);
     expect(engine.state.conflictImpactEvent?.shieldedRecipientIds).toEqual(['p2']);
+    while (engine.state.globalEventHold || engine.state.anomalyTransition) engine.step(FIXED_STEP_MS);
+    engine.step(SHIELD_PRESENTATION_MS);
+    expect(grayRows(engine.state.participants[1]!)).toBe(2);
   });
 
   it('defers a last-survivor result until an earned impact resolves', () => {
@@ -620,6 +628,8 @@ describe('match engine', () => {
     expect(grayRows(eliminated!)).toBe(0);
     engine.state.elapsedMs = 209_000 - 1;
     engine.step(1);
+    expect(grayRows(protectedPlayer!)).toBe(0);
+    while (engine.state.globalEventHold || engine.state.anomalyTransition || engine.state.shieldPresentations.length) engine.step(FIXED_STEP_MS);
     expect(grayRows(protectedPlayer!)).toBe(1);
     expect(engine.state.nextPressureAtMs).toBe(222_000);
   });

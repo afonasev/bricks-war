@@ -134,7 +134,7 @@ export class AudioEventTracker {
       const averageIndex = recipientIndexes.length > 0
         ? recipientIndexes.reduce((sum, index) => sum + index, 0) / recipientIndexes.length
         : (state.participants.length - 1) / 2;
-      events.push({
+      if (state.conflictImpactEvent.maxRows > 0) events.push({
         type: 'conflict-impact',
         rows: state.conflictImpactEvent.maxRows,
         pan: participantPan(averageIndex, state.participants.length),

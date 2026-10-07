@@ -175,6 +175,17 @@ export interface ConflictBatchState {
   defendedRecipientIds?: string[];
 }
 
+/** One count-independent visual shield sequence; residual impacts retain their ordinary rule. */
+export interface ShieldPresentationState {
+  serial: number;
+  participantId: string;
+  remainingMs: number;
+  durationMs: number;
+  absorbedRows: number;
+  remainingRows: number;
+  deferredImpacts: { senders?: ConflictSenderState[]; reason: 'conflict' | 'pressure'; rows: number }[];
+}
+
 export interface ConflictImpactEventState {
   serial: number;
   incomingRows: Record<string, number>;
@@ -282,6 +293,8 @@ export interface MatchState {
   clearImpactSerial: number;
   clearImpactEvents: ClearImpactEventState[];
   clearStreakEvents: ClearStreakEventState[];
+  shieldPresentationSerial: number;
+  shieldPresentations: ShieldPresentationState[];
   shieldInventorySerial: number;
   shieldInventoryEvents: ShieldInventoryEventState[];
   shieldChargeSerial: number;

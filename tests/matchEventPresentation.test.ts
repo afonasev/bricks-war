@@ -74,7 +74,8 @@ describe('match event presentation', () => {
     engine.state.conflictImpactEvent = {
       serial: 1, incomingRows: {}, maxRows: 0, pulseMs: 700, shieldedRecipientIds: ['p2'],
     };
-    expect(participantMatchEvent(engine.state, 'p2', DEFAULT_GAME_TUNING.messages, ['Аня'])).toMatchObject({ kind: 'shield-block', icon: 'shield' });
+    engine.state.pendingConflict = null;
+    expect(participantMatchEvent(engine.state, 'p2', DEFAULT_GAME_TUNING.messages, ['Аня'])).toBeNull();
     engine.step(FIXED_STEP_MS);
   });
 

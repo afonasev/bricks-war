@@ -1,3 +1,4 @@
+import { shieldPresentationForParticipant, shieldVisualFrame } from './shieldPresentation';
 import { airborneBurnCells } from './airborneBurn';
 import * as Phaser from 'phaser/dist/phaser.esm.js';
 import { HumanInputRouter, isCapturedGameKey, isManualPauseKey } from '../controllers/input';
@@ -79,6 +80,8 @@ export interface PlayRuntime {
   mobileTiltControls?: boolean;
   /** Local visual QA stops after reaching this real burn progress; no pause overlay. */
   captureAnomalyBurnAtMs?: number;
+  /** Local-only real simulation shield sequence capture, measured from its first frame. */
+  captureShieldAtMs?: number;
 }
 
 function playtestSimulationScale(): number {
@@ -92,6 +95,8 @@ function playtestSimulationScale(): number {
 export class PlayScene extends Phaser.Scene {
   private staticGraphics!: Phaser.GameObjects.Graphics;
   private graphics!: Phaser.GameObjects.Graphics;
+  private readonly shieldLayers = new Map<string, { graphics: Phaser.GameObjects.Graphics; effect: Phaser.GameObjects.Graphics; maskGraphics: Phaser.GameObjects.Graphics; mask: Phaser.Display.Masks.GeometryMask }>();
+  private shieldCaptureStartedAt: number | null = null;
   private accumulator = 0;
   private lastWallClockMs = Date.now();
   private resultReported = false;
@@ -124,6 +129,10 @@ export class PlayScene extends Phaser.Scene {
       keyboard?.off('keydown', this.handleKeyDown, this);
       keyboard?.off('keyup', this.handleKeyUp, this);
       document.removeEventListener('visibilitychange', this.handleVisibility);
+      for (const layer of this.shieldLayers.values()) {
+        layer.graphics.destroy(); layer.effect.destroy(); layer.mask.destroy(); layer.maskGraphics.destroy();
+      }
+      this.shieldLayers.clear();
       for (const band of this.fireBands.values()) {
         band.image.destroy();
         this.textures.remove(band.key);
@@ -154,6 +163,7 @@ export class PlayScene extends Phaser.Scene {
       && state.anomalyTransition.remainingMs <= this.runtime.captureAnomalyBurnAtMs) {
       this.runtime.onState(state);this.renderState();return;
     }
+    if (this.shieldCaptureReady()) { this.runtime.onState(state); this.renderState(); return; }
     this.runtime.input.setEnabled(this.runtime.engine.acceptsGameplayInput(), state.globalEventHold !== null || state.anomalyTransition !== null);
     this.pollGamepads();
     const wallClockMs = Date.now();
@@ -176,6 +186,7 @@ export class PlayScene extends Phaser.Scene {
     // fixed simulation steps; production retains its four-step frame budget.
     const catchUp = fixedStepCatchUp(this.accumulator, FIXED_STEP_MS, MAX_FIXED_STEPS_PER_RENDER * this.simulationScale);
     for (let step = 0; step < catchUp.steps; step += 1) {
+      if (this.shieldCaptureReady()) break;
       const before = this.activePieceInterpolation.snapshot(state.participants);
       this.runtime.input.setEnabled(this.runtime.engine.acceptsGameplayInput(), !!state.globalEventHold || !!state.anomalyTransition);
       this.runtime.input.step(FIXED_STEP_MS);
@@ -191,6 +202,14 @@ export class PlayScene extends Phaser.Scene {
       this.resultReported = true;
       this.runtime.onFinished(state);
     }
+  }
+
+  private shieldCaptureReady(): boolean {
+    const target = this.runtime.captureShieldAtMs;
+    const state = this.runtime.engine.state;
+    if (target === undefined || state.shieldPresentationSerial === 0) return false;
+    if (this.shieldCaptureStartedAt === null) this.shieldCaptureStartedAt = state.elapsedMs;
+    return state.elapsedMs - this.shieldCaptureStartedAt >= target;
   }
 
   private collectActions(): ActionsByParticipant {
@@ -314,6 +333,7 @@ export class PlayScene extends Phaser.Scene {
     if (renderKey === this.lastRenderKey && this.calmEffects) return;
     this.lastRenderKey = renderKey;
     this.graphics.clear();
+    for (const layer of this.shieldLayers.values()) { layer.graphics.clear(); layer.graphics.setVisible(false); layer.effect.clear(); layer.effect.setVisible(false); }
       state.participants.forEach((participant, index) => {
         const card = layout.participantCards?.[index];
       const column = index % layout.columns;
@@ -379,7 +399,8 @@ export class PlayScene extends Phaser.Scene {
     const settling = this.runtime.engine.state.clearPresentations.some((event) => (
       event.participantId === participant.config.id
     ));
-    for (let y = 0; y < VISIBLE_HEIGHT && !settling; y += 1) {
+    const reflecting = shieldPresentationForParticipant(this.runtime.engine.state, participant.config.id);
+    for (let y = 0; y < VISIBLE_HEIGHT && !settling && !reflecting; y += 1) {
       for (let x = 0; x < BOARD_WIDTH; x += 1) {
         const kind = participant.board.grid[y + HIDDEN_ROWS]?.[x];
         if (kind) drawStyledTile(this.staticGraphics, {
@@ -420,8 +441,8 @@ export class PlayScene extends Phaser.Scene {
       : (this.runtime.engine.state.levelUpEvent?.pulseMs ?? 0) > 0;
     const globalHold = this.runtime.engine.state.globalEventHold;
     const conflict = conflictPresentationForParticipant(this.runtime.engine.state, participant.config.id);
-    const protectedBoard = conflict.shieldReady || conflict.activelyDefended || conflict.shieldBlocked;
-    this.drawClearPresentation(participant, boardX, boardY, cellSize);
+    const shield = shieldPresentationForParticipant(this.runtime.engine.state, participant.config.id);
+    const protectedBoard = !!shield || conflict.shieldReady || conflict.activelyDefended || conflict.shieldBlocked;
 
     if ((protectedBoard || participant.board.clearFlashMs > 0) && participant.board.alive) {
       const color = protectedBoard ? 0x15c8ff : 0x15c8ff;
@@ -433,12 +454,39 @@ export class PlayScene extends Phaser.Scene {
       }
     }
 
+    const originalGraphics = this.graphics;
+    const lift = shield ? shieldVisualFrame(shield, this.calmEffects).liftCells * cellSize : 0;
+    const figureY = boardY - lift;
+    if (shield) {
+      let layer = this.shieldLayers.get(participant.config.id);
+      if (!layer) {
+        const maskGraphics = this.add.graphics().setVisible(false);
+        const graphics = this.add.graphics().setDepth(1);
+        const effect = this.add.graphics().setDepth(3);
+        const mask = maskGraphics.createGeometryMask();
+        graphics.setMask(mask); effect.setMask(mask);
+        layer = { graphics, effect, maskGraphics, mask };
+        this.shieldLayers.set(participant.config.id, layer);
+      }
+      layer.maskGraphics.clear().fillStyle(0xffffff).fillRect(boardX, boardY, boardWidth, boardHeight);
+      layer.graphics.setVisible(true);
+      this.graphics = layer.graphics;
+      const clearing = this.runtime.engine.state.clearPresentations.some((e) => e.participantId === participant.config.id);
+      if (!clearing) for (let y = 0; y < VISIBLE_HEIGHT; y++) for (let x = 0; x < BOARD_WIDTH; x++) {
+        const kind = participant.board.grid[y + HIDDEN_ROWS]?.[x];
+        if (kind) drawStyledTile(this.graphics, { style: participant.resolvedTileStyle, kind,
+          x: boardX + x * cellSize, y: figureY + y * cellSize, size: cellSize,
+          color: kind === 'anomaly' ? ANOMALY_COLOR : kind === 'garbage' ? 0x9aa2b7 : TETROMINO_COLORS[kind], alpha: 1, state: 'settled' });
+      }
+    }
+    this.drawClearPresentation(participant, boardX, figureY, cellSize);
+
     const arrival = this.runtime.engine.state.anomalyTransition;
     const burnTarget = arrival?.phase === 'burning'
       ? arrival.targets.find((target) => target.participantId === participant.config.id)?.piece
       : null;
     if (burnTarget && participant.board.alive) {
-      this.drawAirborneBurn(burnTarget, participant, boardX, boardY, cellSize, 1 - arrival!.remainingMs / arrival!.durationMs);
+      this.drawAirborneBurn(burnTarget, participant, boardX, figureY, cellSize, 1 - arrival!.remainingMs / arrival!.durationMs);
     }
     if (participant.board.active && !burnTarget) {
       const ghost = landingPiece(participant.board.grid, participant.board.active);
@@ -450,7 +498,7 @@ export class PlayScene extends Phaser.Scene {
               style: participant.resolvedTileStyle,
               kind: ghost.definition.settledKind,
               x: boardX + cell.x * cellSize,
-              y: boardY + visibleY * cellSize,
+              y: figureY + visibleY * cellSize,
               size: cellSize,
               color: pieceColor(ghost.definition),
               alpha: 0.28,
@@ -472,7 +520,7 @@ export class PlayScene extends Phaser.Scene {
             style: participant.resolvedTileStyle,
             kind: renderedActive.definition.settledKind,
             x: boardX + cell.x * cellSize,
-            y: boardY + visibleY * cellSize,
+            y: figureY + visibleY * cellSize,
             size: cellSize,
             color: pieceColor(renderedActive.definition),
             alpha: 1,
@@ -481,10 +529,11 @@ export class PlayScene extends Phaser.Scene {
         }
       }
       if (renderedActive.definition.source === 'anomaly') {
-        this.drawActiveAnomalyGlow(activeCells, boardX, boardY, cellSize);
+        this.drawActiveAnomalyGlow(activeCells, boardX, figureY, cellSize);
       }
     }
 
+    this.graphics = originalGraphics;
     if (globalHold && participant.board.alive) {
       const progress = Math.max(0, Math.min(1, globalHold.remainingMs / globalHold.durationMs));
       const alpha = this.calmEffects ? 0.16 : 0.08 + progress * 0.1;
@@ -493,7 +542,7 @@ export class PlayScene extends Phaser.Scene {
       this.graphics.lineStyle(globalHold.kind === 'final-push' ? 5 : 3, 0x8a56c4, this.calmEffects ? 0.82 : 0.55 + progress * 0.35);
       this.graphics.strokeRoundedRect(cardX + 3, cardY + 3, cardWidth - 6, cardHeight - 6, 8);
     }
-    if (this.runtime.engine.state.pressurePulseMs > 0 && participant.board.alive) {
+    if (this.runtime.engine.state.pressurePulseMs > 0 && participant.board.alive && !shield) {
       const alpha = Math.max(0.25, Math.min(1, this.runtime.engine.state.pressurePulseMs / 650));
       this.graphics.lineStyle(3, 0x9b68d1, alpha);
       this.graphics.strokeRect(boardX, boardY, boardWidth, boardHeight);
@@ -553,12 +602,59 @@ export class PlayScene extends Phaser.Scene {
     }
     const burn = this.runtime.engine.state.anomalyBurnEvents.find((event) => event.participantId === participant.config.id);
     if (burn && participant.board.alive) {
-      const bandY = boardY + boardHeight - burn.rows.length * cellSize;
+      const bandY = figureY + boardHeight - burn.rows.length * cellSize;
       const progress = Math.max(0, Math.min(1, 1 - burn.pulseMs / 1_000));
       this.drawFireBand(participant.config.id, boardX, bandY, cellSize, burn.rows.length, progress);
+      const image = this.fireBands.get(participant.config.id)?.image;
+      const layer = this.shieldLayers.get(participant.config.id);
+      if (shield && layer) image?.setMask(layer.mask).setDepth(2);
+      else image?.clearMask(false).setDepth(0);
     } else {
       this.fireBands.get(participant.config.id)?.image.setVisible(false);
     }
+    if (shield) {
+      const layer = this.shieldLayers.get(participant.config.id)!;
+      layer.effect.setVisible(true);
+      this.graphics = layer.effect;
+      this.drawShieldReflection(boardX, boardY, cellSize, shield);
+    }
+    this.graphics = originalGraphics;
+  }
+
+  private drawShieldReflection(x: number, y: number, size: number, event: MatchState['shieldPresentations'][number]): void {
+    const frame = shieldVisualFrame(event, this.calmEffects);
+    const bottom = y + VISIBLE_HEIGHT * size;
+    const bandTop = bottom - frame.liftCells * size;
+    const width = BOARD_WIDTH * size;
+    // Only the visible upper half of a gray row, never a real grid mutation.
+    if (frame.rowAlpha > 0) for (let column = 0; column < BOARD_WIDTH; column++) {
+      this.graphics.fillStyle(0x9aa2b7, frame.rowAlpha);
+      this.graphics.fillRect(x + column * size + 1, bandTop, size - 2, bottom - bandTop);
+      this.graphics.lineStyle(Math.max(1, size * .035), 0xe3e7ef, frame.rowAlpha);
+      this.graphics.lineBetween(x + column * size + 2, bandTop + 2, x + (column + 1) * size - 2, bandTop + 2);
+    }
+    if (frame.fragmentAlpha > 0) for (let column = 0; column < BOARD_WIDTH; column++) for (let shard = 0; shard < 3; shard++) {
+      const seed = (column * 13 + shard * 7 + 17) % 23;
+      const px = x + (column + .18 + shard * .24) * size + (seed - 11) * size * .018 * frame.crumble;
+      const py = bottom - size * .45 - Math.sin(frame.crumble * Math.PI) * size * (.22 + seed * .01) + frame.crumble ** 2 * size * .85;
+      this.graphics.fillStyle(shard === 0 ? 0x83b8e5 : 0x9aa2b7, frame.fragmentAlpha);
+      this.graphics.fillTriangle(px, py, px + size * .2, py + size * .04, px + size * .08, py + size * .2);
+    }
+    if (frame.flash <= 0) return;
+    this.graphics.fillStyle(0x159aff, frame.flash * .14);
+    this.graphics.fillRect(x, bottom - size * 2.4, width, size * 2.4);
+    this.graphics.lineStyle(Math.max(3, size * .28), 0x087cff, frame.flash * .4);
+    this.graphics.lineBetween(x, bottom - size * .5, x + width, bottom - size * .5);
+    this.graphics.lineStyle(Math.max(1.5, size * .08), 0xb9f4ff, frame.flash);
+    this.graphics.lineBetween(x, bottom - size * .5, x + width, bottom - size * .5);
+    const cx = x + width / 2, cy = bottom - size * 1.25;
+    const points = [new Phaser.Geom.Point(cx, cy - size * .85), new Phaser.Geom.Point(cx + size * .65, cy - size * .6),
+      new Phaser.Geom.Point(cx + size * .52, cy + size * .12), new Phaser.Geom.Point(cx, cy + size * .65),
+      new Phaser.Geom.Point(cx - size * .52, cy + size * .12), new Phaser.Geom.Point(cx - size * .65, cy - size * .6)];
+    this.graphics.fillStyle(0x087cff, frame.flash);
+    this.graphics.fillPoints(points, true);
+    this.graphics.lineStyle(Math.max(1.5, size * .06), 0xc6f6ff, frame.flash);
+    this.graphics.strokePoints(points, true);
   }
 
   private drawAirborneBurn(piece: NonNullable<ParticipantState['board']['active']>, participant: ParticipantState,

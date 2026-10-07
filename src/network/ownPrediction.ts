@@ -57,6 +57,8 @@ export class OwnPrediction {
         // Reconciliation may change geometry without changing the number of locks.
         ? {...p, board: {...own.board, staticRenderRevision: -this.presentationRevision}, gravityIntervalMs: own.gravityIntervalMs} : p),
       // Geometry follows the predicted grid; global serial/effect/audio streams stay confirmed.
+      shieldPresentations: [...confirmed.shieldPresentations.filter(e => e.participantId !== this.ownId),
+        ...predicted.shieldPresentations.filter(e => e.participantId === this.ownId)],
       clearPresentations: [...confirmed.clearPresentations.filter(e => e.participantId !== this.ownId),
         ...predicted.clearPresentations.filter(e => e.participantId === this.ownId)],
       anomalyBurnEvents: [...confirmed.anomalyBurnEvents.filter(e => e.participantId !== this.ownId),

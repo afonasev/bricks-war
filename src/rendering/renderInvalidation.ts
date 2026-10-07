@@ -15,6 +15,7 @@ export function staticPlayfieldRenderKey(state: MatchState, layoutKey: string, w
       participant.resolvedTileStyle,
       participant.board.alive ? 1 : 0,
       participant.board.staticRenderRevision,
+      state.shieldPresentations.some((event) => event.participantId === participant.config.id && event.remainingMs > 0) ? 1 : 0,
       state.clearPresentations.some((event) => event.participantId === participant.config.id) ? 1 : 0,
     ].join(':')).join('|'),
   ].join('#');
@@ -40,6 +41,7 @@ export function playfieldRenderKey(
   return [
     staticPlayfieldRenderKey(state, layoutKey, width, height),
     state.phase,
+    state.shieldPresentations.map((e) => `${e.serial}:${e.participantId}:${effectFrame(e.remainingMs)}`).join(','),
     `${state.globalEventHold?.kind ?? ''}:${effectFrame(state.globalEventHold?.remainingMs)}`,
     `${state.anomalyTransition?.serial ?? 0}:${state.anomalyTransition?.phase ?? ""}:${effectFrame(state.anomalyTransition?.remainingMs)}`,
     effectFrame(state.roundStartPulseMs),

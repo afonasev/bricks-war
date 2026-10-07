@@ -114,3 +114,26 @@ it('an ancient neutral can release input but cannot carry movement, rotation or 
   expect(validator.accept(command(12,1,['move-left'],3),10000)).toBe(false);
   expect(validator.accept(command(10001,1,['move-left'],3),10000)).toBe(true);
 });
+
+describe('shield phase prediction composition', () => {
+  it('replays residual insertion and pairs the own shield phase with the own predicted grid', () => {
+    const authority = engine();
+    authority.state.participants[0]!.shieldCount = 1;
+    authority.state.participants[0]!.shieldReady = true;
+    authority.state.pendingConflict = {serial:1,remainingWarningMs:1,senders:[],incomingRows:{p1:4}};
+    authority.step(2);
+    const predictor = new OwnPrediction();
+    predictor.confirm(snapshot(authority,0),[],0);
+    const opponent = structuredClone(predictor.engine!.state.participants[1]);
+    for (let tick=1;tick<=60;tick++) {
+      authority.step(FIXED_STEP_MS);
+      predictor.advanceTo(tick,[]);
+      expect(predictor.engine!.state.participants[0]).toEqual(authority.state.participants[0]);
+      expect(predictor.engine!.state.shieldPresentations).toEqual(authority.state.shieldPresentations);
+      expect(predictor.engine!.state.participants[1]).toEqual(opponent);
+      const presented = predictor.present(authority.state);
+      expect(presented.shieldPresentations).toEqual(predictor.engine!.state.shieldPresentations);
+    }
+    expect(authority.state.participants[0]!.board.grid.filter(row=>row.includes('garbage'))).toHaveLength(3);
+  });
+});
