@@ -618,8 +618,9 @@ export class GameAudio {
     // One common alarm motif across presets; all tones still use the Effects bus.
     for (let index = 0; index < 3; index += 1) {
       const at = start + index * 0.28;
-      this.tone(620, at, 0.24, 0.085, 'triangle', pan, 2400, undefined, 0.015, 980, false);
-      this.tone(310, at, 0.24, 0.032, 'sine', pan, 1400, undefined, 0.015, 490, false);
+      this.tone(1100, at, 0.20, 0.095, 'square', pan, 4500, undefined, 0.004, undefined, false, 0.045);
+      this.tone(1650, at, 0.20, 0.05, 'triangle', pan, 4800, undefined, 0.004, undefined, false, 0.045);
+      this.tone(2200, at, 0.075, 0.027, 'sine', pan, 5000, undefined, 0.004, undefined, false, 0.045);
     }
   }
 
@@ -796,6 +797,7 @@ export class GameAudio {
     attack = 0.006,
     endFrequency?: number,
     styled = true,
+    sustainRelease?: number,
   ): void {
     const context = this.context;
     if (!context || !destination) return;
@@ -814,13 +816,15 @@ export class GameAudio {
     panner.pan.value = Math.max(-1, Math.min(1, pan));
     gain.gain.setValueAtTime(0.0001, start);
     gain.gain.exponentialRampToValueAtTime(Math.max(0.0002, volume), start + attack);
+    // The alarm keeps a steady body after its attack, matching the selected preview.
+    if (sustainRelease !== undefined) gain.gain.setValueAtTime(Math.max(0.0002, volume), start + duration - sustainRelease);
     gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
     oscillator.connect(filter);
     filter.connect(gain);
     gain.connect(panner);
     panner.connect(destination);
     oscillator.start(start);
-    oscillator.stop(start + duration + 0.03);
+    oscillator.stop(start + duration + (sustainRelease === undefined ? 0.03 : 0.025));
     if (this.previewing) this.previewSources.push(oscillator);
   }
 

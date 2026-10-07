@@ -71,7 +71,7 @@ test('records one actual runtime alarm at shared spawn and retains mute-independ
       let frequency=0;
       oscillator.frequency.setValueAtTime=(value,time)=>{frequency=value;return set(value,time);};
       const start=oscillator.start.bind(oscillator);
-      oscillator.start=(at=0)=>{if(frequency===620||frequency===310)capture.tones.push({frequency,at});start(at);};
+      oscillator.start=(at=0)=>{if(frequency===1100||frequency===1650||frequency===2200)capture.tones.push({frequency,at});start(at);};
       return oscillator;
     };
   });
@@ -90,8 +90,9 @@ test('records one actual runtime alarm at shared spawn and retains mute-independ
     const bytes=new Uint8Array(await new Blob(capture.chunks).arrayBuffer());
     return {tones:capture.tones,fires:capture.fires,bytes:Array.from(bytes)};
   });
-  expect(recording.tones.filter((t:any)=>t.frequency===620)).toHaveLength(3);
-  expect(recording.tones.filter((t:any)=>t.frequency===310)).toHaveLength(3);
+  expect(recording.tones.filter((t:any)=>t.frequency===1100)).toHaveLength(3);
+  expect(recording.tones.filter((t:any)=>t.frequency===1650)).toHaveLength(3);
+  expect(recording.tones.filter((t:any)=>t.frequency===2200)).toHaveLength(3);
   expect(recording.fires).toHaveLength(1);
   expect(recording.fires[0].phase).toBe('burning');
   expect(recording.fires[0].at).toBeLessThan(recording.tones[0].at);
