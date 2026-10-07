@@ -199,12 +199,15 @@ export class NetworkApp {
     this.session.connect();
   }
   private teamSelect(teamId:string,name:string):string {return `<label>Команда<select aria-label="Команда" name="${name}"><option value="team-1" ${teamId==='team-1'?'selected':''}>Команда 1</option><option value="team-2" ${teamId==='team-2'?'selected':''}>Команда 2</option></select></label>`;}
+  private seatState(seat:PublicSeat):string {
+    return seat.kind==='ai'?'Готов автоматически':`${seat.connected?seat.ready?'Готов':'Не готов':'Возвращается'}${seat.absence?` · ${Math.ceil(seat.absence.remainingMs/1000)} с`:''}`;
+  }
   private rosterSeat(seat:PublicSeat,index:number,snapshot:ClientSnapshot,creator:boolean):string {
     const ai=seat.kind==='ai';
     const roles=ai?`ИИ · ${aiLabels[seat.difficulty!]}`:[seat.id===snapshot.ownId?'Вы':'',seat.id===snapshot.creatorId?'Создатель':''].filter(Boolean).join(' · ');
-    const state=ai?'Готов автоматически':`${seat.connected?seat.ready?'Готов':'Не готов':'Возвращается'}${seat.absence?` · ${Math.ceil(seat.absence.remainingMs/1000)} с`:''}`;
+    const state=this.seatState(seat);
     const editor=ai&&creator?`<details class="network-ai-editor"><summary>Настроить ИИ</summary><form data-network-ai="${seat.id}"><label>Сложность ИИ<select aria-label="Сложность ИИ" name="difficulty">${Object.entries(aiLabels).map(([v,l])=>`<option value="${v}" ${v===seat.difficulty?'selected':''}>${l}</option>`).join('')}</select></label><label>Вид фигур ИИ<select aria-label="Вид фигур ИИ" name="tileStyle">${styleOptions(seat.tileStyle)}</select></label>${roomRules(snapshot.rules).mode==='team-battle'?this.teamSelect(seat.teamId??'team-1','teamId'):''}<div class="network-ai-actions"><button type="submit">Сохранить ИИ</button>${this.button('Удалить ИИ',`ai-remove:${seat.id}`)}</div></form></details>`:'';
-    return `<li data-kind="${seat.kind}" data-ready="${ai||seat.ready&&seat.connected}"><span class="network-seat-number" aria-hidden="true">${index+1}</span><div class="network-seat-copy"><strong>${escape(seat.name)}</strong><small>${roles}${roomRules(snapshot.rules).mode==='team-battle'?` · Команда ${seat.teamId==='team-2'?2:1}`:''}</small><span class="network-seat-state">${state}</span></div>${editor}</li>`;
+    return `<li data-seat-id="${seat.id}" data-kind="${seat.kind}" data-ready="${ai||seat.ready&&seat.connected}"><span class="network-seat-number" aria-hidden="true">${index+1}</span><div class="network-seat-copy"><strong>${escape(seat.name)}</strong><small>${roles}${roomRules(snapshot.rules).mode==='team-battle'?` · Команда ${seat.teamId==='team-2'?2:1}`:''}</small><span class="network-seat-state">${state}</span></div>${editor}</li>`;
   }
   private renderSession():void {
     const session=this.session;const snapshot=session?.snapshot;
@@ -222,8 +225,16 @@ export class NetworkApp {
       this.updateArena();return;
     }
     this.destroyArena();
-    const key=JSON.stringify([snapshot.room.phase,snapshot.seats,snapshot.rules,snapshot.creatorId]);
-    if(key===this.renderKey){this.status(session.status);return;}
+    // Countdown samples change at publication frequency; preserve open menus and unsaved forms.
+    const seatsKey=snapshot.seats.map(seat=>({...seat,absence:seat.absence?{episodeId:seat.absence.episodeId,blocksGameplay:seat.absence.blocksGameplay}:null}));
+    const key=JSON.stringify([snapshot.room.phase,seatsKey,snapshot.rules,snapshot.creatorId]);
+    if(key===this.renderKey){
+      for(const seat of snapshot.seats){
+        const text=this.root.querySelector<HTMLElement>(`[data-seat-id="${seat.id}"] .network-seat-state`);
+        if(text && text.textContent!==this.seatState(seat))text.textContent=this.seatState(seat);
+      }
+      this.status(session.status);return;
+    }
     this.renderKey=key;
     if(snapshot.state?.phase==='results') {
       this.view='results';
