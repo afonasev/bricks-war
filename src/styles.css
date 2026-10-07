@@ -3,6 +3,7 @@
 @import './desktopSurvivalFit.css';
 @import './desktopRecordFit.css';
 @import './desktopStage.css';
+@import './survivalRecords.css';
 :root {
   color-scheme: light;
   --ink: #eaf8ff;

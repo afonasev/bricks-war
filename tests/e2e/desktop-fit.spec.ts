@@ -159,9 +159,8 @@ for (const [width,height] of [[1280,480],[800,620]] as const) {
           expect(Math.abs(row.width-matchRows[0]!.width)).toBeLessThan(1);
           if(index) expect(row.y).toBeGreaterThanOrEqual(matchRows[index-1]!.bottom);
         });
-        const next=page.getByRole('button',{name:'Следующие →',exact:true});
-        while(await next.isEnabled()) { await next.click(); await expectResultColumns(); }
-        await expect(page.locator('.survival-record-list li:not([hidden])')).not.toHaveCount(0);
+        await expect(page.locator('.desktop-record-pages')).toHaveCount(0);
+        await expect(page.locator('.survival-record-list li:not([hidden])')).toHaveCount(10);
       }
     });
   }
@@ -195,12 +194,9 @@ test('desktop compositions keep proportions and records form one column through 
     const resized = await composition();
     resized.forEach((box,i)=>box.forEach((value,j)=>expect(Math.abs(value-original[i]![j]!)).toBeLessThan(1)));
     const records = await page.locator('.survival-records li:not([hidden])').evaluateAll(items=>items.map(el=>el.getBoundingClientRect().toJSON()));
-    expect(records).toHaveLength(4);
+    expect(records).toHaveLength(10);
     records.forEach((r,i)=>{expect(Math.abs(r.x-records[0]!.x)).toBeLessThan(1); if(i) expect(r.y).toBeGreaterThanOrEqual(records[i-1]!.bottom);});
   }
-  await page.getByRole('button',{name:'Следующие →',exact:true}).click();
-  await expect(page.locator('.desktop-record-pages output')).toHaveText('2 / 3');
-  await page.setViewportSize({width:2560,height:1440});
-  await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
-  await expect(page.locator('.desktop-record-pages output')).toHaveText('2 / 3');
+  await expect(page.locator('.desktop-record-pages')).toHaveCount(0);
+  await expect(page.locator('.survival-records li:not([hidden])')).toHaveCount(10);
 });

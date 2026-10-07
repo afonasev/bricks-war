@@ -365,9 +365,9 @@ test('shows mode-specific setup and removes participants reversibly', async ({ p
   await expect(page.getByText('Имя', { exact: true })).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Лучшие результаты' })).toBeVisible();
   await expect(page.locator('.survival-records')).toContainText('Тест');
-  await expect(page.locator('.survival-records')).toContainText('42 фигуры');
+  await expect(page.locator('.survival-records li small')).toHaveCount(0);
   await expect(page.locator('.survival-records')).not.toContainText('Дата неизвестна');
-  await expect(page.locator('.survival-records li small.is-empty')).toHaveCount(1);
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('bricks-war:solo-records:v1')!)[0].placedPieces)).toBe(42);
   await expect(page.getByRole('button', { name: 'Начать' })).toBeEnabled();
   await page.getByRole('button', { name: 'Начать' }).click();
   await expect(page.locator('.hud-card')).toHaveCount(2);

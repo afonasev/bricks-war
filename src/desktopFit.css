@@ -118,8 +118,6 @@ html:has(#app[data-layout="desktop"]), body:has(#app[data-layout="desktop"]), #a
 #app[data-layout="desktop"] .results-panel { width: min(1100px,calc(1120px - 32px)); }
 #app[data-layout="desktop"] .survival-match-results, #app[data-layout="desktop"] .survival-record-list { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 4px 10px; }
 #app[data-layout="desktop"] .results-list small { font-size: 12px; }
-#app[data-layout="desktop"] .desktop-record-pages { display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; align-items: center; margin: 6px 0; }
-#app[data-layout="desktop"] .desktop-record-pages button { min-height: 32px; border: 2px solid #a9bdd1; border-radius: 8px; background: #fffdf8; color: #123564; font-size: 14px; }
 #app[data-layout="desktop"] .pause-panel { gap: 6px; }
 #app[data-layout="desktop"] .pause-panel > span { font-size: 26px; }
 #app[data-layout="desktop"] .pause-panel > small { font-size: 12px; }

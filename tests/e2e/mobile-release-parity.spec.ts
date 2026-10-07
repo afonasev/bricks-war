@@ -119,7 +119,7 @@ test('keeps phone Battle context in side zones and makes Pause exclusive', async
   expect(settingsBounds.scrollHeight).toBe(settingsBounds.clientHeight);
 });
 
-test('scrolls every Survival record above the fixed start action', async ({ page }) => {
+test('shows all ten Survival records above Start without scrolling', async ({ page }) => {
   await page.evaluate(() => {
     const records = Array.from({ length: 10 }, (_, index) => ({
       id: `scroll-record-${index}`,
@@ -134,8 +134,9 @@ test('scrolls every Survival record above the fixed start action', async ({ page
   });
   await page.reload();
   await page.getByRole('button', { name: /^Выживание/ }).click();
-  await page.locator('.setup-scroll').evaluate((screen) => { screen.scrollTop = screen.scrollHeight; });
-  await page.locator('.mobile-survival-records ol').evaluate((list) => { list.scrollTop = list.scrollHeight; });
+  const scrolling = await page.locator('.setup-scroll, .mobile-survival-records ol').evaluateAll(elements => elements.filter(el => el.scrollHeight > el.clientHeight + 1 || el.scrollTop !== 0).map(el => el.className));
+  expect(scrolling).toEqual([]);
+  await expect(page.locator('.mobile-survival-records li:visible')).toHaveCount(10);
   const [lastRecord, start] = await Promise.all([
     page.locator('.mobile-survival-records li').last().boundingBox(),
     page.getByRole('button', { name: 'Начать', exact: true }).boundingBox(),
