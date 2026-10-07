@@ -121,7 +121,7 @@ describe('authoritative room lifecycle',()=>{
     }
     expect(g.room.engine!.state.elapsedMs-elapsed).toBeCloseTo(2000,4);
     expect(g.room.engine!.state.phase).toBe('playing');
-    expect(()=>f.service.command(g.room,observer.seat,observer.epoch,{type:'input',matchId:g.room.matchId!,connectionEpoch:observer.epoch,inputEpoch:observer.seat.inputEpoch,sequence:1,held:{left:true,right:false,down:false},rotate:false})).toThrow();
+    expect(()=>f.service.command(g.room,observer.seat,observer.epoch,{type:'input',matchId:g.room.matchId!,connectionEpoch:observer.epoch,inputEpoch:observer.seat.inputEpoch,targetTick:g.room.tick+1,spawnSerial:g.room.engine!.state.participants[0]!.board.spawnSerial,actions:['move-left'],sequence:1,held:{left:true,right:false,down:false},rotate:false})).toThrow();
   });
   it.each(['expiry','exclusion'])('an already eliminated observer cannot emit another elimination on %s',async(method)=>{
     const f=fixture();const g=await f.room();f.start(g.links[0]!);f.advance(4200);const observer=g.links[2]!;
@@ -144,11 +144,11 @@ describe('authoritative room lifecycle',()=>{
   it('strict input sequence/epochs reject spoofed/stale commands; duplicate input acts once and flood bounds queue',async()=>{
     const f=fixture();const g=await f.room(2);f.start(g.links[0]!);f.advance(4500);
     const l=g.links[0]!;const input:InputEnvelope={type:'input',matchId:g.room.matchId!,connectionEpoch:l.epoch,inputEpoch:l.seat.inputEpoch,
-      sequence:1,held:{left:true,right:false,down:false},rotate:false};
+      targetTick:g.room.tick+1,spawnSerial:g.room.engine!.state.participants[0]!.board.spawnSerial,actions:['move-left'],sequence:1,held:{left:true,right:false,down:false},rotate:false};
     f.service.command(g.room,l.seat,l.epoch,input);f.service.command(g.room,l.seat,l.epoch,input);expect(l.seat.queue).toHaveLength(1);
     expect(()=>f.service.command(g.room,l.seat,l.epoch,{...input,sequence:2,matchId:'old'})).toThrow();
     expect(()=>f.service.command(g.room,l.seat,l.epoch,{...input,sequence:2,inputEpoch:0})).toThrow();
-    for(let seq=2;seq<=64;seq++)f.service.command(g.room,l.seat,l.epoch,{...input,sequence:seq});
+    for(let seq=2;seq<=64;seq++)f.service.command(g.room,l.seat,l.epoch,{...input,sequence:seq,actions:[]});
     expect(()=>f.service.command(g.room,l.seat,l.epoch,{...input,sequence:65})).toThrow(RoomError);
     expect(l.seat.queue).toHaveLength(64);
     f.service.command(g.room,l.seat,l.epoch,{type:'pause'});expect(l.seat.queue).toHaveLength(0);expect(l.seat.input.held.down).toBe(false);
@@ -159,11 +159,11 @@ describe('authoritative room lifecycle',()=>{
     const x=board.active!.x;
     f.jump(1000); // A delayed callback has one second of older simulation debt.
     const input:InputEnvelope={type:'input',matchId:g.room.matchId!,connectionEpoch:link.epoch,inputEpoch:link.seat.inputEpoch,
-      sequence:1,held:{left:true,right:false,down:false},rotate:false};
+      targetTick:g.room.tick+1,spawnSerial:g.room.engine!.state.participants[0]!.board.spawnSerial,actions:['move-left'],sequence:1,held:{left:true,right:false,down:false},rotate:false};
     f.service.command(g.room,link.seat,link.epoch,input);f.service.advance();
     f.jump(10);f.service.advance(); // Only 10 ms of actual hold; never a DAS repeat.
     expect(board.active!.x).toBe(x-1);
-    f.service.command(g.room,link.seat,link.epoch,{...input,sequence:2,held:{left:false,right:false,down:false}});
+    f.service.command(g.room,link.seat,link.epoch,{...input,sequence:2,held:{left:false,right:false,down:false},actions:[]});
     for(let n=0;n<20;n++)f.service.advance();
     f.advance(20);
     expect(link.seat.ack).toBe(2);
@@ -175,4 +175,37 @@ describe('authoritative room lifecycle',()=>{
     const tiny=new RoomService(()=>0,1);await tiny.create('A','A');await expect(tiny.create('B','B')).rejects.toThrow();
     tiny.draining=true;await expect(tiny.create('C','C')).rejects.toThrow();
   });
+});
+
+it('scheduled actions wait for their tick, ACK after execution, and mismatched release never stalls',async()=>{
+  const f=fixture(),g=await f.room(2);f.start(g.links[0]!);f.advance(4500);
+  const l=g.links[0]!,board=g.room.engine!.state.participants[0]!.board;
+  const tick=g.room.tick,x=board.active!.x;
+  const input:InputEnvelope={type:'input',matchId:g.room.matchId!,connectionEpoch:l.epoch,inputEpoch:l.seat.inputEpoch,
+    sequence:1,targetTick:tick+10,spawnSerial:board.spawnSerial,held:{left:true,right:false,down:true},rotate:false,actions:['move-left','soft-drop-on']};
+  f.service.command(g.room,l.seat,l.epoch,input);f.advance(100);
+  expect(l.seat.ack).toBe(0);expect(board.active!.x).toBe(x);
+  f.advance(70);expect(l.seat.ack).toBe(1);expect(board.active!.x).toBe(x-1);
+  expect(l.seat.inputResult).toEqual({sequence:1,appliedTick:tick+10,disposition:'applied',lateCount:0,mismatchCount:0});
+  f.service.command(g.room,l.seat,l.epoch,{...input,sequence:2,targetTick:g.room.tick+1,spawnSerial:board.spawnSerial+9,
+    held:{left:false,right:false,down:false},rotate:true,actions:['rotate-clockwise','soft-drop-off']});
+  const rotation=board.active!.rotation;f.advance(20);
+  expect(l.seat.ack).toBe(2);expect(l.seat.inputResult?.disposition).toBe('piece-mismatch');
+  expect(board.active!.rotation).toBe(rotation);expect(board.softDrop).toBe(false);expect(l.seat.queue).toHaveLength(0);
+});
+
+it('acknowledges a neutral delayed beyond the movement age bound and resumes the next sequence',async()=>{
+  const f=fixture(),g=await f.room(2);f.start(g.links[0]!);f.advance(4500);
+  const l=g.links[0]!;
+  const input:InputEnvelope={type:'input',matchId:g.room.matchId!,connectionEpoch:l.epoch,inputEpoch:l.seat.inputEpoch,
+    sequence:1,targetTick:g.room.tick+1,spawnSerial:g.room.engine!.state.participants[0]!.board.spawnSerial,
+    held:{left:false,right:false,down:true},rotate:false,actions:['soft-drop-on']};
+  f.service.command(g.room,l.seat,l.epoch,input);f.advance(2500);
+  f.service.command(g.room,l.seat,l.epoch,{...input,sequence:2,targetTick:input.targetTick+1,
+    held:{left:false,right:false,down:false},actions:['soft-drop-off']});f.advance(20);
+  expect(l.seat.ack).toBe(2);expect(g.room.engine!.state.participants[0]!.board.softDrop).toBe(false);
+  const board=g.room.engine!.state.participants[0]!.board;
+  f.service.command(g.room,l.seat,l.epoch,{...input,sequence:3,targetTick:g.room.tick+1,spawnSerial:board.spawnSerial,
+    held:{left:true,right:false,down:false},actions:['move-left']});f.advance(20);
+  expect(l.seat.ack).toBe(3);expect(l.seat.queue).toHaveLength(0);
 });

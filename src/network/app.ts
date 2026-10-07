@@ -308,6 +308,7 @@ export class NetworkApp {
     const presentation=session.state.participants[0]!;
     Object.assign(arena.dataset,{ownId:snapshot.ownId,total:String(snapshot.state.participants.length),phase:snapshot.state.phase,
       confirmedX:String(own.board.active?.x??''),presentedX:String(presentation.board.active?.x??''),spawnSerial:String(own.board.spawnSerial),
+      presentedY:String(presentation.board.active?.y??''),presentedSpawn:String(presentation.board.spawnSerial),
       inputEpoch:String(snapshot.inputEpoch),inputAck:String(snapshot.inputAck),matchId:snapshot.matchId??'',tick:String(snapshot.tick),alive:String(own.board.alive),preparation:String(own.board.preparationRemainingMs)});
     for(const clock of this.root.querySelectorAll('#network-clock,#network-mobile-clock'))clock.textContent=formatClock(snapshot.state.isSurvival||snapshot.state.options.battleTimeMode==='until-victory'?snapshot.state.elapsedMs:snapshot.state.remainingMs??0);
     const countdown=this.root.querySelector<HTMLElement>('#network-countdown')!;

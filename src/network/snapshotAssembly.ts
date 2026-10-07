@@ -1,8 +1,8 @@
 import {MAX_INPUT_BYTES,MAX_SNAPSHOT_BYTES,type ClientSnapshot} from './protocol';
-export type CommonSnapshot=Omit<ClientSnapshot,'ownId'|'connectionEpoch'|'inputAck'|'inputEpoch'|'repeatSequence'|'repeatOrdinal'>;
+export type CommonSnapshot=Omit<ClientSnapshot,'ownId'|'connectionEpoch'|'inputAck'|'inputEpoch'|'repeatSequence'|'repeatOrdinal'|'inputResult'>;
 export interface SnapshotManifest {
   type:'snapshot-manifest';snapshotId:string;revision:number;roomId:string;matchId:string|null;
-  ackRequired?:boolean;
+  ackRequired?:boolean; inputResult?: ClientSnapshot['inputResult'];
   ownId:string;connectionEpoch:number;inputAck:number;inputEpoch:number;
   repeatSequence:number;repeatOrdinal:number;
 }
@@ -34,7 +34,7 @@ export class SnapshotAssembly {
     const common=JSON.parse(new TextDecoder().decode(Uint8Array.from(binary,c=>c.charCodeAt(0)))) as CommonSnapshot;
     const m=p.manifest;
     if(common.type!=='snapshot'||common.revision!==m.revision||common.room.id!==m.roomId||common.matchId!==m.matchId)throw new Error('Manifest identity mismatch');
-    const snapshot:ClientSnapshot={...common,ownId:m.ownId,connectionEpoch:m.connectionEpoch,inputAck:m.inputAck,inputEpoch:m.inputEpoch,repeatSequence:m.repeatSequence,repeatOrdinal:m.repeatOrdinal};
+    const snapshot:ClientSnapshot={...common,ownId:m.ownId,connectionEpoch:m.connectionEpoch,inputAck:m.inputAck,inputEpoch:m.inputEpoch,repeatSequence:m.repeatSequence,repeatOrdinal:m.repeatOrdinal,inputResult:m.inputResult};
     if(new TextEncoder().encode(JSON.stringify(snapshot)).length>MAX_SNAPSHOT_BYTES)throw new Error('Combined bound');
     this.clear();return snapshot;
   }

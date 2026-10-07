@@ -28,7 +28,7 @@ process.on('message',(message:{type:string;credentials?:Credential[]})=>{
       if(snapshot.inputEpoch!==inputEpoch){inputEpoch=snapshot.inputEpoch;seq=0;}
       if(snapshot.state?.phase==='playing'&&!snapshot.state.globalEventHold&&snapshot.tick%90<4)socket.send(JSON.stringify({type:'input',
         matchId:snapshot.matchId,connectionEpoch:snapshot.connectionEpoch,inputEpoch:snapshot.inputEpoch,sequence:++seq,
-        held:{left:(snapshot.tick%180)<90,right:(snapshot.tick%180)>=90,down:false},rotate:false}));
+        targetTick:snapshot.tick+1,spawnSerial:snapshot.state.participants.find(p=>p.config.id===snapshot.ownId)!.board.spawnSerial,actions:['rotate-clockwise'],held:{left:false,right:false,down:false},rotate:true}));
     });
   }
 });

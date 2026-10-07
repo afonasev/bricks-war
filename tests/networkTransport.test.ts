@@ -99,7 +99,7 @@ it('committed input publishes complete state before the next periodic deadline',
     await wait(()=>!!snapshots.at(-1)?.seats.find(s=>s.id===host.participantId)?.connected);
     const initial=snapshots.at(-1)!;publicationClock=10;
     const original=service.command.bind(service);let received=false;service.command=(room,seat,epoch,command)=>{original(room,seat,epoch,command);if(command.type==='input')received=true;};
-    socket.send(JSON.stringify({type:'input',matchId:initial.matchId,connectionEpoch:initial.connectionEpoch,inputEpoch:initial.inputEpoch,sequence:1,held:{left:false,right:true,down:false},rotate:false}));
+    socket.send(JSON.stringify({type:'input',matchId:initial.matchId,connectionEpoch:initial.connectionEpoch,inputEpoch:initial.inputEpoch,targetTick:initial.tick+1,spawnSerial:initial.state!.participants.find(p=>p.config.id===initial.ownId)!.board.spawnSerial,actions:['move-right'],sequence:1,held:{left:false,right:true,down:false},rotate:false}));
     await wait(()=>received);expect(links[0]!.seat.ack).toBe(0);expect(snapshots.at(-1)!.inputAck).toBe(0);
     now+=1000/60;await wait(()=>snapshots.at(-1)!.inputAck===1);
     const confirmed=snapshots.at(-1)!;expect(publicationClock).toBeLessThan(50);expect(confirmed.state!.phase).toBe('playing');expect(confirmed.tick).toBeGreaterThan(initial.tick);

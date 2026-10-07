@@ -121,6 +121,9 @@ export function createNetworkServer(service = new RoomService(), allowedOrigins:
             old.socket.send(JSON.stringify({type: 'replaced', message: 'Управление открыто в другой вкладке.'})); old.socket.close(1000);
           }
           link = {socket, ...connected, revision: -1, snapshotAcks: command.snapshotAcks===true, outstanding: [], coalesced: false}; links.add(link); clearTimeout(authTimeout);
+        } else if(command.type==='ping') {
+          if (Number.isFinite(command.nonce)) socket.send(JSON.stringify({type:'pong',nonce:command.nonce}));
+          return;
         } else if(command.type==='snapshot-ack') {
           const index=link.outstanding.indexOf(command.snapshotId);
           if(index>=0){link.outstanding.splice(0,index+1);if(link.coalesced)publishRoom(link.room,link);}

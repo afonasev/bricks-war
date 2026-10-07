@@ -1,3 +1,4 @@
+import {ScheduledInput, pieceActions} from '../src/network/scheduledInput';
 import { roomRules, normalizeRoomRules, defaultRoomRules, balancedNetworkTeams } from '../src/network/rules';
 import { randomBytes, randomUUID, scrypt, timingSafeEqual, createHash } from 'node:crypto';
 import { MatchEngine, encodeMatchState, FIXED_STEP_MS } from '../src/simulation/match';
@@ -32,7 +33,7 @@ export interface Seat {
   id: string; token: string | null; name: string; tileStyle: TileStyleSelection; teamId: TeamId; seatOrder: number;
   ready: boolean; connected: boolean; retained: boolean; connectionEpoch: number; inputEpoch: number;
   lastHealth: number; absence: { episodeId: number; deadline: number; blocksGameplay: boolean } | null;
-  episode: number; awaitingRevision: number | null; input: HeldInput; inputAt:number; queue: (InputEnvelope & {receivedAt:number})[]; received: number; ack: number;
+  episode: number; awaitingRevision: number | null; scheduled: ScheduledInput; inputResult?: ClientSnapshot['inputResult']; input: HeldInput; inputAt:number; queue: (InputEnvelope & {receivedAt:number})[]; received: number; ack: number;
 }
 export interface Room {
   id: string; name: string; password: {salt: string; verifier: Buffer} | null;
@@ -83,7 +84,7 @@ export class RoomService {
     const token = randomBytes(32).toString('base64url');
     const seat: Seat = {kind: 'human', difficulty: null, id: randomUUID(), token: credentialHash(token), name: name(playerName), tileStyle: profile.tileStyle ?? 'random', teamId: profile.teamId ?? (room.seats.filter(s=>s.retained&&s.teamId==='team-1').length <= room.seats.filter(s=>s.retained&&s.teamId==='team-2').length ? 'team-1' : 'team-2'),
       seatOrder: room.nextSeatOrder++, ready: false, connected: false, retained: true, connectionEpoch: 0, inputEpoch: 1,
-      lastHealth: this.now(), absence: null, episode: 0, awaitingRevision: null, input: new HeldInput(), inputAt:this.now(), queue: [], received: 0, ack: 0};
+      lastHealth: this.now(), absence: null, episode: 0, awaitingRevision: null, scheduled: new ScheduledInput(), input: new HeldInput(), inputAt:this.now(), queue: [], received: 0, ack: 0};
     // An allocation which never opens a control connection also expires.
     seat.absence = {episodeId: ++seat.episode, deadline: this.now() + RETURN_WINDOW_MS, blocksGameplay: false};
     if(!room.engine)room.seats=room.seats.filter(s=>s.retained);
@@ -159,6 +160,7 @@ export class RoomService {
         && typeof command.rotate === 'boolean', 'input', 'Некорректный ввод.');
       if (command.sequence <= seat.received) return;
       requireCondition(command.sequence === seat.received + 1 && seat.queue.length < MAX_PENDING_INPUTS, 'resync', 'Очередь ввода заполнена; восстановите состояние.');
+      requireCondition(seat.scheduled.accept(command, room.tick), 'resync', 'Некорректный такт или действия ввода.');
       seat.received = command.sequence; seat.queue.push({...structuredClone(command),receivedAt:this.now()}); return;
     }
     if (command.type === 'pause') {
@@ -237,12 +239,12 @@ export class RoomService {
   private botSeat(room: Room, template: BotTemplate): Seat {
     return {kind:'ai', difficulty:template.difficulty, id:randomUUID(), token:null, name:aiNames[template.difficulty], tileStyle:template.tileStyle, teamId:template.teamId,
       seatOrder:room.nextSeatOrder++, ready:true, connected:true, retained:true, connectionEpoch:0, inputEpoch:0, lastHealth:0, absence:null, episode:0, awaitingRevision:null,
-      input:new HeldInput(), inputAt:this.now(), queue:[], received:0, ack:0};
+      scheduled:new ScheduledInput(), input:new HeldInput(), inputAt:this.now(), queue:[], received:0, ack:0};
   }
   private resetReady(room: Room): void { for (const seat of room.seats) seat.ready = seat.kind === 'ai'; }
   private resetInputs(room: Room, target?:Seat): void {
     room.inputEpoch++;
-    for (const seat of (target ? [target] : room.seats).filter(s => s.kind === 'human')) {seat.inputEpoch++;seat.input.reset(); seat.inputAt=this.now(); seat.queue = []; seat.received = 0; seat.ack = 0;}
+    for (const seat of (target ? [target] : room.seats).filter(s => s.kind === 'human')) {seat.inputEpoch++;seat.input.reset(); seat.scheduled = new ScheduledInput(); seat.inputResult = undefined; seat.inputAt=this.now(); seat.queue = []; seat.received = 0; seat.ack = 0;}
     for (const p of (room.engine?.state.participants ?? []).filter(p=>!target||p.config.id===target.id)) {p.board.softDrop = false; p.board.softDropElapsedMs = 0;}
   }
   private event(room: Room, kind: RoomEvent['kind'], participantId?: string): void {
@@ -311,17 +313,18 @@ export class RoomService {
         const actions = new Map<string, GameAction[]>();
         for (const s of room.seats) {
           if (s.kind !== 'human' || !s.retained || !s.connected) continue;
-          // Repeat timing follows trusted server arrival time, not historical
-          // simulation debt. A newly arrived 10 ms tap must never become a DAS
-          // hold just because this callback replays older fixed physics steps.
           const inputActions:GameAction[]=[];
-          for(const input of s.queue.splice(0)){
-            inputActions.push(...s.input.step(Math.max(0,input.receivedAt-s.inputAt)));
-            s.inputAt=input.receivedAt;
-            s.input.update(input.held,input.rotate,input.sequence);s.ack=input.sequence;
+          const board = room.engine.state.participants.find(p => p.config.id === s.id)!.board;
+          while (s.queue[0] && s.queue[0].targetTick <= room.tick + 1) {
+            const input = s.queue.shift()!;
+            inputActions.push(...pieceActions(input, board.spawnSerial));
+            s.input.update(input.held, false, input.sequence); s.input.step(0);
+            s.ack = input.sequence;
+            s.inputResult = {sequence: input.sequence, appliedTick: room.tick + 1,
+              lateCount: (s.inputResult?.lateCount ?? 0) + Number(input.targetTick < room.tick + 1),
+              mismatchCount: (s.inputResult?.mismatchCount ?? 0) + Number(input.spawnSerial !== board.spawnSerial),
+              disposition: input.spawnSerial !== board.spawnSerial ? 'piece-mismatch' : input.targetTick < room.tick + 1 ? 'late' : 'applied'};
           }
-          inputActions.push(...s.input.step(Math.max(0,now-s.inputAt)));
-          s.inputAt=now;
           actions.set(s.id,inputActions);
         }
         const alive = room.engine.state.participants.filter(p => p.board.alive).map(p => p.config.id);
@@ -345,7 +348,7 @@ export class RoomService {
       protected: !!room.password, phase: room.engine?.state.phase ?? 'waiting'};
   }
   snapshot(room: Room, seat: Seat): ClientSnapshot {
-    return {...this.commonSnapshot(room),ownId:seat.id,connectionEpoch:seat.connectionEpoch,inputAck:seat.ack,inputEpoch:seat.inputEpoch,repeatSequence:seat.input.holdSequence,repeatOrdinal:seat.input.completedRepeats};
+    return {...this.commonSnapshot(room),ownId:seat.id,connectionEpoch:seat.connectionEpoch,inputAck:seat.ack,inputEpoch:seat.inputEpoch,repeatSequence:seat.input.holdSequence,repeatOrdinal:seat.input.completedRepeats,inputResult:seat.inputResult};
   }
   commonSnapshot(room: Room, sampledAt=this.now(), includeState=true): CommonSnapshot {
     return {type: 'snapshot', protocol: PROTOCOL_VERSION, rulesVersion: RULES_VERSION, serviceId: this.serviceId,
@@ -354,6 +357,7 @@ export class RoomService {
         ready: s.ready, connected: s.connected, retained: s.retained,
         absence: s.absence ? {episodeId: s.absence.episodeId, remainingMs: Math.max(0,s.absence.deadline-sampledAt), blocksGameplay: s.absence.blocksGameplay} : null})),
 
+      prediction: room.engine?.predictionCheckpoint() ?? null,
       matchId: room.matchId, tick: room.tick, state: includeState && room.engine ? encodeMatchState(room.engine.state) : null,
       manualPausedBy: room.manualPausedBy, events: room.events.map(e => ({...e}))};
   }

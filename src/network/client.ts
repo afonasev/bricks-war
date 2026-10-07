@@ -1,12 +1,11 @@
-import type { MatchState, PauseReason } from '../domain/types';
+import type { GameAction, MatchState, PauseReason } from '../domain/types';
 import type { MatchSession } from '../sessions/matchSession';
-import { decodeMatchState } from '../simulation/match';
-import { tryMove, tryRotateClockwise } from '../simulation/board';
+import { decodeMatchState, FIXED_STEP_MS } from '../simulation/match';
+import {OwnPrediction} from './ownPrediction';
 import { HeldInput } from './heldInput';
-import { EMPTY_HELD, HEARTBEAT_MS, HEALTH_TIMEOUT_MS, MAX_PENDING_INPUTS, PROTOCOL_VERSION, RULES_VERSION,
+import { EMPTY_HELD, HEARTBEAT_MS, HEALTH_TIMEOUT_MS, MAX_PENDING_INPUTS, MAX_INPUT_LEAD_TICKS, PREDICTION_TIMEOUT_MS, PROTOCOL_VERSION, RULES_VERSION,
   type ClientCommand, type ClientSnapshot, type Credential, type HeldControls, type InputEnvelope } from './protocol';
 import { SnapshotAssembly } from './snapshotAssembly';
-import {PredictionJournal} from './predictionJournal';
 import { retainNetworkParticipation,setNetworkParticipation } from '../pwa/participation';
 const STORAGE_KEY = 'bricks-network-seat-v1';
 export function loadCredential(): Credential | null {
@@ -46,9 +45,11 @@ export class NetworkMatchSession implements MatchSession {
   private pending: {input: InputEnvelope; at: number}[] = [];
   private predicted: MatchState | null = null;
   private repeat = new HeldInput();
-  private journal = new PredictionJournal();
+  private prediction = new OwnPrediction();
+  private snapshotAt = performance.now();
+  private leadTicks = 12;
+  private pingAt: number | null = null;
   private held = {...EMPTY_HELD};
-  private lastFrame = performance.now();
   private assembly = new SnapshotAssembly();
   private seenEvents = new Set<string>();
   private recoverySequence: number | null = null;
@@ -68,6 +69,10 @@ export class NetworkMatchSession implements MatchSession {
           const snapshot=this.assembly.accept(data);
           if(snapshot){this.confirm(snapshot);if(publication?.ackRequired)this.send({type:'snapshot-ack',snapshotId:publication.id});publication=null;}
           return;
+        }
+        if (data.type === 'pong' && data.nonce === this.pingAt) {
+          this.leadTicks = Math.min(MAX_INPUT_LEAD_TICKS - 4, Math.max(12, Math.ceil((performance.now() - data.nonce + 50) / FIXED_STEP_MS)));
+          this.pingAt = null; return;
         }
         if (data.type === 'ended' || data.type === 'replaced') {
           this.dispose(); this.status = data.message;
@@ -95,7 +100,7 @@ export class NetworkMatchSession implements MatchSession {
       if (!this.closed) {this.status = 'Связь потеряна · переподключение…'; this.onChange(); this.retry=setTimeout(()=>this.connect(),1000);}
     };
     if (!this.heartbeat) {
-      this.heartbeat = setInterval(()=>this.send({type:'heartbeat',visible:!document.hidden}),HEARTBEAT_MS);
+      this.heartbeat = setInterval(()=>{this.send({type:'heartbeat',visible:!document.hidden});this.pingAt=performance.now();this.send({type:'ping',nonce:this.pingAt});},HEARTBEAT_MS);
       document.addEventListener('visibilitychange',this.visibility);
     }
     this.armSnapshotWatchdog();
@@ -112,21 +117,20 @@ export class NetworkMatchSession implements MatchSession {
     const old = this.snapshot;
     const reset = !old || old.inputEpoch !== snapshot.inputEpoch || old.connectionEpoch !== snapshot.connectionEpoch
       || old.matchId !== snapshot.matchId || snapshot.state?.phase !== 'playing';
-    const spawned=old?.state?.participants.find(p=>p.config.id===snapshot.ownId)?.board.spawnSerial !== snapshot.state?.participants.find(p=>p.config.id===snapshot.ownId)?.board.spawnSerial;
     this.snapshot = snapshot;
     if (reset) {
       const epochChanged=!old || old.inputEpoch!==snapshot.inputEpoch || old.connectionEpoch!==snapshot.connectionEpoch || old.matchId!==snapshot.matchId;
       const sequence=this.sequence;this.reset();if(!epochChanged)this.sequence=sequence;
     }
     this.sequence = Math.max(this.sequence,snapshot.inputAck);
-    if(spawned&&!reset)this.journal.reset();
     this.pending=this.pending.filter(p=>p.input.sequence>snapshot.inputAck);
     if(this.recoverySequence!==null&&snapshot.inputAck>=this.recoverySequence)this.recoverySequence=null;
     this.predicted = snapshot.state ? decodeMatchState(snapshot.state) : null;
-    if (snapshot.state?.anomalyTransition || snapshot.state?.globalEventHold) {
-      this.journal.reset();this.repeat.reset();this.held={...EMPTY_HELD};this.onResetInput();
-    } else this.applyPrediction(this.journal.reconcile(snapshot.inputAck,snapshot.repeatSequence,snapshot.repeatOrdinal));
-    this.repeat.acknowledge(snapshot.repeatSequence,snapshot.repeatOrdinal);
+    const frozen = !!(snapshot.state?.anomalyTransition || snapshot.state?.globalEventHold);
+    if (frozen) {this.repeat.reset();this.held={...EMPTY_HELD};this.onResetInput();}
+    const target = frozen ? snapshot.tick : reset ? snapshot.tick + this.leadTicks : Math.max(this.prediction.tick, snapshot.tick);
+    this.snapshotAt = performance.now();
+    this.prediction.confirm(snapshot, frozen ? [] : this.pending.map(p => p.input), target);
     for (const event of snapshot.events) this.seenEvents.add(event.id);
     if (this.seenEvents.size>128) this.seenEvents=new Set(snapshot.events.map(e=>e.id));
     const own = snapshot.seats.find(s=>s.id===snapshot.ownId);
@@ -137,7 +141,7 @@ export class NetworkMatchSession implements MatchSession {
   }
   get state(): MatchState {
     if (!this.predicted) throw new Error('No network match');
-    return projectedState(this.predicted,this.credential.participantId);
+    return projectedState(this.prediction.present(this.predicted),this.credential.participantId);
   }
   get active(): boolean {return !this.closed;}
   acceptsGameplayInput(): boolean {
@@ -149,42 +153,57 @@ export class NetworkMatchSession implements MatchSession {
   }
   controls(held: HeldControls, rotate=false): void {
     if (!this.acceptsGameplayInput() || !this.snapshot?.matchId) return;
+    this.step();
+    if (!this.acceptsGameplayInput()) return;
     if (!rotate && held.left===this.held.left && held.right===this.held.right && held.down===this.held.down) return;
-    if (this.pending.length>=MAX_PENDING_INPUTS-1 || (this.pending[0] && performance.now()-this.pending[0].at>300)) {this.recoverPrediction();return;}
+    if (this.exhausted()) {this.recoverPrediction();return;}
     this.held={...held};
-    const input: InputEnvelope={type:'input',matchId:this.snapshot.matchId,connectionEpoch:this.snapshot.connectionEpoch,
-      inputEpoch:this.snapshot.inputEpoch,sequence:++this.sequence,held:{...held},rotate};
-    this.pending.push({input,at:performance.now()}); this.send(input);
-    this.repeat.update(held,rotate,input.sequence);
-    const actions=this.repeat.step(0);this.journal.record(actions,input.sequence,null,performance.now());this.applyPrediction(actions);
+    this.repeat.update(held,rotate,this.sequence+1);
+    this.queueActions(this.repeat.step(FIXED_STEP_MS), rotate);
+  }
+  private exhausted(): boolean {
+    return this.pending.length >= MAX_PENDING_INPUTS - 1
+      || !!this.pending[0] && performance.now() - this.pending[0].at > PREDICTION_TIMEOUT_MS
+      || !!this.snapshot && this.prediction.tick >= this.snapshot.tick + MAX_INPUT_LEAD_TICKS - 1
+      || performance.now() - this.snapshotAt > PREDICTION_TIMEOUT_MS;
+  }
+  private queueActions(actions: GameAction[], rotate=false): void {
+    const snapshot=this.snapshot;
+    const board=this.prediction.engine?.state.participants.find(p=>p.config.id===this.credential.participantId)?.board;
+    if (!snapshot?.matchId || !board) return;
+    const targetTick = this.prediction.tick + 1;
+    const input: InputEnvelope={type:'input',matchId:snapshot.matchId,connectionEpoch:snapshot.connectionEpoch,
+      inputEpoch:snapshot.inputEpoch,sequence:++this.sequence,held:{...this.held},rotate,
+      targetTick,spawnSerial:board.spawnSerial,actions};
+    this.pending.push({input,at:performance.now()});this.send(input);
+    this.prediction.advanceTo(targetTick, this.pending.map(p=>p.input));
   }
   step(): void {
-    const now=performance.now(); const dt=Math.min(now-this.lastFrame,50); this.lastFrame=now;
-    if (!this.acceptsGameplayInput()) return;
-    if ((this.pending[0] && now-this.pending[0].at>300)||this.journal.exceeded(now)) {this.recoverPrediction();return;}
-    const ordinal=this.repeat.completedRepeats+1;const actions=this.repeat.step(dt);
-    this.journal.record(actions,this.repeat.holdSequence,ordinal,now);this.applyPrediction(actions);
-  }
-  private applyPrediction(actions: readonly string[]): void {
-    if (this.predicted?.anomalyTransition || this.predicted?.globalEventHold) return;
-    const board=this.predicted?.participants.find(p=>p.config.id===this.credential.participantId)?.board;
-    if (!board?.active) return;
-    for (const action of actions) {
-      if (action==='move-left') tryMove(board,-1,0);
-      if (action==='move-right') tryMove(board,1,0);
-      if (action==='rotate-clockwise') tryRotateClockwise(board);
+    const now=performance.now();
+    if (!this.acceptsGameplayInput() || !this.snapshot) return;
+    if (this.exhausted()) {this.recoverPrediction();return;}
+    const target = this.snapshot.tick + this.leadTicks + Math.floor((now-this.snapshotAt)/FIXED_STEP_MS);
+    const end = Math.min(target,this.prediction.tick+2,this.snapshot.tick+MAX_INPUT_LEAD_TICKS-1);
+    while(this.prediction.tick < end) {
+      const actions=this.repeat.step(FIXED_STEP_MS);
+      if(actions.length)this.queueActions(actions);
+      else this.prediction.advanceTo(this.prediction.tick+1,this.pending.map(p=>p.input));
+      if(this.exhausted()) {this.recoverPrediction();break;}
     }
   }
+
   private recoverPrediction(): void {
     if(this.recoverySequence!==null||!this.snapshot?.matchId)return;
     const input:InputEnvelope={type:'input',matchId:this.snapshot.matchId,connectionEpoch:this.snapshot.connectionEpoch,
-      inputEpoch:this.snapshot.inputEpoch,sequence:++this.sequence,held:{...EMPTY_HELD},rotate:false};
+      inputEpoch:this.snapshot.inputEpoch,sequence:++this.sequence,held:{...EMPTY_HELD},rotate:false,
+      targetTick:Math.max(this.snapshot.tick+1,(this.pending.at(-1)?.input.targetTick??0)+1),
+      spawnSerial:this.prediction.engine?.state.participants.find(p=>p.config.id===this.credential.participantId)?.board.spawnSerial??0,
+      actions:['soft-drop-off']};
     this.recoverySequence=input.sequence;this.status='Задержка связи · восстановление…';
-    this.held={...EMPTY_HELD};this.repeat.reset();this.journal.reset();
-    this.predicted=this.snapshot.state?decodeMatchState(this.snapshot.state):null;
+    this.held={...EMPTY_HELD};this.repeat.reset();
     this.pending.push({input,at:performance.now()});this.send(input);this.onResetInput();this.onChange();
   }
-  private reset(): void {this.pending=[];this.sequence=0;this.recoverySequence=null;this.repeat.reset();this.journal.reset();this.lastFrame=performance.now();this.held={...EMPTY_HELD};this.onResetInput();}
+  private reset(): void {this.pending=[];this.sequence=0;this.recoverySequence=null;this.repeat.reset();this.prediction.reset();this.held={...EMPTY_HELD};this.onResetInput();}
   send(command: ClientCommand): void {if(this.socket?.readyState===WebSocket.OPEN) this.socket.send(JSON.stringify(command));}
   toggleManualPause(): boolean {
     if (!this.snapshot?.state || !this.active) return false;
@@ -192,7 +211,7 @@ export class NetworkMatchSession implements MatchSession {
   }
   pause(reason: PauseReason='manual'): void {this.send(reason==='hidden'?{type:'heartbeat',visible:false}:{type:'pause'});}
   resume(reason: PauseReason='manual'): void {this.send(reason==='hidden'?{type:'heartbeat',visible:true}:{type:'resume'});}
-  private visibility=()=>{this.reset();this.send({type:'heartbeat',visible:!document.hidden});};
+  private visibility=()=>{this.reset();{this.send({type:'heartbeat',visible:!document.hidden});this.pingAt=performance.now();this.send({type:'ping',nonce:this.pingAt});};};
   dispose(leave=false): void {
     if (leave) {this.send({type:'leave'});storeCredential(null);setNetworkParticipation(false);}
     else retainNetworkParticipation();

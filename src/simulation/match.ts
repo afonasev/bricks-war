@@ -199,9 +199,13 @@ export function validateNetworkSurvivalParticipants(configs: readonly Participan
     ? [] : [{ message: 'Сетевое Выживание: минимум два человека, до шести ИИ и восьми разных участников.' }];
 }
 
+export type PredictionCheckpoint = Omit<EngineCheckpoint, 'state' | 'sequence'>;
+
 export class MatchEngine {
+  private predictionOwnId: string | null = null;
+  private predicts(id: string): boolean { return this.predictionOwnId === null || this.predictionOwnId === id; }
   readonly state: MatchState;
-  readonly sequence: PieceSequence;
+  sequence: PieceSequence;
   readonly options;
   private phaseBeforePause: MatchPhase = 'playing';
   private nonAttackLockIds = new Set<string>();
@@ -313,6 +317,26 @@ export class MatchEngine {
       deferredPressureRows: [...this.deferredPressureRows] });
   }
 
+  predictionCheckpoint(): PredictionCheckpoint {
+    return structuredClone({version: 4, execution: this.execution, phaseBeforePause: this.phaseBeforePause,
+      nonAttackLockIds: [...this.nonAttackLockIds], resolvedAnomalyBurnParticipantIds: [...this.resolvedAnomalyBurnParticipantIds],
+      resolvedClearParticipantIds: [...this.resolvedClearParticipantIds], pendingClears: [...this.pendingClears],
+      deferredPressureRows: [...this.deferredPressureRows]});
+  }
+
+  static restorePrediction(state: EncodedMatchState, internals: PredictionCheckpoint, sequence?: PieceSequence): MatchEngine {
+    const engine = MatchEngine.restore({...internals, state, sequence: {randomState: state.seed, pieces: []}});
+    engine.sequence = sequence ?? new PieceSequence(state.seed);
+    return engine;
+  }
+
+  /** Same own lifecycle as authority; opponents and global outcomes never speculate. */
+  stepOwnPrediction(ownId: string, deltaMs: number, actions: readonly GameAction[] = []): void {
+    this.predictionOwnId = ownId;
+    try { this.step(deltaMs, new Map([[ownId, actions]])); }
+    finally { this.predictionOwnId = null; }
+  }
+
   static restore(checkpoint: EngineCheckpoint): MatchEngine {
     if (checkpoint.version !== 4) throw new Error('Unsupported checkpoint version');
     const state = decodeMatchState(checkpoint.state);
@@ -400,6 +424,8 @@ export class MatchEngine {
     const lockEvents: LockEventState[] = [...completedLocks];
 
     for (const participant of this.state.participants) {
+
+      if (!this.predicts(participant.config.id)) continue;
       if (!participant.board.alive) continue;
       if (this.pendingClears.has(participant.config.id) || this.resolvedClearParticipantIds.has(participant.config.id) || this.resolvedAnomalyBurnParticipantIds.has(participant.config.id)) continue;
       participant.board.clearFlashMs = Math.max(0, participant.board.clearFlashMs - activeDeltaMs);
@@ -424,6 +450,7 @@ export class MatchEngine {
       && this.state.nextPressureAtMs <= this.state.elapsedMs
     ) {
       for (const participant of this.state.participants) {
+        if (!this.predicts(participant.config.id)) continue;
         if (participant.board.alive && !this.hasPendingAnomalyBurn(participant.config.id) && !this.resolvedAnomalyBurnParticipantIds.has(participant.config.id)) {
           if (this.absorbShieldRows(participant, 1, 'pressure') === 0) continue;
           if (this.pendingClears.has(participant.config.id)) {
@@ -442,6 +469,7 @@ export class MatchEngine {
 
     if (this.state.isSurvival) {
       for (const participant of this.state.participants) {
+        if (!this.predicts(participant.config.id)) continue;
         const level = Math.floor(participant.placedPieces / this.options.piecesPerLevel);
         if (level <= participant.gravityLevel) continue;
         for (let nextLevel = participant.gravityLevel + 1; nextLevel <= level; nextLevel += 1) this.deliverLevelAnomaly(nextLevel, [participant]);
@@ -451,6 +479,7 @@ export class MatchEngine {
     } else {
       for (let level = previousGravityLevel + 1; level <= nextGravityLevel; level += 1) this.deliverLevelAnomaly(level);
       for (const participant of this.state.participants) {
+        if (!this.predicts(participant.config.id)) continue;
         participant.gravityLevel = nextGravityLevel;
         participant.gravityIntervalMs = gravityIntervalFor(nextGravityLevel, this.options);
       }
@@ -503,6 +532,7 @@ export class MatchEngine {
       level: level ?? current?.level,
     };
     for (const participant of this.state.participants) {
+      if (!this.predicts(participant.config.id)) continue;
       participant.board.softDrop = false;
       participant.board.softDropElapsedMs = 0;
     }
@@ -517,6 +547,7 @@ export class MatchEngine {
       this.state.levelUpEvent.pulseMs = Math.max(0, this.state.levelUpEvent.pulseMs - deltaMs);
     }
     for (const participant of this.state.participants) {
+      if (!this.predicts(participant.config.id)) continue;
       if (participant.levelUpEvent) participant.levelUpEvent.pulseMs = Math.max(0, participant.levelUpEvent.pulseMs - deltaMs);
     }
     if (hold.remainingMs > 0) return;
@@ -708,6 +739,7 @@ export class MatchEngine {
       this.state.levelUpEvent.pulseMs = Math.max(0, this.state.levelUpEvent.pulseMs - deltaMs);
     }
     for (const participant of this.state.participants) {
+      if (!this.predicts(participant.config.id)) continue;
       if (participant.levelUpEvent) participant.levelUpEvent.pulseMs = Math.max(0, participant.levelUpEvent.pulseMs - deltaMs);
     }
     if (this.state.conflictImpactEvent) {
@@ -718,6 +750,7 @@ export class MatchEngine {
     const pendingClears: ClearPresentationState[] = [];
     const landedClears: ClearPresentationState[] = [];
     for (const event of this.state.clearPresentations) {
+      if (!this.predicts(event.participantId)) { pendingClears.push(event); continue; }
       const participant = this.state.participants.find((candidate) => candidate.config.id === event.participantId);
       if (!participant?.board.alive) continue;
       event.remainingMs = Math.max(0, event.remainingMs - deltaMs);
@@ -771,6 +804,7 @@ export class MatchEngine {
     }
     const pendingBurnEvents = [];
     for (const event of this.state.anomalyBurnEvents) {
+      if (!this.predicts(event.participantId)) { pendingBurnEvents.push(event); continue; }
       event.pulseMs = Math.max(0, event.pulseMs - deltaMs);
       if (event.pulseMs > 0.001) {
         pendingBurnEvents.push(event);
@@ -874,6 +908,7 @@ export class MatchEngine {
   }
 
   private collectConflictAttacks(lockEvents: readonly LockEventState[]): void {
+    if (this.predictionOwnId !== null) return;
     if (!this.options.conflictEnabled) return;
     const competitionParticipants = this.state.participants.map((participant, index) => ({
       id: participant.config.id,
@@ -935,6 +970,7 @@ export class MatchEngine {
     const shieldedRecipientIds: string[] = [];
     const incomingRows: Record<string, number> = {};
     for (const [participantId, rows] of Object.entries(pending.incomingRows).sort(([left], [right]) => left.localeCompare(right))) {
+      if (!this.predicts(participantId)) continue;
       const participant = this.state.participants.find((candidate) => candidate.config.id === participantId);
       if (!participant?.board.alive || defended.has(participantId)) continue;
       const remainingRows = this.absorbShieldRows(participant, rows, 'conflict');
@@ -963,6 +999,7 @@ export class MatchEngine {
 
   private updateSurvivalTimes(): void {
     for (const participant of this.state.participants) {
+      if (!this.predicts(participant.config.id)) continue;
       if (!participant.board.alive && participant.eliminatedAtMs === null) {
         participant.eliminatedAtMs = this.state.elapsedMs;
         participant.survivalMs = this.state.elapsedMs;
@@ -979,6 +1016,7 @@ export class MatchEngine {
   }
 
   private resolveOutcomeWhenReady(): void {
+    if (this.predictionOwnId !== null) return;
     this.resolveOutcome();
     if (this.state.phase === 'results') this.state.anomalyTransition = null;
   }
@@ -1048,6 +1086,7 @@ export class MatchEngine {
   private deliverLevelAnomaly(level: number, recipients = this.state.participants): void {
     const anomaly = generateAnomaly(this.state.seed, level);
     for (const participant of recipients) {
+      if (!this.predicts(participant.config.id)) continue;
       const board = participant.board;
       if (!board.alive) continue;
       board.pendingAnomalies.push(anomaly);
@@ -1064,6 +1103,7 @@ export class MatchEngine {
     };
     if (this.state.isSurvival) {
       for (const participant of recipients) {
+        if (!this.predicts(participant.config.id)) continue;
         if (!participant.board.alive) continue;
         participant.levelUpEvent = {
           serial: (participant.levelUpEvent?.serial ?? 0) + 1,
@@ -1140,6 +1180,7 @@ export class MatchEngine {
         .filter((participant) => participant.score === bestScore)
         .map((participant) => participant.config.id);
       for (const participant of this.state.participants) {
+        if (!this.predicts(participant.config.id)) continue;
         participant.placement = 1 + this.state.participants.filter((other) => other.score > participant.score).length;
       }
       this.state.endReason = 'survival';
@@ -1194,6 +1235,7 @@ export class MatchEngine {
     const winnerSet = new Set(this.state.winnerIds);
     const eliminated = this.state.participants.filter((participant) => !winnerSet.has(participant.config.id));
     for (const participant of this.state.participants) {
+      if (!this.predicts(participant.config.id)) continue;
       if (winnerSet.has(participant.config.id)) {
         participant.placement = 1;
         continue;

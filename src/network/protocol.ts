@@ -1,6 +1,6 @@
-import type { AiDifficulty, BattleDifficulty, SoftDropPreset, TileStyleSelection, MatchOptionSelections, TeamId } from '../domain/types';
-import type { EncodedMatchState } from '../simulation/match';
-export const PROTOCOL_VERSION = 2;
+import type { GameAction, AiDifficulty, BattleDifficulty, SoftDropPreset, TileStyleSelection, MatchOptionSelections, TeamId } from '../domain/types';
+import type { EncodedMatchState, PredictionCheckpoint } from '../simulation/match';
+export const PROTOCOL_VERSION = 3;
 export const RULES_VERSION = 'network-modes-6';
 export const RETURN_WINDOW_MS = 30_000;
 export const HEARTBEAT_MS = 2_000;
@@ -8,6 +8,10 @@ export const HEALTH_TIMEOUT_MS = 6_000;
 export const MAX_INPUT_BYTES = 4096;
 export const MAX_SNAPSHOT_BYTES = 256 * 1024;
 export const MAX_PENDING_INPUTS = 64;
+export const MAX_PREDICTION_TICKS = 120;
+export const MAX_INPUT_LEAD_TICKS = 60;
+export const MAX_INPUT_LATENESS_TICKS = 120;
+export const PREDICTION_TIMEOUT_MS = 2000;
 export type NetworkMode = 'survival' | 'battle' | 'team-battle';
 export interface RoomRules extends Partial<MatchOptionSelections> { mode?: NetworkMode; durationMinutes?: number; battleDifficulty: BattleDifficulty; softDrop: SoftDropPreset }
 export interface SeatPreferences { tileStyle?: TileStyleSelection; teamId?: TeamId }
@@ -18,8 +22,10 @@ export interface HeldControls { left: boolean; right: boolean; down: boolean }
 export interface InputEnvelope {
   type: 'input'; matchId: string; connectionEpoch: number; inputEpoch: number; sequence: number;
   held: HeldControls; rotate: boolean;
+  targetTick: number; spawnSerial: number; actions: GameAction[];
 }
 export type ClientCommand = InputEnvelope
+  | { type: 'ping'; nonce: number }
   | { type: 'hello'; credential: Credential; protocol: number; rulesVersion: string; snapshotAcks?: boolean }
   | { type: 'snapshot-ack'; snapshotId: string }
   | { type: 'ack'; revision: number; visible: boolean }
@@ -47,6 +53,8 @@ export interface ClientSnapshot {
   room: LobbySummary; rules: RoomRules; creatorId: string | null; seats: PublicSeat[];
   ownId: string; connectionEpoch: number; inputEpoch: number; inputAck: number;
   repeatSequence: number; repeatOrdinal: number;
+  inputResult?: {sequence: number; appliedTick: number; lateCount: number; mismatchCount: number; disposition: 'applied' | 'late' | 'piece-mismatch'};
+  prediction?: PredictionCheckpoint | null;
   matchId: string | null; tick: number; state: EncodedMatchState | null;
   manualPausedBy: string | null; events: RoomEvent[];
 }

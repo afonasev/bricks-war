@@ -30,7 +30,7 @@ export class SnapshotPublisher {
   }
   manifest(publication:Publication,seat:Seat,ackRequired=false):string {
     const manifest:SnapshotManifest={type:'snapshot-manifest',snapshotId:publication.snapshotId,revision:publication.revision,
-      roomId:publication.roomId,matchId:publication.matchId,ownId:seat.id,connectionEpoch:seat.connectionEpoch,inputAck:seat.ack,inputEpoch:seat.inputEpoch,repeatSequence:seat.input.holdSequence,repeatOrdinal:seat.input.completedRepeats,...(ackRequired?{ackRequired:true}:{})};
+      roomId:publication.roomId,matchId:publication.matchId,ownId:seat.id,connectionEpoch:seat.connectionEpoch,inputAck:seat.ack,inputEpoch:seat.inputEpoch,repeatSequence:seat.input.holdSequence,repeatOrdinal:seat.input.completedRepeats,inputResult:seat.inputResult,...(ackRequired?{ackRequired:true}:{})};
     return JSON.stringify(manifest);
   }
 }

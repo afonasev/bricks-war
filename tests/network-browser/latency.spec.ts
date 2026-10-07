@@ -2,9 +2,9 @@ import {test,expect,type Page,type Browser} from '@playwright/test';
 import {delayRelayProcess} from './delayRelayProcess';
 import {mkdir,writeFile} from 'node:fs/promises';
 const percentile=(values:number[],q:number)=>[...values].sort((a,b)=>a-b)[Math.ceil(values.length*q)-1]!;
-async function writeLatencyEvidence(filename:string,data:unknown){const directory=process.env.BRICKS_NETWORK_LATENCY_EVIDENCE_DIR;const destination=directory?`${directory}/${filename}`:`/tmp/${filename}`;if(directory)await mkdir(directory,{recursive:true});await writeFile(destination,JSON.stringify(data,null,2));}
+async function writeLatencyEvidence(filename:string,data:unknown){const directory=process.env.BRICKS_NETWORK_LATENCY_EVIDENCE_DIR;const repeat=test.info().repeatEachIndex;const name=repeat?filename.replace(/\.json$/,`-repeat-${repeat}.json`):filename;const destination=directory?`${directory}/${name}`:`/tmp/${name}`;if(directory)await mkdir(directory,{recursive:true});await writeFile(destination,JSON.stringify(data,null,2));}
 async function enter(page:Page){await page.goto('/');await page.getByRole('button',{name:/^Сетевая игра/}).click();}
-for(const variant of [2,8,'mixed','battle-8','teams-mixed'] as const){const mixed=variant==='mixed'||variant==='teams-mixed';const count=mixed?2:typeof variant==='number'?variant:8;test(`${variant} contexts RTT 150±50ms prediction and confirmed other-board latency`,async({browser,baseURL})=>{
+for(const variant of [2,7,8,'mixed','battle-7','battle-8','teams-mixed'] as const){const mixed=variant==='mixed'||variant==='teams-mixed';const count=mixed?2:typeof variant==='number'?variant:variant==='battle-7'?7:8;test(`${variant} contexts RTT 150±50ms prediction and confirmed other-board latency`,async({browser,baseURL})=>{
   const isolatedDevices=process.env.BRICKS_NETWORK_ISOLATED_DEVICES==='1';
   const devices:Browser[]=isolatedDevices?await Promise.all(Array.from({length:count},()=>browser.browserType().launch({channel:'chrome',args:['--mute-audio']}))):[];
   const contexts=await Promise.all(Array.from({length:count},(_,index)=>(devices[index]??browser).newContext({baseURL,viewport:{width:800,height:900}})));
@@ -56,7 +56,7 @@ for(const variant of [2,8,'mixed','battle-8','teams-mixed'] as const){const mixe
       if(event.code!=='KeyA'&&event.code!=='KeyD')return;
       const arena=document.querySelector<HTMLElement>('.network-arena');if(!arena)return;
       const started=performance.now(),x=Number(arena.dataset.presentedX)+(event.code==='KeyA'?-1:1);
-      keys.push({at:started,x,code:event.code,target:(event.target as HTMLElement).tagName,hidden:document.hidden,...arena.dataset,status:document.querySelector('#network-status')?.textContent});
+      keys.push({at:started,x,code:event.code,target:(event.target as HTMLElement).tagName,hidden:document.hidden,...arena.dataset,spawnSerial:arena.dataset.presentedSpawn,status:document.querySelector('#network-status')?.textContent});
       const measure=()=>{if(Number(arena.dataset.presentedX)===x){samples.push(performance.now()-started);return;}if(performance.now()-started<1000)requestAnimationFrame(measure);};
       requestAnimationFrame(measure);
     },true);
@@ -65,7 +65,7 @@ for(const variant of [2,8,'mixed','battle-8','teams-mixed'] as const){const mixe
   const local:number[]=[],remote:number[]=[];
   try{
     await enter(host);await host.getByRole('button',{name:'Создать лобби',exact:true}).click();
-    if(variant==='battle-8'||variant==='teams-mixed'){await host.getByRole('combobox',{name:'Режим',exact:true}).click();await host.getByRole('option',{name:variant==='battle-8'?'Битва':'Командный бой',exact:true}).click();}
+    if(variant==='battle-7'||variant==='battle-8'||variant==='teams-mixed'){await host.getByRole('combobox',{name:'Режим',exact:true}).click();await host.getByRole('option',{name:variant==='teams-mixed'?'Командный бой':'Битва',exact:true}).click();}
     await host.getByLabel('Название лобби').fill(room);await host.getByLabel('Ваше имя',{exact:true}).fill('Latency host');await host.getByRole('button',{name:'Создать',exact:true}).click();
     await expect(host.getByRole('heading',{name:room})).toBeVisible();
     for(let i=1;i<count;i++){const page=pages[i]!;await enter(page);await page.locator('.network-lobby').filter({hasText:room}).getByRole('button',{name:'Войти'}).click();await page.getByLabel('Ваше имя',{exact:true}).fill(`Latency human ${i}`);await page.getByRole('button',{name:'Войти',exact:true}).click();await expect(page.getByRole('heading',{name:room})).toBeVisible();}
@@ -76,6 +76,16 @@ for(const variant of [2,8,'mixed','battle-8','teams-mixed'] as const){const mixe
     await expect(host.getByRole('button',{name:'Начать',exact:true})).toBeEnabled();await host.getByRole('button',{name:'Начать',exact:true}).click();
     await expect(host.locator('.network-arena')).toHaveAttribute('data-phase','playing',{timeout:15000});
     await expect(host.locator('.network-arena')).toHaveAttribute('data-preparation','0',{timeout:15000});
+    if(process.env.BRICKS_NETWORK_TRACE==='1')for(const page of [host,other])await page.evaluate(async()=>{
+      const audit:unknown[]=[];(window as any).__predictionTrace=audit;
+      const record=(row:unknown)=>{if(audit.length<20000)audit.push(row);};
+      const {OwnPrediction}=await new Function('return import("/src/network/ownPrediction.ts")')();
+      const {MatchEngine}=await new Function('return import("/src/simulation/match.ts")')();
+      const {NetworkMatchSession}=await new Function('return import("/src/network/client.ts")')();
+      const restore=MatchEngine.restorePrediction;MatchEngine.restorePrediction=function(...args:any[]){const at=performance.now();const result=restore.apply(this,args);record({kind:'restore',ms:performance.now()-at});return result;};
+      const advance=OwnPrediction.prototype.advanceTo;OwnPrediction.prototype.advanceTo=function(...args:any[]){const at=performance.now(),before=this.tick;const result=advance.apply(this,args);record({kind:'replay',ms:performance.now()-at,ticks:this.tick-before});return result;};
+      const confirm=NetworkMatchSession.prototype.confirm;NetworkMatchSession.prototype.confirm=function(snapshot:any){const at=performance.now();const result=confirm.call(this,snapshot);record({kind:'confirm',at:performance.timeOrigin+at,ms:performance.now()-at,tick:snapshot.tick,ack:snapshot.inputAck,inputResult:snapshot.inputResult,lead:this.leadTicks,predictedTick:this.prediction.tick});return result;};
+    });
     ownId=(await host.locator('.network-arena').getAttribute('data-own-id'))!;
     await relay.observe(ownId);
     for(let sample=0;sample<24;sample++){
@@ -100,7 +110,7 @@ for(const variant of [2,8,'mixed','battle-8','teams-mixed'] as const){const mixe
           for(const type of ['keydown','keyup'])document.body.dispatchEvent(new KeyboardEvent(type,{code,key:code,bubbles:true}));
           const baseline=audit.__networkKeyTrace.at(-1)!;
           await wait(()=>arena.dataset.presentedX===String(baseline.x),1000);
-          return {baseline,x:arena.dataset.presentedX,serial:arena.dataset.spawnSerial};
+          return {baseline,x:arena.dataset.presentedX,serial:arena.dataset.presentedSpawn};
         },direction);
         baseline=probe.baseline;
         expect(probe.x).toBe(String(baseline.x));
@@ -108,6 +118,8 @@ for(const variant of [2,8,'mixed','battle-8','teams-mixed'] as const){const mixe
         // Wait for the actual transition at the receiving browser, preserving the
         // existing 2-second observation deadline and same-spawn assertions.
         await expect.poll(()=>presses.length,{intervals:[5],timeout:1000}).toBe(pressCount+1);
+        // Correlate the piece actually controlled, including a speculative next spawn.
+        expect((presses[pressCount]!.input as {spawnSerial:number}).spawnSerial).toBe(Number(baseline.spawnSerial));
         const forwarded=performance.timeOrigin+presses[pressCount]!.at;
         const result=await other.evaluate(async({id,x,serial,forwarded})=>{
           const audit=window as unknown as {__networkRemoteFrames:{id:string;x:string;serial:string;at:number}[]};
@@ -135,7 +147,7 @@ for(const variant of [2,8,'mixed','battle-8','teams-mixed'] as const){const mixe
     const metrics={contexts:count,browserProcesses:isolatedDevices?count:1,isolatedDevices,injectedOneWayMs:[50,100],samples:local.length,localMoveMs:{p95:percentile(local,.95),max:Math.max(...local)},confirmedOtherBoardMs:{p95:percentile(remote,.95),max:Math.max(...remote)},serverArrivalToOwnAckMs:{p50:percentile(observedRtt,.5),p95:percentile(observedRtt,.95)},method:'transparent endpoint-compressed byte relay; confirmed-other duration starts when input is forwarded upstream, before service commit, ends at receiver DOM mutation (excludes runner/assertion RPC)',relay:{maxMessageBytes:relayMetrics.maxMessageBytes,maxQueuedBytes:relayMetrics.maxQueuedBytes,oneWayDeliveryP95Ms:percentile(relayMetrics.oneWayDeliveryMs,.95)},gate:{localP95LimitMs:50,confirmedOtherP95LimitMs:250}};
     await writeLatencyEvidence(`bricks-network-latency-${variant}.json`,metrics);
     expect(metrics.localMoveMs.p95).toBeLessThanOrEqual(50);expect(metrics.confirmedOtherBoardMs.p95).toBeLessThanOrEqual(250);
-  }finally{if(process.env.BRICKS_NETWORK_LATENCY_EVIDENCE_DIR)await writeLatencyEvidence(`relay-${variant}.json`,await relay.metrics());for(const context of contexts)await context.close();for(const device of devices)await device.close();await relay.close();}
+  }finally{if(process.env.BRICKS_NETWORK_TRACE==='1')await writeLatencyEvidence(`client-trace-${variant}.json`,await Promise.all([host,other].map(page=>page.evaluate(()=>({trace:(window as any).__predictionTrace,remote:(window as any).__networkRemoteFrames,keys:(window as any).__networkKeyTrace})).catch(()=>null))));if(process.env.BRICKS_NETWORK_LATENCY_EVIDENCE_DIR)await writeLatencyEvidence(`relay-${variant}.json`,await relay.metrics());for(const context of contexts)await context.close();for(const device of devices)await device.close();await relay.close();}
 
 });
 

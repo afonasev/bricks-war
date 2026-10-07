@@ -10,13 +10,13 @@ it('spawn clears only piece prediction; held release and repeat timing survive o
   service.command(host.room,host.seat,host.epoch,{type:'start'});
   for(let i=0;i<260;i++){now+=1000/60;for(const seat of host.room.seats)seat.lastHealth=now;service.advance();}
   vi.stubGlobal('document',{hidden:false});vi.stubGlobal('WebSocket',{OPEN:1});
-  const session=new NetworkMatchSession(a);const raw=session as unknown as {confirm:(s:unknown)=>void;socket:unknown;lastFrame:number};
+  const session=new NetworkMatchSession(a);const raw=session as unknown as {confirm:(s:unknown)=>void;socket:unknown};
   const sent:unknown[]=[];raw.socket={readyState:1,send:(text:string)=>sent.push(JSON.parse(text))};session.onResetInput=vi.fn();
   try{
     raw.confirm(service.snapshot(host.room,host.seat));const resets=vi.mocked(session.onResetInput).mock.calls.length;
-    session.controls({left:false,right:true,down:false});raw.lastFrame=123;
+    session.controls({left:false,right:true,down:false});
     const state=service.snapshot(host.room,host.seat);state.revision++;state.state!.participants[0]!.board.spawnSerial++;
-    raw.confirm(state);expect(raw.lastFrame).toBe(123);expect(session.onResetInput).toHaveBeenCalledTimes(resets);
+    raw.confirm(state);expect(session.onResetInput).toHaveBeenCalledTimes(resets);
     session.controls({left:false,right:false,down:false});expect(sent).toHaveLength(2);
     expect(sent[1]).toMatchObject({type:'input',sequence:2,held:{right:false,left:false,down:false}});
     const nextEpoch=structuredClone(state);nextEpoch.inputEpoch++;raw.confirm(nextEpoch);expect(session.onResetInput).toHaveBeenCalledTimes(resets+1);
@@ -40,12 +40,12 @@ async function playingSession() {
     cleanup:()=>{clock.mockRestore();setNetworkParticipation(false);vi.unstubAllGlobals();}};
 }
 
-it('late input confirmation releases held input once on the same socket and resumes monotonic input',async()=>{
+it('exhausted two-second prediction releases held input once on the same socket and resumes monotonic input',async()=>{
   const f=await playingSession();
   try {
     f.session.controls({left:true,right:false,down:true});
     f.service.command(f.guest.room,f.guest.seat,f.guest.epoch,f.sent[0]);
-    f.advance(350);f.session.step();
+    f.advance(2010);f.session.step();
     expect(f.sent).toHaveLength(2);expect(f.sent[1]).toMatchObject({type:'input',sequence:2,held:{left:false,right:false,down:false}});
     expect(f.close).not.toHaveBeenCalled();expect(f.session.acceptsGameplayInput()).toBe(false);
     for(let i=0;i<10;i++)f.session.step();expect(f.sent).toHaveLength(2);
@@ -58,14 +58,16 @@ it('late input confirmation releases held input once on the same socket and resu
   }finally{f.cleanup();}
 });
 
-it('pending bound reserves its final slot for neutral release instead of disconnecting',async()=>{
+it('input horizon reserves a valid final tick for one neutral without overflowing the pending bound',async()=>{
   const f=await playingSession();
   try {
     for(let i=0;i<64;i++)f.session.controls({left:i%2===0,right:i%2!==0,down:false});
-    expect(f.sent).toHaveLength(64);expect(f.raw.pending).toHaveLength(64);
-    expect(f.sent.at(-1)).toMatchObject({sequence:64,held:{left:false,right:false,down:false}});
+    expect(f.sent.length).toBeLessThanOrEqual(64);expect(f.raw.pending).toHaveLength(f.sent.length);
+    expect(f.sent.at(-1)).toMatchObject({sequence:f.sent.length,held:{left:false,right:false,down:false},actions:['soft-drop-off']});
+    expect(f.sent.at(-1).targetTick).toBeLessThanOrEqual(f.guest.room.tick+60);
+    const count=f.sent.length;f.session.controls({left:true,right:false,down:false});expect(f.sent).toHaveLength(count);
     for(const input of f.sent)f.service.command(f.guest.room,f.guest.seat,f.guest.epoch,input);
-    expect(f.guest.seat.queue).toHaveLength(64);expect(f.close).not.toHaveBeenCalled();
+    expect(f.guest.seat.queue).toHaveLength(f.sent.length);expect(f.close).not.toHaveBeenCalled();
   }finally{f.cleanup();}
 });
 
@@ -77,7 +79,7 @@ it('complete-snapshot timeout closes a silent downstream even while upstream hea
   vi.stubGlobal('WebSocket',Socket);vi.stubGlobal('location',{href:'http://localhost/',protocol:'http:'});
   vi.stubGlobal('document',{hidden:false,addEventListener:vi.fn(),removeEventListener:vi.fn()});
   const session=new NetworkMatchSession({roomId:'r',participantId:'p',token:'t'});
-  try {session.connect();vi.advanceTimersByTime(4000);expect(send).toHaveBeenCalledTimes(2);expect(close).not.toHaveBeenCalled();vi.advanceTimersByTime(2000);expect(close).toHaveBeenCalledOnce();}
+  try {session.connect();vi.advanceTimersByTime(4000);expect(send.mock.calls.filter(([raw])=>JSON.parse(raw).type==='heartbeat')).toHaveLength(2);expect(close).not.toHaveBeenCalled();vi.advanceTimersByTime(2000);expect(close).toHaveBeenCalledOnce();}
   finally{session.dispose();clock.mockRestore();vi.unstubAllGlobals();vi.useRealTimers();}
 });
 
@@ -94,6 +96,35 @@ it('snapshot between heartbeat ticks resets the exact six-second downstream dead
     (session as unknown as {confirm:(s:unknown)=>void}).confirm(service.snapshot(link.room,link.seat));
     vi.advanceTimersByTime(5999);expect(close).not.toHaveBeenCalled();vi.advanceTimersByTime(1);expect(close).toHaveBeenCalledOnce();
   }finally{session.dispose();setNetworkParticipation(false);vi.unstubAllGlobals();vi.useRealTimers();}
+});
+
+ it('350ms delayed confirmation preserves control and predicts soft drop without a neutral',async()=>{
+  const f=await playingSession();
+  try {
+    const y=f.session.state.participants[0]!.board.active!.y;
+    f.session.controls({left:false,right:false,down:true});
+    for(let i=0;i<21;i++){f.advance(1000/60);f.session.step();}
+    expect(f.sent).toHaveLength(1);expect(f.session.acceptsGameplayInput()).toBe(true);
+    expect(f.session.state.participants[0]!.board.active!.y).toBeGreaterThan(y);
+    expect(f.close).not.toHaveBeenCalled();
+  }finally{f.cleanup();}
+});
+
+it('holding and rotating at the input horizon never generates same-tick repeat bursts',async()=>{
+  const f=await playingSession();
+  try {
+    f.session.controls({left:true,right:false,down:false});
+    for(let frame=0;frame<100;frame++){
+      f.advance(1000/60);f.session.step();
+      f.session.controls({left:true,right:false,down:false},true);
+    }
+    expect(f.session.acceptsGameplayInput()).toBe(false);
+    expect(f.sent.at(-1).actions).toEqual(['soft-drop-off']);
+    const gameplay=f.sent.slice(0,-1);
+    expect(gameplay.every((input,i)=>!i||input.targetTick>gameplay[i-1].targetTick)).toBe(true);
+    for(const input of f.sent)expect(()=>f.service.command(f.guest.room,f.guest.seat,f.guest.epoch,input)).not.toThrow();
+    const before=f.sent.length;f.session.step();expect(f.sent).toHaveLength(before);
+  }finally{f.cleanup();}
 });
 
 it('does not replay pending prediction or held controls over an authoritative arrival freeze',async()=>{
