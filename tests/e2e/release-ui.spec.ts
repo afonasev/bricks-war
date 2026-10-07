@@ -12,6 +12,8 @@ test('updates the fixed main-menu showcase for pointer and keyboard selection', 
   const menu = page.getByRole('navigation', { name: 'Главное меню' });
   const choices = menu.getByRole('button');
   await expect(choices).toHaveCount(5);
+  expect(await choices.evaluateAll(els => els.flatMap(el => ['::before', '::after'].map(p => getComputedStyle(el, p).content)))).toEqual(Array(10).fill('none'));
+  if (process.env.BRICKS_RECORD_SCREENSHOTS) await page.screenshot({path: `${process.env.BRICKS_RECORD_SCREENSHOTS}/menu-1440x960.png`});
   await expect(choices).toContainText(['Выживание', 'Битва', 'Командный бой', 'Сетевая игра', 'Настройки']);
   await expect(page.locator('.main-menu-layout')).toBeVisible();
   const showcase = page.locator('.menu-showcase');

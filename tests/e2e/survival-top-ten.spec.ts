@@ -2,9 +2,10 @@ import { expect, test, type Page } from '@playwright/test';
 import { mkdir } from 'node:fs/promises';
 
 const viewports = [[1920,1080],[1280,480],[800,620],[390,844],[360,640],[320,568],[844,390]] as const;
-const evidence = 'evidence/compact-survival-records/time-feedback/screenshots';
+const evidence = process.env.BRICKS_RECORD_SCREENSHOTS ?? 'evidence/compact-survival-records/time-feedback/screenshots';
 
 async function expectTenFit(page: Page, results = false) {
+  if (results) expect(await page.locator('.results-panel').evaluate(el => ['::before', '::after'].map(pseudo => getComputedStyle(el, pseudo).content))).toEqual(['none', 'none']);
   const selector = results ? '.survival-record-list' : '.survival-records ol';
   await expect(page.locator(`${selector} > li:visible`)).toHaveCount(10);
   await expect(page.locator('.desktop-record-pages')).toHaveCount(0);

@@ -80,9 +80,6 @@ button { color: inherit; }
 .main-menu-screen .mode-menu { width: 100%; margin: 0; display: grid; grid-template-columns: 1fr; gap: clamp(9px, 1.35vh, 14px); }
 .main-menu-screen .mode-choice { --choice: #ff8d69; position: relative; min-height: clamp(80px, 10.8vh, 108px); display: grid; grid-template-columns: clamp(62px, 5.3vw, 86px) minmax(0, 1fr) 28px; align-items: center; gap: clamp(14px, 1.5vw, 24px); padding: 8px 18px 8px 9px; border: 2px solid #d9c9ae; border-radius: 18px; background: rgba(255,253,247,.94); color: #123564; box-shadow: 0 4px 0 #d4c2a7, 0 10px 20px rgba(70,48,21,.08), inset 0 1px #fff; transform: none; transition: border-color .15s ease, box-shadow .15s ease, background .15s ease; }
 .main-menu-screen .mode-menu .mode-choice { background: rgba(255,253,247,.94); }
-.main-menu-screen .mode-choice::before, .main-menu-screen .mode-choice::after { content: ""; position: absolute; z-index: 2; width: 18px; height: 18px; opacity: 0; pointer-events: none; transition: opacity .15s ease; }
-.main-menu-screen .mode-choice::before { top: -7px; left: -7px; border-top: 5px solid #247cf0; border-left: 5px solid #247cf0; border-radius: 3px 0 0; }
-.main-menu-screen .mode-choice::after { right: -7px; bottom: -7px; border-right: 5px solid #247cf0; border-bottom: 5px solid #247cf0; border-radius: 0 0 3px; }
 .main-menu-screen .mode-choice.mode-survival { --choice: #ff936e; }
 .main-menu-screen .mode-choice.mode-battle { --choice: #69aef5; }
 .main-menu-screen .mode-choice.mode-team { --choice: #b6d943; }
@@ -96,7 +93,6 @@ button { color: inherit; }
 .main-menu-screen .mode-copy small { margin-top: 2px; color: #33547e; font-size: clamp(.68rem, .94vw, .92rem); font-weight: 700; line-height: 1.2; }
 .main-menu-screen .mode-forward { color: #247cf0; font-size: 2.8rem; font-weight: 950; line-height: 1; opacity: 0; transform: translateX(-5px); transition: opacity .15s ease, transform .15s ease; }
 .main-menu-screen [data-ui-focus].is-ui-selected, .main-menu-screen [data-ui-focus]:focus-visible { outline: none; border-color: #247cf0; background: #eaf4ff; box-shadow: 0 0 0 3px #247cf0, 0 5px 0 #0e58ba, 0 12px 24px #247cf044; }
-.main-menu-screen .mode-choice.is-ui-selected::before, .main-menu-screen .mode-choice.is-ui-selected::after, .main-menu-screen .mode-choice:focus-visible::before, .main-menu-screen .mode-choice:focus-visible::after { opacity: 1; }
 .main-menu-screen .mode-choice.is-ui-selected .mode-forward, .main-menu-screen .mode-choice:focus-visible .mode-forward { opacity: 1; transform: none; }
 
 .menu-showcase { position: relative; min-width: 0; overflow: hidden; display: grid; padding: clamp(40px, 6vh, 74px) clamp(24px, 3vw, 54px) clamp(20px, 3vh, 34px); border-left: 2px solid #e4cda8; border-bottom-left-radius: 76px; background: linear-gradient(154deg, #bfe8f9 0 25%, #ffd3bd 25.2% 47%, #d8ef9e 47.2% 70%, #e5d1f1 70.2%); box-shadow: inset 16px 0 28px #8d68401a; transition: background .2s ease; }
@@ -716,10 +712,6 @@ body.calm-effects .shield-slot.is-burning { filter: drop-shadow(0 0 8px #ff7626)
     background: rgba(255,253,247,.94);
     box-shadow: 0 4px 0 #d4c2a7, 0 10px 20px rgba(70,48,21,.08), inset 0 1px #fff;
   }
-  .main-menu-screen .mode-choice.is-ui-selected::before,
-  .main-menu-screen .mode-choice.is-ui-selected::after,
-  .main-menu-screen .mode-choice:focus-visible::before,
-  .main-menu-screen .mode-choice:focus-visible::after,
   .main-menu-screen .mode-choice.is-ui-selected .mode-forward,
   .main-menu-screen .mode-choice:focus-visible .mode-forward { opacity: 0; }
 }
@@ -1194,8 +1186,6 @@ html:fullscreen .mode-setup-screen.premium-surface { width: 100%; height: 100%; 
   .main-menu-screen .menu-block { z-index: 0; }
   .main-menu-screen [data-ui-focus].is-ui-selected,
   .main-menu-screen [data-ui-focus]:focus-visible { border-color: #d9c9ae; background: rgba(255,253,247,.94); box-shadow: 0 4px 0 #d4c2a7, 0 10px 20px rgba(70,48,21,.08), inset 0 1px #fff; }
-  .main-menu-screen .mode-choice.is-ui-selected::before, .main-menu-screen .mode-choice.is-ui-selected::after,
-  .main-menu-screen .mode-choice:focus-visible::before, .main-menu-screen .mode-choice:focus-visible::after,
   .main-menu-screen .mode-choice.is-ui-selected .mode-forward, .main-menu-screen .mode-choice:focus-visible .mode-forward { opacity: 0; }
   .mobile-solo-setup { display: grid; gap: 14px; max-width: 520px; margin: auto; }
   .settings-screen .settings-list { padding-bottom: calc(var(--release-footer-reserve) + 24px); }
@@ -1299,14 +1289,6 @@ html:fullscreen .mode-setup-screen.premium-surface { width: 100%; height: 100%; 
   background-color: #fffaf0f7;
   box-shadow: 0 28px 90px #173e6754, inset 0 1px #fff;
 }
-.pause-panel::before,
-.pause-panel::after,
-.results-panel::before,
-.results-panel::after { content: ""; position: absolute; width: 34px; height: 34px; border-color: #247cf0; pointer-events: none; }
-.pause-panel::before,
-.results-panel::before { inset: 12px auto auto 12px; border-top: 5px solid #247cf0; border-left: 5px solid #247cf0; }
-.pause-panel::after,
-.results-panel::after { inset: auto 12px 12px auto; border-right: 5px solid #247cf0; border-bottom: 5px solid #247cf0; }
 .pause-panel > span { color: var(--release-ink, #123564); font-size: clamp(2rem, 4vw, 3.2rem); }
 .pause-continue,
 .pause-actions button,

@@ -127,8 +127,6 @@ html:has(#app[data-layout="desktop"]), body:has(#app[data-layout="desktop"]), #a
 #app[data-layout="desktop"] .pause-settings-panel .setup-audio-controls { margin-top: 0; }
 #app[data-layout="desktop"] .pause-settings-panel .audio-toggle { min-height: 32px; font-size: 14px; }
 #app[data-layout="desktop"] .release-screen.main-menu-screen { padding: 0; }
-#app[data-layout="desktop"] .main-menu-screen .mode-choice::before { top: 0; left: 0; }
-#app[data-layout="desktop"] .main-menu-screen .mode-choice::after { right: 0; bottom: 0; }
 #app[data-layout="desktop"] .menu-showcase { min-height: 0; padding: 12px; }
 #app[data-layout="desktop"] .survival-preview-board { min-height: 0; padding: 5px; }
 #app[data-layout="desktop"] .survival-record { padding: 10px; }

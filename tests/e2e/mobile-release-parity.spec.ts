@@ -63,6 +63,15 @@ test('keeps the supported phone release flow touch-accessible', async ({ page })
   await expect(page.getByRole('button', { name: '← В меню' })).toHaveCount(0);
   await pause.click();
   await expect(page.locator('#pause-overlay')).toBeVisible();
+  expect(await page.locator('.pause-panel:visible').evaluate(el => ['::before', '::after'].map(p => getComputedStyle(el, p).content))).toEqual(['none', 'none']);
+  if (process.env.BRICKS_RECORD_SCREENSHOTS) {
+    await page.screenshot({path: `${process.env.BRICKS_RECORD_SCREENSHOTS}/pause-390x844.png`});
+    await page.setViewportSize({width:1920,height:1080});
+    await expect(page.locator('#app')).toHaveAttribute('data-layout','desktop');
+    await page.screenshot({path: `${process.env.BRICKS_RECORD_SCREENSHOTS}/pause-1920x1080.png`});
+    await page.setViewportSize({width:390,height:844});
+    await expect(page.locator('#app')).toHaveAttribute('data-layout','mobile');
+  }
   await expect(page.locator('.mobile-match-actions')).toBeHidden();
   await expect(page.locator('.mobile-touch-zones')).toBeHidden();
   await expect(page.getByRole('button', { name: 'Продолжить', exact: true })).toBeVisible();
