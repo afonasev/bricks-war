@@ -2,12 +2,13 @@ import { expect, test, type Page } from '@playwright/test';
 import { mkdir } from 'node:fs/promises';
 
 const viewports = [[1920,1080],[1280,480],[800,620],[390,844],[360,640],[320,568],[844,390]] as const;
-const evidence = 'evidence/compact-survival-records/screenshots';
+const evidence = 'evidence/compact-survival-records/time-feedback/screenshots';
 
 async function expectTenFit(page: Page, results = false) {
   const selector = results ? '.survival-record-list' : '.survival-records ol';
   await expect(page.locator(`${selector} > li:visible`)).toHaveCount(10);
   await expect(page.locator('.desktop-record-pages')).toHaveCount(0);
+  await expect(page.locator(`${selector} .record-duration:visible`)).toHaveCount(10);
   const issues = await page.evaluate(({selector,results}) => {
     const list = document.querySelector<HTMLElement>(selector)!;
     const scope = document.querySelector<HTMLElement>(results ? '.results-panel' : '.mode-setup-screen')!;
@@ -23,7 +24,10 @@ async function expectTenFit(page: Page, results = false) {
       if(r.top<0 || r.bottom>innerHeight || r.left<0 || r.right>innerWidth) errors.push(['offscreen',i,r.toJSON()]);
       if(Math.min(r.right,a.right)>Math.max(r.left,a.left)+1 && Math.min(r.bottom,a.bottom)>Math.max(r.top,a.top)+1) errors.push(['action-overlap',i]);
       if(i && r.top<rows[i-1]!.getBoundingClientRect().bottom-1) errors.push(['row-overlap',i]);
-      const parts = [...row.querySelectorAll<HTMLElement>('b,.result-place,strong,time')];
+      const duration = row.querySelector<HTMLElement>('.record-duration')!;
+      const score = row.querySelector<HTMLElement>('time')!;
+      if(parseFloat(getComputedStyle(duration).fontSize) >= parseFloat(getComputedStyle(score).fontSize)) errors.push(['time-not-secondary',i]);
+      const parts = [...row.querySelectorAll<HTMLElement>('b,.result-place,strong,time,.record-duration')];
       parts.forEach(part => {
         const range=document.createRange();range.selectNodeContents(part);const t=range.getBoundingClientRect();
         if(t.left<r.left-1 || t.right>r.right+1 || t.top<r.top-1 || t.bottom>r.bottom+1 || part.scrollWidth>part.clientWidth+1) errors.push(['text-clipped',i,part.textContent]);
@@ -48,6 +52,7 @@ for(const [width,height] of viewports) {
     await mkdir(evidence,{recursive:true});
     await page.screenshot({path:`${evidence}/setup-${width}x${height}.png`});
     await expectTenFit(page);
+    await expect(page.locator('.survival-records .record-duration')).toHaveText(Array(10).fill('◷ 10:00'));
   });
 }
 
