@@ -3,7 +3,7 @@ import {delayRelayProcess} from './delayRelayProcess';
 import {mkdir,writeFile} from 'node:fs/promises';
 const percentile=(values:number[],q:number)=>[...values].sort((a,b)=>a-b)[Math.ceil(values.length*q)-1]!;
 async function writeLatencyEvidence(filename:string,data:unknown){const directory=process.env.BRICKS_NETWORK_LATENCY_EVIDENCE_DIR;const repeat=test.info().repeatEachIndex;const name=repeat?filename.replace(/\.json$/,`-repeat-${repeat}.json`):filename;const destination=directory?`${directory}/${name}`:`/tmp/${name}`;if(directory)await mkdir(directory,{recursive:true});await writeFile(destination,JSON.stringify(data,null,2));}
-async function enter(page:Page){await page.goto('/');await page.getByRole('button',{name:/^Сетевая игра/}).click();}
+async function enter(page:Page){await page.goto('/?muted=1');await page.getByRole('button',{name:/^Сетевая игра/}).click();}
 for(const variant of [2,7,8,'battle-2','mixed','battle-7','battle-8','teams-mixed'] as const){const mixed=variant==='mixed'||variant==='teams-mixed';const count=mixed?2:typeof variant==='number'?variant:variant==='battle-2'?2:variant==='battle-7'?7:8;test(`${variant} contexts RTT 150±50ms prediction and confirmed other-board latency`,async({browser,baseURL})=>{
   const isolatedDevices=process.env.BRICKS_NETWORK_ISOLATED_DEVICES==='1';
   const devices:Browser[]=isolatedDevices?await Promise.all(Array.from({length:count},()=>browser.browserType().launch({channel:'chrome',args:['--mute-audio']}))):[];

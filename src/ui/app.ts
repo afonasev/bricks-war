@@ -1711,6 +1711,7 @@ export class BricksWarApp {
   private updateHud(state: MatchState): void {
     this.latestHudState = state;
     if (this.countdownReady || state.phase !== 'countdown') this.audio.sync(state);
+    this.audio.syncMusic(state, `local:${state.seed}`, state.seed);
     if (isLocalPlaytestFlag('playtest-anomaly-arrival')) {
       const stage = this.root.querySelector<HTMLElement>('#game-stage');
       if (stage) {

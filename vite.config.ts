@@ -180,6 +180,11 @@ export default defineConfig(async ({ command }) => {
         clientsClaim: false,
         // Exact approved WAVs are inlined in the single-file game (currently 5.79 MB).
         maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
+        runtimeCaching: [{
+          urlPattern: /\/audio\/music\/.*\.mp3$/,
+          handler: 'CacheFirst',
+          options: { cacheName: 'bricks-war-music-v1' },
+        }],
         skipWaiting: false,
       },
     }),

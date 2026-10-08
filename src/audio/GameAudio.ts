@@ -14,6 +14,7 @@ import {
   variationIndex,
 } from './audioDirections';
 import { createFoleyLibrary, type FoleyKind } from './foley';
+import { MENU_MUSIC_URL, matchMusicForSeed, matchMusicOffset, MUSIC_PLATEAU_LOOP_END_SECONDS } from './musicCatalog';
 import { audioBufferFromSamples, fireSamples, impactGainForLines, impactSamples } from './clearSounds';
 import {
   createSoftToySfxLibrary,
@@ -105,6 +106,15 @@ export class GameAudio {
   private readonly previewSources: AudioScheduledSourceNode[] = [];
   private readonly tracker = new AudioEventTracker();
   private readonly networkAnomalyTracker = new AudioEventTracker();
+  private recordedMusicSource: AudioBufferSourceNode | null = null;
+  private recordedMusicBuffer: AudioBuffer | null = null;
+  private recordedMusicKey = '';
+  private recordedMusicRequestedKey = '';
+  private recordedMusicOffset = 0;
+  private musicLoadRevision = 0;
+  private recordedMusicStartedAt = 0;
+  private readonly productionMusicEnabled = true;
+  private latestMusicSync: { state: MatchState; identity: string; seed: number } | null = null;
 
   constructor(initialMuted = false, levels: { music?: number; effects?: number; sfxPreset?: SfxPresetId } = {}) {
     this.muted = initialMuted;
@@ -184,6 +194,10 @@ export class GameAudio {
     this.stopAllClearFires();
     const alreadyInMenu = this.mode === 'menu';
     this.mode = 'menu';
+    this.latestMusicSync = null;
+    if (!this.muted && this.musicVolume > 0 && !(this.recordedMusicKey === 'menu' && this.recordedMusicSource) && this.recordedMusicRequestedKey !== 'menu') {
+      void this.playRecordedMusic('menu', MENU_MUSIC_URL, 0, true);
+    }
     this.gameIntroStep = -1;
     this.tracker.reset();
     if (alreadyInMenu) return;
@@ -195,6 +209,7 @@ export class GameAudio {
     this.cancelBoardWarning();
     this.stopAllClearFires();
     this.mode = 'countdown';
+    this.stopRecordedMusic();
     this.gameIntroStep = -1;
     this.tracker.reset();
     this.restartMusicClock();
@@ -263,6 +278,34 @@ export class GameAudio {
     if (!baseline) for (const event of events) if (event.type === 'anomaly-spawn' || event.type === 'anomaly-success') this.playEvent(event);
   }
 
+  /** Syncs recorded match music independently from SFX event history. */
+  syncMusic(state: MatchState, matchIdentity: string, matchSeed: number): void {
+    this.latestMusicSync = { state, identity: matchIdentity, seed: matchSeed };
+    if (this.muted || this.musicVolume <= 0) {
+      if (this.recordedMusicSource || this.recordedMusicRequestedKey) this.stopRecordedMusic();
+      return;
+    }
+    if (state.phase === 'results') {
+      this.stopRecordedMusic();
+      return;
+    }
+    if (state.phase === 'paused' || state.phase === 'countdown' || state.globalEventHold || state.anomalyTransition) {
+      if (this.recordedMusicSource) this.pauseRecordedMusic();
+      else if (this.recordedMusicRequestedKey) this.stopRecordedMusic();
+      return;
+    }
+    const track = matchMusicForSeed(matchSeed);
+    const key = `${matchIdentity}:${track.id}`;
+    if (this.recordedMusicKey === key && this.recordedMusicSource) return;
+    if (this.recordedMusicRequestedKey === key) return;
+    const offset = matchMusicOffset(state.elapsedMs);
+    if (this.recordedMusicKey !== key || !this.recordedMusicSource) {
+      void this.playRecordedMusic(key, track.url, offset, false);
+    } else if (Math.abs(offset - this.recordedMusicOffset) > 3) {
+      void this.playRecordedMusic(key, track.url, offset, false);
+    }
+  }
+
   sync(state: MatchState): void {
     this.gravityIntervalMs = state.gravityIntervalMs;
     this.startingGravityMs = state.options.startingGravityMs;
@@ -314,6 +357,8 @@ export class GameAudio {
   toggleMuted(): boolean {
     this.muted = !this.muted;
     this.applyMasterGain();
+    if (this.muted) this.stopRecordedMusic();
+    else this.resumeConfiguredMusic();
     return this.muted;
   }
 
@@ -336,6 +381,8 @@ export class GameAudio {
   setMusicVolume(value: number): number {
     this.musicVolume = this.clampVolume(value);
     this.applyUserGains();
+    if (this.musicVolume <= 0) this.stopRecordedMusic();
+    else if (!this.muted) this.resumeConfiguredMusic();
     return this.musicVolume;
   }
 
@@ -412,7 +459,7 @@ export class GameAudio {
 
   private scheduleMusic(): void {
     const context = this.context;
-    if (!context || context.state === 'closed' || this.mode === 'paused' || this.mode === 'results') return;
+    if (!context || context.state === 'closed' || this.productionMusicEnabled || this.recordedMusicSource || this.mode === 'paused' || this.mode === 'results') return;
     if (this.nextMusicStepAt < context.currentTime - MUSIC_LATE_RESET_SECONDS) this.restartMusicClock();
     while (this.nextMusicStepAt < context.currentTime + MUSIC_LOOKAHEAD_SECONDS) {
       const bpm = this.mode === 'menu'
@@ -425,6 +472,83 @@ export class GameAudio {
       this.nextMusicStepAt += stepDuration;
       this.musicStep = (this.musicStep + 1) % 32;
     }
+  }
+
+  private async playRecordedMusic(key: string, url: string, offset: number, menu: boolean): Promise<void> {
+    const context = this.context;
+    const destination = this.musicBus;
+    if (!context || !destination) return;
+    this.recordedMusicRequestedKey = key;
+    const revision = ++this.musicLoadRevision;
+    const absoluteUrl = new URL(url, document.baseURI).href;
+    try {
+      let buffer: AudioBuffer;
+      if (this.recordedMusicKey === key && this.recordedMusicBuffer) buffer = this.recordedMusicBuffer;
+      else {
+        const response = await fetch(absoluteUrl);
+        if (!response.ok) throw new Error(`Music request failed: ${response.status}`);
+        buffer = await context.decodeAudioData(await response.arrayBuffer());
+      }
+      if (revision !== this.musicLoadRevision || this.mode === 'paused' || this.mode === 'results') return;
+      this.stopRecordedMusic(false);
+      this.recordedMusicBuffer = buffer;
+      this.recordedMusicKey = key;
+      this.recordedMusicRequestedKey = '';
+      const latest = this.latestMusicSync;
+      const latestKey = latest ? `${latest.identity}:${matchMusicForSeed(latest.seed).id}` : '';
+      if (!menu && latestKey === key && (latest!.state.phase !== 'playing' || latest!.state.globalEventHold || latest!.state.anomalyTransition)) {
+        this.stopRecordedMusic();
+        return;
+      }
+      const currentOffset = !menu && latestKey === key ? matchMusicOffset(latest!.state.elapsedMs) : offset;
+      this.recordedMusicOffset = menu ? 0 : Math.max(0, Math.min(currentOffset, buffer.duration - 0.05));
+      const source = context.createBufferSource();
+      const sourceGain = context.createGain();
+      source.buffer = buffer;
+      if (!menu && buffer.duration > MUSIC_PLATEAU_LOOP_END_SECONDS) {
+        source.loop = true;
+        source.loopStart = 180;
+        source.loopEnd = MUSIC_PLATEAU_LOOP_END_SECONDS;
+      } else if (menu) source.loop = true;
+      source.connect(sourceGain);
+      sourceGain.connect(destination);
+      source.start(context.currentTime + 0.02, this.recordedMusicOffset);
+      this.recordedMusicStartedAt = context.currentTime + 0.02;
+      sourceGain.gain.setValueAtTime(0.0001, context.currentTime);
+      sourceGain.gain.linearRampToValueAtTime(menu ? 0.22 : 0.25, context.currentTime + 0.3);
+      this.recordedMusicSource = source;
+      source.onended = () => { if (this.recordedMusicSource === source) this.recordedMusicSource = null; };
+    } catch {
+      if (revision === this.musicLoadRevision) { this.recordedMusicRequestedKey = ''; this.stopRecordedMusic(); }
+    }
+  }
+
+  private pauseRecordedMusic(): void {
+    const source = this.recordedMusicSource;
+    if (!source || !this.context) return;
+    const position = this.recordedMusicOffset + Math.max(0, this.context.currentTime - this.recordedMusicStartedAt);
+    this.recordedMusicOffset = source.loop && source.loopEnd > source.loopStart && position >= source.loopEnd
+      ? source.loopStart + ((position - source.loopStart) % (source.loopEnd - source.loopStart))
+      : position;
+    this.stopRecordedMusic(false);
+  }
+
+  private stopRecordedMusic(clear = true): void {
+    this.musicLoadRevision += 1;
+    const source = this.recordedMusicSource;
+    this.recordedMusicSource = null;
+    if (source) { source.onended = null; try { source.stop(); } catch { /* already ended */ } }
+    if (clear) { this.recordedMusicBuffer = null; this.recordedMusicKey = ''; this.recordedMusicRequestedKey = ''; this.recordedMusicOffset = 0; }
+  }
+
+  private resumeConfiguredMusic(): void {
+    if (this.muted || this.musicVolume <= 0) return;
+    if (this.latestMusicSync) {
+      const { state, identity, seed } = this.latestMusicSync;
+      this.syncMusic(state, identity, seed);
+      return;
+    }
+    if (this.mode === 'menu') void this.playRecordedMusic('menu', MENU_MUSIC_URL, 0, true);
   }
 
   private scheduleMusicStep(start: number, stepDuration: number): void {

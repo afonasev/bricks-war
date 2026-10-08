@@ -53,7 +53,7 @@ export class NetworkApp {
   private listBusy=false;
   private listOffset=0;
   private storageAvailable=true;
-  constructor(private root:HTMLElement,private onMenu:()=>void,private audio?:Pick<GameAudio,'syncNetworkAnomalies'>) {
+  constructor(private root:HTMLElement,private onMenu:()=>void,private audio?:Pick<GameAudio,'syncNetworkAnomalies'|'syncMusic'|'enterMenu'>) {
     this.root.classList.add('network-root');
     window.addEventListener('keydown',this.keyDown);window.addEventListener('keyup',this.keyUp);
     window.addEventListener('deviceorientation',this.sensor);
@@ -217,9 +217,11 @@ export class NetworkApp {
     if(!snapshot){this.status(session.status);return;}
     if(snapshot.state) {
       const generation=`${snapshot.matchId}:${snapshot.connectionEpoch}`;
-      this.audio?.syncNetworkAnomalies(decodeMatchState(snapshot.state),generation!==this.audioGeneration);
+      const decodedState=decodeMatchState(snapshot.state);
+      this.audio?.syncNetworkAnomalies(decodedState,generation!==this.audioGeneration);
+      if(snapshot.matchId)this.audio?.syncMusic(decodedState,snapshot.matchId,decodedState.seed);
       this.audioGeneration=generation;
-    } else this.audioGeneration=null;
+    } else { this.audioGeneration=null; this.audio?.enterMenu(); }
     if(snapshot.state && snapshot.state.phase!=='results') {
       if(this.view!=='arena')this.arena();
       this.updateArena();return;
