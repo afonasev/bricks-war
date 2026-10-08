@@ -44,7 +44,7 @@ export const SFX_DIRECTIONS: readonly SfxDirection[] = [
 
 export const AUDIO_EVENT_PRIORITY: Readonly<Record<string, AudioPriority>> = {
   rotate: 'tactile', lock: 'tactile', 'line-clear': 'reward', 'clear-impact': 'reward', 'level-up': 'reward', countdown: 'reward', 'round-start': 'reward',
-  'anomaly-spawn': 'critical', pressure: 'critical', 'conflict-launch': 'critical', 'conflict-impact': 'critical', cleanup: 'reward',
+  'anomaly-success': 'critical', 'attack-warning': 'critical', 'anomaly-spawn': 'critical', pressure: 'critical', 'conflict-launch': 'critical', 'conflict-impact': 'critical', cleanup: 'reward',
   'shield-half-charge': 'reward', 'shield-full-charge': 'reward', 'shield-block': 'critical', 'active-defense': 'critical', 'final-push': 'critical', eliminated: 'critical', results: 'reward',
 };
 

@@ -30,12 +30,8 @@ export function conflictPresentationForParticipant(
   participantId: string,
 ): ConflictPresentation {
   const pending = state.pendingConflict;
-  const senderRows = Math.max(
-    0,
-    ...(pending?.senders
-      .filter((sender) => sender.participantId === participantId)
-      .map((sender) => sender.rows) ?? []),
-  );
+  const current = state.attackQueues[participantId]?.[0];
+  const senderRows = Math.max(0,...state.attackLaunchEvents.filter(e=>e.participantId===participantId).map(e=>e.rows));
   const incomingRows = pending?.incomingRows[participantId] ?? 0;
   const senderIds = (pending?.senders ?? [])
     .filter((sender) => sender.recipientIds.includes(participantId))
@@ -54,7 +50,7 @@ export function conflictPresentationForParticipant(
     impactRows,
     cleanupRows,
     tier: conflictTier(Math.max(senderRows, incomingRows, impactRows)),
-    warningProgress: pending ? 1 - (pending.remainingWarningMs / CONFLICT_WARNING_MS) : 0,
+    warningProgress: current?.phase === 'warning' ? 1-current.remainingMs/CONFLICT_WARNING_MS : 0,
     impactProgress: state.conflictImpactEvent ? state.conflictImpactEvent.pulseMs / CONFLICT_IMPACT_PULSE_MS : 0,
     cleanupProgress: cleanupEvent ? cleanupEvent.pulseMs / CLEANUP_PULSE_MS : 0,
     shieldReady: incomingRows > 0 && (participant?.shieldCount ?? 0) >= incomingRows,

@@ -1,3 +1,5 @@
+import {BOARD_EVENT_ASSETS, type BoardEventSound} from './boardEventAssets';
+import { shieldEnergyBuffer } from './shieldEnergy';
 import type { MatchState } from '../domain/types';
 import { AudioEventTracker, gameTempo, type GameAudioEvent } from './audioEvents';
 import {
@@ -71,6 +73,11 @@ export class GameAudio {
   private effectsUserGain: GainNode | null = null;
   private noiseBuffer: AudioBuffer | null = null;
   private clearImpactBuffer: AudioBuffer | null = null;
+  private boardEventBuffers = new Map<BoardEventSound, AudioBuffer>();
+  private networkAudio = false;
+  private warningPaused = false;
+  private warningVoice: AudioBufferSourceNode | null = null;
+  private shieldEnergyBuffer: AudioBuffer | null = null;
   private clearFireBuffer: AudioBuffer | null = null;
   private readonly activeFires = new Map<string | symbol, { serial: number; source: AudioBufferSourceNode; gain: GainNode }>();
   private foley: Readonly<Record<FoleyKind, readonly AudioBuffer[]>> | null = null;
@@ -152,8 +159,15 @@ export class GameAudio {
       this.effectsUserGain = effectsUserGain;
       this.noiseBuffer = this.createNoiseBuffer(context);
       this.clearImpactBuffer = audioBufferFromSamples(context, impactSamples(context.sampleRate));
+      this.shieldEnergyBuffer = shieldEnergyBuffer(context);
       this.clearFireBuffer = audioBufferFromSamples(context, fireSamples(context.sampleRate));
       this.foley = createFoleyLibrary(context);
+      void Promise.all(Object.entries(BOARD_EVENT_ASSETS).map(async ([name,url]) => {
+        const bytes = await (await fetch(url)).arrayBuffer();
+        const buffer = await context.decodeAudioData(bytes);
+        this.boardEventBuffers.set(name as BoardEventSound, buffer);
+        if (name === 'fire') this.clearFireBuffer = buffer;
+      })).catch(() => undefined);
       void this.setSfxPreset(this.requestedSfxPreset);
       this.restartMusicClock();
       window.setInterval(() => this.scheduleMusic(), MUSIC_SCHEDULER_MS);
@@ -165,6 +179,8 @@ export class GameAudio {
   }
 
   enterMenu(): void {
+    this.cancelBoardWarning();
+    this.networkAudio = false;
     this.stopAllClearFires();
     const alreadyInMenu = this.mode === 'menu';
     this.mode = 'menu';
@@ -176,6 +192,7 @@ export class GameAudio {
   }
 
   startGame(): void {
+    this.cancelBoardWarning();
     this.stopAllClearFires();
     this.mode = 'countdown';
     this.gameIntroStep = -1;
@@ -235,13 +252,15 @@ export class GameAudio {
 
   /** Network arena uses full authoritative state; reconnect establishes a silent baseline. */
   syncNetworkAnomalies(state: MatchState, baseline = false): void {
+    this.networkAudio = true;
+    this.syncClearFires(state);
     if (baseline) {
       this.networkAnomalyTracker.reset();
       this.stopClearFire(ARRIVAL_FIRE);
     }
     this.syncArrivalFire(state);
     const events = this.networkAnomalyTracker.sync(state);
-    if (!baseline) for (const event of events) if (event.type === 'anomaly-spawn') this.playEvent(event);
+    if (!baseline) for (const event of events) if (event.type === 'anomaly-spawn' || event.type === 'anomaly-success') this.playEvent(event);
   }
 
   sync(state: MatchState): void {
@@ -249,9 +268,10 @@ export class GameAudio {
     this.startingGravityMs = state.options.startingGravityMs;
     this.finalPush = state.finalPushActive;
     const events = this.tracker.sync(state);
-    this.syncClearFires(state);
-    this.syncArrivalFire(state);
+    if (!this.networkAudio) { this.syncClearFires(state); this.syncArrivalFire(state); }
     if (state.phase === 'paused') {
+      try { this.warningVoice?.stop(); } catch { /* completed */ }
+      this.warningVoice = null;
       if (this.mode !== 'paused') {
         this.mode = 'paused';
         this.fadeMusic(0.055);
@@ -260,8 +280,18 @@ export class GameAudio {
       this.mode = 'game';
       this.restartMusicClock();
       this.fadeMusic(0.25);
+
     }
-    for (const event of events) this.playEvent(event);
+    const warningFrozen = state.phase === 'paused' || state.phase === 'results' || !!state.globalEventHold || !!state.anomalyTransition;
+    if(warningFrozen){
+      try{this.warningVoice?.stop();}catch{/* completed */}
+      this.warningVoice=null;this.warningPaused=true;
+    }else if(this.warningPaused){
+      this.warningPaused=false;
+      const head=Object.values(state.attackQueues).map(q=>q[0]).find(e=>e?.phase==='warning');
+      if(head&&this.context)this.playBoardSound('warning',this.context.currentTime+.008,0,(3000-head.remainingMs)/1000);
+    }
+    for (const event of events) if ((!warningFrozen || (event.type !== 'attack-warning' && event.type !== 'pressure')) && (!this.networkAudio || (event.type !== 'anomaly-success' && event.type !== 'anomaly-spawn'))) this.playEvent(event);
   }
 
   playUiSelect(): void {
@@ -362,14 +392,15 @@ export class GameAudio {
     if (event.type === 'level-up') this.playLevelUp(now, event.level, event.pan);
     if (event.type === 'anomaly-spawn') this.playAnomaly(now, event.pan);
     if (event.type === 'final-tick') this.playCountdown(now, event.second, true);
-    if (event.type === 'pressure') this.playPressure(now);
-    if (event.type === 'conflict-launch') this.playConflictLaunch(now, event.rows, event.pan);
+    if (event.type === 'pressure' || event.type === 'attack-warning') this.playBoardSound('warning', now, event.type === 'attack-warning' ? event.pan : 0);
+    if (event.type === 'anomaly-success') this.playBoardSound('anomaly', now, event.pan);
+    if (event.type === 'conflict-launch') this.playBoardSound('out', now, event.pan);
     if (event.type === 'conflict-impact') this.playConflictImpact(now, event.rows, event.pan);
     if (event.type === 'cleanup') this.playCleanup(now, event.rows, event.pan, event.amplified);
     if (event.type === 'shield-half-charge') this.playShieldHalfCharge(now, event.pan);
-    if (event.type === 'shield-full-charge') this.playShieldFullCharge(now, event.pan);
-    if (event.type === 'shield-block') this.playShieldBlock(now, event.pan);
-    if (event.type === 'active-defense') this.playDefense(now, event.pan);
+    if (event.type === 'shield-full-charge') this.playBoardSound('charge', now, event.pan);
+    if (event.type === 'shield-block') this.playBoardSound('shield', now, event.pan);
+    if (event.type === 'active-defense') this.playBoardSound('block', now, event.pan);
     if (event.type === 'final-push') this.playFinalPush(now);
     if (event.type === 'eliminated') this.playEliminated(now, event.pan);
     if (event.type === 'results') {
@@ -566,7 +597,7 @@ export class GameAudio {
     const gain = context.createGain();
     const panner = context.createStereoPanner();
     source.buffer = buffer;
-    gain.gain.value = 0.55 * CLEAR_EFFECT_GAIN_SCALE;
+    gain.gain.value = this.boardEventBuffers.has('fire') ? 1 : 0.55 * CLEAR_EFFECT_GAIN_SCALE;
     panner.pan.value = pan;
     source.connect(gain); gain.connect(panner); panner.connect(destination);
     const playback = { serial, source, gain };
@@ -575,6 +606,28 @@ export class GameAudio {
       if (this.activeFires.get(key) === playback) this.activeFires.delete(key);
     };
     source.start(context.currentTime + 0.008, Math.min(buffer.duration - 0.01, Math.max(0, (1_000 - remainingMs) / 1_000)));
+  }
+
+  private cancelBoardWarning(): void {
+    try { this.warningVoice?.stop(); } catch { /* completed */ }
+    this.warningVoice = null;
+    this.warningPaused = false;
+  }
+
+  private playBoardSound(name: BoardEventSound, start: number, pan: number, offset = 0): void {
+    const context = this.context, destination = this.sfxBus, buffer = this.boardEventBuffers.get(name);
+    if (!context || !destination || !buffer) return;
+    const source = context.createBufferSource(), gain = context.createGain(), panner = context.createStereoPanner();
+    source.buffer = buffer;
+    // The WAVs already contain the approved audition mix. Alarm is intentionally quieter.
+    gain.gain.value = name === 'warning' ? .45 : 1;
+    panner.pan.value = pan;
+    source.connect(gain); gain.connect(panner); panner.connect(destination);
+    if (name === 'warning') {
+      try { this.warningVoice?.stop(); } catch { /* completed */ }
+      this.warningVoice = source;
+    }
+    source.start(start, Math.min(buffer.duration-.01,Math.max(0,offset)));
   }
 
   private playFoley(kind: FoleyKind, variation: number, start: number, pan: number, volume: number): void {
@@ -704,9 +757,7 @@ export class GameAudio {
   }
 
   private playShieldBlock(start: number, pan: number): void {
-    if (this.playPackEvent('shield-block', start, pan, 1.2)) return;
-    this.tone(210, start, 0.52, 0.07, 'triangle', pan, 1700, undefined, 0.012, 115);
-    this.tone(420, start + 0.025, 0.36, 0.027, 'sine', pan, 2500, undefined, 0.012, 260);
+    if (this.shieldEnergyBuffer) this.playBufferedFoley(this.shieldEnergyBuffer, start, pan, 0.75);
   }
 
   private playDefense(start: number, pan: number): void {

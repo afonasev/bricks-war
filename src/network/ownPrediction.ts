@@ -51,7 +51,16 @@ export class OwnPrediction {
     const predicted = this.engine?.state;
     const own = predicted?.participants.find(p => p.config.id === this.ownId);
     if (!predicted || !own || confirmed.phase !== 'playing' || confirmed.anomalyTransition || confirmed.globalEventHold) return confirmed;
-    return {...confirmed,
+    const attackQueues = {...confirmed.attackQueues, [this.ownId]: predicted.attackQueues[this.ownId] ?? []};
+    const heads = Object.entries(attackQueues).flatMap(([id,q])=>q[0]?.phase==='warning'?[{id,head:q[0]}]:[]);
+    const pendingConflict = heads.length ? {
+      serial: confirmed.pendingConflict?.serial ?? 0,
+      remainingWarningMs: Math.min(...heads.map(e=>e.head.remainingMs)),
+      incomingRows: Object.fromEntries(heads.map(e=>[e.id,e.head.rows])),
+      senders: heads.flatMap(e=>e.head.senderId?[{participantId:e.head.senderId,rows:e.head.rows,recipientIds:[e.id]}]:[]),
+      defendedRecipientIds: heads.filter(e=>e.head.defended).map(e=>e.id),
+    } : null;
+    return {...confirmed, attackQueues, pendingConflict,
       participants: confirmed.participants.map(p => p.config.id === this.ownId
         // Render-only negative revisions cannot collide with authoritative mutation counters.
         // Reconciliation may change geometry without changing the number of locks.
@@ -61,6 +70,7 @@ export class OwnPrediction {
         ...predicted.shieldPresentations.filter(e => e.participantId === this.ownId)],
       clearPresentations: [...confirmed.clearPresentations.filter(e => e.participantId !== this.ownId),
         ...predicted.clearPresentations.filter(e => e.participantId === this.ownId)],
+      anomalyCueEvents: [...confirmed.anomalyCueEvents.filter(e=>e.participantId!==this.ownId),...predicted.anomalyCueEvents.filter(e=>e.participantId===this.ownId)],
       anomalyBurnEvents: [...confirmed.anomalyBurnEvents.filter(e => e.participantId !== this.ownId),
         ...predicted.anomalyBurnEvents.filter(e => e.participantId === this.ownId)]};
   }

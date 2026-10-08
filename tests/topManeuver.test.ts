@@ -133,8 +133,10 @@ describe('bounded maneuver on a high stack', () => {
     engine.state.nextPressureAtMs = engine.state.elapsedMs + 50;
     engine.step(50);
     expect(engine.state.pressureRows).toBe(1);
-    expect(board.grid[BOARD_HEIGHT - 1]!.every(cell => cell === 'garbage')).toBe(true);
+    expect(engine.state.attackQueues[engine.state.participants[0]!.config.id]![0]!.reason).toBe('pressure');
     expect(board.maneuverSpentMs).toBeGreaterThanOrEqual(200);
+    engine.step(3000);
+    expect(board.grid[BOARD_HEIGHT - 1]!.every(cell => cell === 'garbage')).toBe(true);
   });
   it('holds a real kicked T rotation and permits movement afterward', () => {
     const { engine, board } = fixture();

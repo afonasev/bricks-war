@@ -43,6 +43,8 @@ describe('whole shield inventory presentation', () => {
     const p = engine.state.participants[0]!; p.shieldCount = 2; p.shieldReady = true; p.lineClearStreak = 4;
     const tracker = new AudioEventTracker(); tracker.sync(engine.state);
     engine.state.nextPressureAtMs = engine.state.elapsedMs + 1; engine.step(2);
+    expect(p.shieldCount).toBe(2); expect(engine.state.attackQueues.p1![0]!.reason).toBe('pressure');
+    engine.step(3000);
     expect(p.shieldCount).toBe(1); expect(p.lineClearStreak).toBe(4);
     expect(engine.state.shieldInventoryEvents[0]).toMatchObject({reason:'pressure', count:1, firstSlot:1});
     expect(tracker.sync(engine.state).filter(e => e.type === 'shield-block')).toHaveLength(1);

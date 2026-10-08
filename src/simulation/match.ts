@@ -64,11 +64,11 @@ export const LEVEL_UP_PULSE_MS = 1200;
 export const ANOMALY_ARRIVAL_BURN_MS = 1000;
 export const CONFLICT_WARNING_MS = 3000;
 export const CONFLICT_IMPACT_PULSE_MS = 700;
-export const SHIELD_PRESENTATION_MS = 700;
+export const SHIELD_PRESENTATION_MS = 1100;
 export const MIN_CONFLICT_NOTICE_MS = 2_000;
 export const CLEANUP_PULSE_MS = 800;
 export const ANOMALY_BURN_PULSE_MS = 1_000;
-export const SHIELD_CHARGE_NOTICE_MS = 1_250;
+export const SHIELD_CHARGE_NOTICE_MS = 2_200;
 export const FINAL_PUSH_PULSE_MS = 2_000;
 export const MAX_REACHABLE_GRAVITY_LEVELS = Math.floor(
   (MAX_DURATION_MINUTES * 60_000) / LOCK_DELAY_MS / 10,
@@ -161,7 +161,7 @@ interface PendingClear {
   nextPiece: ParticipantState['board']['nextPiece'];
   cleanupCapacity: number;
   underAttack: boolean;
-  stage: 'playable' | 'burn';
+  stage: 'playable' | 'cue' | 'burn';
 }
 
 export type EncodedMatchState = Omit<MatchState, 'durationMs' | 'remainingMs'> & {
@@ -179,7 +179,7 @@ export function decodeMatchState(state: EncodedMatchState): MatchState {
 }
 
 export interface EngineCheckpoint {
-  version: 5;
+  version: 6;
   execution: 'local' | 'network';
   state: EncodedMatchState;
   sequence: ReturnType<PieceSequence['checkpoint']>;
@@ -275,10 +275,12 @@ export class MatchEngine {
       anomalyTransitionSerial: 0,
       anomalyArrivalSerial: 0,
       lockEvents: [],
+      attackSerial: 0, attackActivationSerial: 0, attackResolutionSerial: 0, attackResolutionEvents: [], attackQueues: {}, attackLaunchEvents: [],
       pendingConflict: null,
       conflictImpactEvent: null,
       cleanupSerial: 0,
       cleanupEvents: [],
+      anomalySuccessSerial: 0, anomalySuccessEvents: [], anomalyCueEvents: [],
       anomalyBurnSerial: 0,
       anomalyBurnEvents: [],
       clearPresentationSerial: 0,
@@ -315,7 +317,7 @@ export class MatchEngine {
   }
 
   checkpoint(): EngineCheckpoint {
-    return structuredClone({ version: 5, execution: this.execution, state: encodeMatchState(this.state),
+    return structuredClone({ version: 6, execution: this.execution, state: encodeMatchState(this.state),
       sequence: this.sequence.checkpoint(), phaseBeforePause: this.phaseBeforePause,
       nonAttackLockIds: [...this.nonAttackLockIds], resolvedAnomalyBurnParticipantIds: [...this.resolvedAnomalyBurnParticipantIds],
       resolvedClearParticipantIds: [...this.resolvedClearParticipantIds], pendingClears: [...this.pendingClears],
@@ -323,7 +325,7 @@ export class MatchEngine {
   }
 
   predictionCheckpoint(): PredictionCheckpoint {
-    return structuredClone({version: 5, execution: this.execution, phaseBeforePause: this.phaseBeforePause,
+    return structuredClone({version: 6, execution: this.execution, phaseBeforePause: this.phaseBeforePause,
       nonAttackLockIds: [...this.nonAttackLockIds], resolvedAnomalyBurnParticipantIds: [...this.resolvedAnomalyBurnParticipantIds],
       resolvedClearParticipantIds: [...this.resolvedClearParticipantIds], pendingClears: [...this.pendingClears],
       deferredPressureRows: [...this.deferredPressureRows]});
@@ -343,7 +345,7 @@ export class MatchEngine {
   }
 
   static restore(checkpoint: EngineCheckpoint): MatchEngine {
-    if (checkpoint.version !== 5) throw new Error('Unsupported checkpoint version');
+    if (checkpoint.version !== 6) throw new Error('Unsupported checkpoint version');
     const state = decodeMatchState(checkpoint.state);
     const engine = new MatchEngine(state.participants.map((p) => p.config), state.seed,
       Number.isFinite(state.durationMs) ? state.durationMs / 60_000 : DEFAULT_DURATION_MINUTES,
@@ -366,6 +368,8 @@ export class MatchEngine {
     participant.board.softDrop = false;
     participant.eliminatedAtMs = this.state.elapsedMs;
     participant.survivalMs = this.state.elapsedMs;
+    delete this.state.attackQueues[participantId];
+    this.projectPendingConflict();
     this.pendingClears.delete(participantId);
     this.deferredPressureRows.delete(participantId);
     this.state.shieldPresentations = this.state.shieldPresentations.filter((event) => event.participantId !== participantId);
@@ -384,6 +388,11 @@ export class MatchEngine {
       return;
     }
 
+    if (!this.state.isSurvival && this.state.elapsedMs >= this.state.durationMs) {
+      this.finishTimedMatch();
+      return;
+    }
+
     if (this.state.anomalyTransition) {
       this.advanceAnomalyTransition(deltaMs);
       return;
@@ -394,25 +403,14 @@ export class MatchEngine {
       return;
     }
 
-    if (!this.state.isSurvival && this.state.elapsedMs >= this.state.durationMs) {
-      this.nonAttackLockIds.clear();
-      this.state.lockEvents = this.tickPresentation(deltaMs).sort((a, b) => a.participantId.localeCompare(b.participantId));
-      this.collectConflictAttacks(this.state.lockEvents);
-      for (const [id, next] of this.stepSpawns) {
-        const p = this.state.participants.find((p) => p.config.id === id);
-        if (p?.board.alive) this.spawnAfterLock(p, next);
-      }
-      this.stepSpawns.clear();
-      this.advancePendingConflict(deltaMs);
-      this.updateSurvivalTimes();
-      this.resolveOutcomeWhenReady();
-      return;
-    }
-
     this.stepSpawns.clear();
     const previousElapsedMs = this.state.elapsedMs;
     this.state.elapsedMs = this.state.isSurvival ? this.state.elapsedMs + deltaMs : Math.min(this.state.durationMs, this.state.elapsedMs + deltaMs);
     this.state.remainingMs = Math.max(0, this.state.durationMs - this.state.elapsedMs);
+    if (!this.state.isSurvival && this.state.remainingMs === 0) {
+      this.finishTimedMatch();
+      return;
+    }
     const activeDeltaMs = this.state.elapsedMs - previousElapsedMs;
     this.resolvedAnomalyBurnParticipantIds.clear();
     this.resolvedClearParticipantIds.clear();
@@ -457,12 +455,10 @@ export class MatchEngine {
     ) {
       for (const participant of this.state.participants) {
         if (!this.predicts(participant.config.id)) continue;
-        if (participant.board.alive && !this.hasPendingAnomalyBurn(participant.config.id) && !this.resolvedAnomalyBurnParticipantIds.has(participant.config.id)) {
-          const remaining = this.absorbShieldRows(participant, 1, 'pressure');
-          if (this.queueShieldImpact(participant, 1, remaining, 'pressure') || remaining === 0) continue;
-          if (this.pendingClears.has(participant.config.id)) {
-            this.deferredPressureRows.set(participant.config.id, (this.deferredPressureRows.get(participant.config.id) ?? 0) + 1);
-          } else addRisingFloor(participant.board);
+        if (participant.board.alive) {
+          this.enqueueBoardAttack(participant.config.id, 1, 'pressure');
+          // Pressure identity is derived from pulse ordinal, independent of prediction's recipient subset.
+          this.state.attackQueues[participant.config.id]!.at(-1)!.serial = -(this.state.pressureRows + 1) * 16 - this.state.participants.map(p=>p.config.id).sort().indexOf(participant.config.id);
         }
       }
       this.state.pressureRows += 1;
@@ -677,6 +673,8 @@ export class MatchEngine {
         const defended = new Set(this.state.pendingConflict.defendedRecipientIds);
         defended.add(participant.config.id);
         this.state.pendingConflict.defendedRecipientIds = [...defended].sort();
+        const currentAttack = this.state.attackQueues[participant.config.id]?.[0];
+        if (currentAttack?.phase === 'warning') currentAttack.defended = true;
       }
       this.beginClearPresentation(participant, lines, lockedGrid, clearedRows, removedGrayRows, 'highlight');
       return null;
@@ -742,6 +740,8 @@ export class MatchEngine {
     const completedLocks: LockEventState[] = [];
     this.state.roundStartPulseMs = Math.max(0, this.state.roundStartPulseMs - deltaMs);
     this.state.pressurePulseMs = Math.max(0, this.state.pressurePulseMs - deltaMs);
+    for (const event of this.state.attackLaunchEvents) event.remainingMs = Math.max(0, event.remainingMs - deltaMs);
+    this.state.attackLaunchEvents = this.state.attackLaunchEvents.filter(event => event.remainingMs > 0);
     this.state.finalPushPulseMs = Math.max(0, this.state.finalPushPulseMs - deltaMs);
     if (this.state.levelUpEvent) {
       this.state.levelUpEvent.pulseMs = Math.max(0, this.state.levelUpEvent.pulseMs - deltaMs);
@@ -796,10 +796,11 @@ export class MatchEngine {
         if (pending.underAttack || pending.cleanupCapacity > 0 || pending.source === 'anomaly') this.nonAttackLockIds.add(event.participantId);
         completedLocks.push({ participantId: event.participantId, lines: pending.lines, source: pending.source });
         if (pending.source === 'anomaly') {
-          pending.stage = 'burn';
+          pending.stage = 'cue';
           const rows = participant.board.grid.slice(-pending.lines).map((row) => [...row]);
-          this.state.anomalyBurnSerial += 1;
-          startedBurns.push({ serial: this.state.anomalyBurnSerial, participantId: event.participantId, rows, pulseMs: ANOMALY_BURN_PULSE_MS });
+          this.state.anomalyCueEvents.push({serial: ++this.state.anomalySuccessSerial, participantId: event.participantId, rows, remainingMs: 800});
+          this.state.anomalySuccessEvents.push({serial:this.state.anomalySuccessSerial,participantId:event.participantId});
+          if(this.state.anomalySuccessEvents.length>64)this.state.anomalySuccessEvents.shift();
           continue;
         }
       } else {
@@ -810,6 +811,21 @@ export class MatchEngine {
       this.state.clearImpactEvents.push({ serial: this.state.clearImpactSerial, participantId: event.participantId, lines: event.lines });
       if (this.state.clearImpactEvents.length > 64) this.state.clearImpactEvents.shift();
     }
+    this.state.anomalyCueEvents = this.state.anomalyCueEvents.filter(event => {
+      if (!this.predicts(event.participantId)) return true;
+      // A cue created in this step receives its full first frame.
+      if (landedClears.some(clear => clear.participantId === event.participantId)) return true;
+      event.remainingMs = Math.max(0, event.remainingMs - deltaMs);
+      if (event.remainingMs > 0.001) return true;
+      const pending = this.pendingClears.get(event.participantId);
+      const participant = this.state.participants.find(p => p.config.id === event.participantId);
+      if (pending && participant?.board.alive) {
+        pending.stage = 'burn';
+        startedBurns.push({ serial: ++this.state.anomalyBurnSerial, participantId: event.participantId,
+          rows: participant.board.grid.slice(-event.rows.length).map(row => [...row]), pulseMs: ANOMALY_BURN_PULSE_MS });
+      }
+      return false;
+    });
     const pendingBurnEvents = [];
     for (const event of this.state.anomalyBurnEvents) {
       if (!this.predicts(event.participantId)) { pendingBurnEvents.push(event); continue; }
@@ -901,7 +917,7 @@ export class MatchEngine {
     reason: 'clear' | 'pressure' | 'conflict', firstSlot: number, count: number): void {
     this.state.shieldInventoryEvents.push({ serial: ++this.state.shieldInventorySerial,
       participantId: participant.config.id, kind, reason, firstSlot, count,
-      pulseMs: kind === 'burn' ? 1_000 : 450 });
+      pulseMs: kind === 'burn' ? 1_500 : 450 });
   }
 
   private absorbShieldRows(participant: ParticipantState, rows: number, reason: 'pressure' | 'conflict'): number {
@@ -974,7 +990,7 @@ export class MatchEngine {
   }
 
   private hasPendingAnomalyBurn(participantId: string): boolean {
-    return this.state.anomalyBurnEvents.some((event) => event.participantId === participantId);
+    return this.state.anomalyBurnEvents.some((event) => event.participantId === participantId) || this.state.anomalyCueEvents.some(e => e.participantId === participantId);
   }
 
   private collectConflictAttacks(lockEvents: readonly LockEventState[]): void {
@@ -1000,65 +1016,115 @@ export class MatchEngine {
     });
     if (senders.length === 0) return;
 
-    const incomingRows = { ...(this.state.pendingConflict?.incomingRows ?? {}) };
-    for (const sender of senders) {
-      for (const recipientId of sender.recipientIds) {
-        incomingRows[recipientId] = (incomingRows[recipientId] ?? 0) + sender.rows;
-      }
+    for (const sender of senders.sort((a, b) => a.participantId.localeCompare(b.participantId))) {
+      const serial = ++this.state.attackSerial;
+      this.state.attackLaunchEvents.push({ ...sender, serial, remainingMs: 1500 });
+      for (const id of [...sender.recipientIds].sort()) this.enqueueBoardAttack(id, sender.rows, 'conflict', sender.participantId);
     }
-    const previousSerial = Math.max(
-      this.state.pendingConflict?.serial ?? 0,
-      this.state.conflictImpactEvent?.serial ?? 0,
-    );
-    this.state.pendingConflict = {
-      serial: previousSerial + 1,
-      remainingWarningMs: this.options.tuning?.conflictWarningMs ?? CONFLICT_WARNING_MS,
-      senders: [...(this.state.pendingConflict?.senders ?? []), ...senders]
-        .sort((a, b) => a.participantId.localeCompare(b.participantId)),
-      incomingRows,
-      defendedRecipientIds: this.state.pendingConflict?.defendedRecipientIds ?? [],
+  }
+
+  /** One event per recipient, never a row aggregate. */
+  enqueueBoardAttack(id: string, rows: number, reason: 'conflict' | 'pressure', senderId?: string): void {
+    if (!Number.isInteger(rows) || rows <= 0) throw new Error('Attack rows must be positive integers');
+    const participant = this.state.participants.find(p => p.config.id === id);
+    if (!participant?.board.alive) return;
+    const queue = this.state.attackQueues[id] ??= [];
+    queue.push({ serial: ++this.state.attackSerial, activationSerial: 0, reason, senderId,
+      senderLabel: this.state.participants.find(p=>p.config.id===senderId)?.config.label, rows,
+      phase: 'queued', remainingMs: 3000, defended: false, riseRows: 0 });
+    this.activateBoardAttack(id);
+    this.projectPendingConflict();
+  }
+
+  private activateBoardAttack(id: string): void {
+    const head = this.state.attackQueues[id]?.[0];
+    if (head?.phase !== 'queued') return;
+    head.phase = 'warning';
+    head.remainingMs = CONFLICT_WARNING_MS;
+    head.activationSerial = ++this.state.attackActivationSerial;
+  }
+
+  /** Compatibility view. All timing/defense ownership is in recipient queues. */
+  private projectPendingConflict(): void {
+    const heads = Object.entries(this.state.attackQueues).flatMap(([id, queue]) =>
+      queue[0]?.phase === 'warning' ? [{id, head: queue[0]}] : []);
+    this.state.pendingConflict = heads.length === 0 ? null : {
+      serial: Math.max(...heads.map(({head}) => head.activationSerial)),
+      remainingWarningMs: Math.min(...heads.map(({head}) => head.remainingMs)),
+      senders: heads.reduce<import('../domain/types').ConflictSenderState[]>((all,{id,head}) => {
+        if(head.senderId){const same=all.find(s=>s.participantId===head.senderId&&s.rows===head.rows);
+          if(same)same.recipientIds.push(id);else all.push({participantId:head.senderId,rows:head.rows,recipientIds:[id]});}
+        return all;
+      },[]),
+      incomingRows: Object.fromEntries(heads.map(({id, head}) => [id, head.rows])),
+      defendedRecipientIds: heads.filter(({head}) => head.defended).map(({id}) => id).sort(),
     };
   }
 
-  private advancePendingConflict(deltaMs: number): void {
-    const pending = this.state.pendingConflict;
-    if (!pending) return;
-    pending.remainingWarningMs = Math.max(0, pending.remainingWarningMs - deltaMs);
-    if (pending.remainingWarningMs > 0) return;
-    if (Object.keys(pending.incomingRows).some((participantId) => {
-      const participant = this.state.participants.find((candidate) => candidate.config.id === participantId);
-      return participant?.board.alive && this.pendingClears.has(participantId)
-        && !pending.defendedRecipientIds?.includes(participantId)
-        && (pending.incomingRows[participantId] ?? 0) > participant.shieldCount;
-    })) {
-      pending.remainingWarningMs = 0.001;
-      return;
+  private advancePendingConflict(deltaMs: number, resolutionOnly = false): void {
+    // Existing local playtest fixtures inject the legacy view. Adopt once, without merging real queues.
+    if (Object.values(this.state.attackQueues).every(queue => queue.length === 0) && this.state.pendingConflict) {
+      const legacy = this.state.pendingConflict;
+      for (const [id, rows] of Object.entries(legacy.incomingRows)) {
+        const sender = legacy.senders.find(s => s.recipientIds.includes(id));
+        this.enqueueBoardAttack(id, rows, 'conflict', sender?.participantId);
+        const head = this.state.attackQueues[id]![0]!;
+        head.remainingMs = legacy.remainingWarningMs;
+        head.defended = legacy.defendedRecipientIds?.includes(id) ?? false;
+      }
     }
-
-    const defendedRecipientIds = [...(pending.defendedRecipientIds ?? [])].sort();
-    const defended = new Set(defendedRecipientIds);
-    const shieldedRecipientIds: string[] = [];
     const incomingRows: Record<string, number> = { ...this.shieldImpactsThisStep?.incomingRows };
-    for (const [participantId, rows] of Object.entries(pending.incomingRows).sort(([left], [right]) => left.localeCompare(right))) {
-      if (!this.predicts(participantId)) continue;
-      const participant = this.state.participants.find((candidate) => candidate.config.id === participantId);
-      if (!participant?.board.alive || defended.has(participantId)) continue;
-      const remainingRows = this.absorbShieldRows(participant, rows, 'conflict');
-      if (remainingRows < rows) shieldedRecipientIds.push(participantId);
-      if (this.queueShieldImpact(participant, rows, remainingRows, 'conflict', pending.senders) || remainingRows === 0) continue;
-      this.insertConflictRows(participant, remainingRows);
-      incomingRows[participantId] = (incomingRows[participantId] ?? 0) + remainingRows;
+    const defendedRecipientIds: string[] = [], shieldedRecipientIds: string[] = [];
+    const senders: import('../domain/types').ConflictSenderState[] = [...(this.shieldImpactsThisStep?.senders ?? [])];
+    let resolved = false;
+    for (const id of Object.keys(this.state.attackQueues).sort()) {
+      if (!this.predicts(id)) continue;
+      const queue = this.state.attackQueues[id]!;
+      const participant = this.state.participants.find(p => p.config.id === id);
+      if (!participant?.board.alive) { queue.length = 0; continue; }
+      const head = queue[0];
+      if (!head) continue;
+      if (head.phase === 'shield') {
+        if (this.state.shieldPresentations.some(e => e.participantId === id)) continue;
+        head.phase = 'rise'; head.remainingMs = head.riseRows > 0 ? 600 : 0;
+        if (head.remainingMs > 0) continue;
+      } else if (head.phase === 'rise') head.remainingMs = Math.max(0, head.remainingMs - deltaMs) < .001 ? 0 : head.remainingMs - deltaMs;
+      else if (head.phase === 'warning') {
+        if (resolutionOnly) continue;
+        head.remainingMs = Math.max(0, head.remainingMs - deltaMs);
+        if (head.remainingMs < .001) head.remainingMs = 0;
+        if (head.remainingMs > 0 || (this.pendingClears.has(id) && !head.defended)) continue;
+        resolved = true;
+        this.state.attackResolutionEvents.push({serial:++this.state.attackResolutionSerial,participantId:id,defended:head.defended});
+        if(this.state.attackResolutionEvents.length>64)this.state.attackResolutionEvents.shift();
+        const source = head.senderId ? [{participantId: head.senderId, rows: head.rows, recipientIds: [id]}] : [];
+        senders.push(...source);
+        if (head.defended) { defendedRecipientIds.push(id); head.phase = 'rise'; head.remainingMs = 1100; }
+        else {
+          const remaining = this.absorbShieldRows(participant, head.rows, head.reason);
+          head.riseRows = remaining;
+          if (remaining < head.rows) shieldedRecipientIds.push(id);
+          if (this.queueShieldImpact(participant, head.rows, remaining, head.reason, source)) {
+            head.phase = 'shield'; continue;
+          }
+          if (head.reason === 'pressure') {
+            for (let row = 0; row < remaining && participant.board.alive; row++) addRisingFloor(participant.board);
+          } else this.insertConflictRows(participant, remaining);
+          incomingRows[id] = remaining;
+          head.phase = 'rise'; head.remainingMs = remaining > 0 ? 600 : 0;
+        }
+        if (head.remainingMs > 0) continue;
+      }
+      if (head.phase === 'rise' && head.remainingMs === 0) {
+        queue.shift(); this.activateBoardAttack(id);
+      }
     }
-    this.state.conflictImpactEvent = {
-      serial: (this.state.conflictImpactEvent?.serial ?? 0) + 1,
-      incomingRows,
-      maxRows: Math.max(0, ...Object.values(incomingRows)),
-      pulseMs: Math.max(CONFLICT_IMPACT_PULSE_MS, MIN_CONFLICT_NOTICE_MS - (this.options.tuning?.conflictWarningMs ?? CONFLICT_WARNING_MS)),
-      defendedRecipientIds,
-      shieldedRecipientIds,
-      senders: [...(this.shieldImpactsThisStep?.senders ?? []), ...pending.senders],
+    if (resolved) this.state.conflictImpactEvent = {
+      serial: (this.state.conflictImpactEvent?.serial ?? 0) + 1, incomingRows,
+      maxRows: Math.max(0, ...Object.values(incomingRows)), pulseMs: defendedRecipientIds.length ? 1100 : CONFLICT_IMPACT_PULSE_MS,
+      defendedRecipientIds, shieldedRecipientIds, senders,
     };
-    this.state.pendingConflict = null;
+    this.projectPendingConflict();
   }
 
   private updateSurvivalTimes(): void {
@@ -1072,11 +1138,26 @@ export class MatchEngine {
   }
 
   private hasPendingImpactForAliveParticipant(): boolean {
-    const pending = this.state.pendingConflict;
-    if (!pending) return false;
-    return this.state.participants.some((participant) => (
-      participant.board.alive && (pending.incomingRows[participant.config.id] ?? 0) > 0
-    ));
+    return this.state.participants.some(p => p.board.alive && (this.state.attackQueues[p.config.id]?.length ?? 0) > 0);
+  }
+
+  private finishTimedMatch(): void {
+    // Expiry wins the boundary: an unfinished warning/clear cannot extend play.
+    this.state.remainingMs = 0;
+    this.state.attackQueues = {};
+    this.state.pendingConflict = null;
+    this.pendingClears.clear();
+    this.deferredPressureRows.clear();
+    this.stepSpawns.clear();
+    this.state.clearPresentations = [];
+    this.state.shieldPresentations = [];
+    this.state.anomalyCueEvents = [];
+    this.state.anomalyBurnEvents = [];
+    this.state.anomalyTransition = null;
+    this.state.globalEventHold = null;
+    this.state.lockEvents = [];
+    this.updateSurvivalTimes();
+    this.resolveOutcomeWhenReady();
   }
 
   private resolveOutcomeWhenReady(): void {
@@ -1212,6 +1293,7 @@ export class MatchEngine {
       this.resolvedClearParticipantIds.clear();
       this.resolvedAnomalyBurnParticipantIds.clear();
       this.state.lockEvents = this.tickPresentation(deltaMs);
+      this.advancePendingConflict(deltaMs, true);
       this.collectConflictAttacks(this.state.lockEvents);
       this.beginAnomalyBurnWhenReady();
       this.updateSurvivalTimes();

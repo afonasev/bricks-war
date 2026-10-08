@@ -69,7 +69,7 @@ describe('match event presentation', () => {
       incomingRows: { p2: 3 },
     };
     expect(participantMatchEvent(engine.state, 'p2', DEFAULT_GAME_TUNING.messages, ['Аня'])).toMatchObject({
-      kind: 'incoming-attack', title: 'Вас атакует Аня +3', values: { senders: 'Аня', rows: 3 },
+      kind: 'incoming-attack', title: 'Аня ⚔ 3',
     });
     engine.state.conflictImpactEvent = {
       serial: 1, incomingRows: {}, maxRows: 0, pulseMs: 700, shieldedRecipientIds: ['p2'],
@@ -112,21 +112,21 @@ describe('match event presentation', () => {
     engine.state.conflictImpactEvent = {
       serial: 2, incomingRows: {}, maxRows: 0, pulseMs: 700, defendedRecipientIds: ['p2'],
     };
-    expect(participantMatchEvent(engine.state, 'p2', DEFAULT_GAME_TUNING.messages, [])).toMatchObject({ kind: 'active-defense', icon: 'defense' });
+    expect(participantMatchEvent(engine.state, 'p2', DEFAULT_GAME_TUNING.messages, [])).toBeNull();
 
     engine.state.conflictImpactEvent = null;
     engine.state.shieldChargeEvents = [{ serial: 3, participantId: 'p2', kind: 'half', pulseMs: 1_000 }];
     expect(participantMatchEvent(engine.state, 'p2', DEFAULT_GAME_TUNING.messages, [])).toBeNull();
     engine.state.shieldChargeEvents = [{ serial: 4, participantId: 'p2', kind: 'full', pulseMs: 900 }];
-    expect(participantMatchEvent(engine.state, 'p2', DEFAULT_GAME_TUNING.messages, [])).toMatchObject({ kind: 'shield-full', lifetimeMs: 900 });
+    expect(participantMatchEvent(engine.state, 'p2', DEFAULT_GAME_TUNING.messages, [])).toBeNull();
 
     engine.state.cleanupEvents = [{ serial: 2, participantId: 'p2', rows: 3, pulseMs: 650 }];
-    expect(participantMatchEvent(engine.state, 'p2', DEFAULT_GAME_TUNING.messages, [])).toMatchObject({ kind: 'shield-full' });
+    expect(participantMatchEvent(engine.state, 'p2', DEFAULT_GAME_TUNING.messages, [])).toMatchObject({kind:'cleanup'});
     engine.state.shieldChargeEvents = [];
     expect(participantMatchEvent(engine.state, 'p2', DEFAULT_GAME_TUNING.messages, [])).toMatchObject({ kind: 'cleanup', lifetimeMs: 650 });
 
     engine.state.anomalyBurnEvents = [{ serial: 2, participantId: 'p2', rows: [[null, 'garbage']], pulseMs: 500 }];
-    expect(participantMatchEvent(engine.state, 'p2', DEFAULT_GAME_TUNING.messages, [])).toMatchObject({ kind: 'anomaly-burn', lifetimeMs: 500 });
+    expect(participantMatchEvent(engine.state, 'p2', DEFAULT_GAME_TUNING.messages, [])).toMatchObject({kind:'cleanup'});
   });
 
   it('renders the shared plaque anatomy for every event family', () => {

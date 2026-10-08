@@ -126,7 +126,8 @@ describe('shared anomaly transition', () => {
     engine.step(1);
     expect(engine.state.pressureRows).toBe(1);expect(engine.state.anomalyTransition).toBeNull();
     expect(p.board.regularPieceIndex).toBe(2);expect(p.placedPieces).toBe(1);
-    expect(p.board.active?.y).toBe(0);
+    expect(p.board.active?.y).toBe(1);
+    expect(engine.state.attackQueues[p.config.id]?.[0]?.remainingMs).toBe(3000);
   });
 
   it('sweeps bottom-to-top without touching non-piece cells, including calm effects', () => {

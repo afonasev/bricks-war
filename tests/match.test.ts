@@ -71,6 +71,7 @@ function finishPlayableClear(engine: MatchEngine, lines: number): void {
     else engine.step(Math.max(1, engine.state.clearPresentations[0]?.remainingMs ?? clearFallDurationMs(lines)));
   }
   expect(engine.state.clearPresentations).toHaveLength(0);
+  if (engine.state.anomalyCueEvents.length) engine.step(800);
 }
 
 function finishAnomalyBurn(engine: MatchEngine, lines: number): void {
@@ -338,7 +339,7 @@ describe('match engine', () => {
       incomingRows: { p2: 1 },
     };
     engine.step(1);
-    expect(engine.state.conflictImpactEvent?.pulseMs).toBe(1_650);
+    expect(engine.state.conflictImpactEvent?.pulseMs).toBe(700);
   });
 
   it('produces order-independent same-step attack state', () => {
@@ -395,7 +396,7 @@ describe('match engine', () => {
     expect(grayRows(discarded.state.participants[1]!)).toBe(0);
   });
 
-  it('cancels every sender addressed to an actively defended recipient in one warning batch', () => {
+  it('blocks only the current sender and retains the next warning', () => {
     const engine = new MatchEngine([
       ...humanPair(),
       { id: 'p3', label: 'ИИ', controller: 'ai', difficulty: 'easy' },
@@ -405,7 +406,7 @@ describe('match engine', () => {
     prepareClassicClear(engine.state.participants[2]!, 3);
     engine.step(FIXED_STEP_MS);
     finishPlayableClear(engine, 3);
-    engine.state.pendingConflict!.remainingWarningMs = 2_000;
+    engine.state.attackQueues.p2![0]!.remainingMs = 2_000;
     prepareClassicClear(engine.state.participants[1]!, 1);
     engine.step(800);
     finishPlayableClear(engine, 1);
@@ -447,6 +448,7 @@ describe('match engine', () => {
     engine.step(CONFLICT_WARNING_MS - 1);
     expect(engine.state.phase).toBe('playing');
     engine.step(2);
+    if(engine.state.attackQueues.p2?.[0]?.phase==='rise')engine.step(600);
     expect(engine.state.phase).toBe('results');
     expect(engine.state.winnerIds).toEqual(['p2']);
   });
@@ -469,7 +471,7 @@ describe('match engine', () => {
       engine.step(FIXED_STEP_MS);
       expect(participant.score).toBe(0);
       finishPlayableClear(engine, 2);
-      expect(engine.state.lockEvents).toContainEqual({ participantId: 'p1', lines: 2, source: 'anomaly' });
+      expect(engine.state.anomalySuccessSerial).toBe(1);
       expect(participant.score).toBe(300);
       expect(grayRows(participant)).toBe(2);
       const activeY = participant.board.active?.y;
@@ -603,6 +605,9 @@ describe('match engine', () => {
       engine.step(1);
       expect(engine.state.pressureRows).toBe(index + 1);
       expect(engine.state.nextPressureAtMs).toBe(time + Math.max(5_000, 15_000 - index * 1_000));
+      for (const participant of engine.state.participants) expect(engine.state.attackQueues[participant.config.id]?.[0]?.reason).toBe('pressure');
+      if (engine.state.globalEventHold) engine.step(engine.state.globalEventHold.remainingMs);
+      engine.step(3000); engine.step(600);
       for (const participant of engine.state.participants) expect(grayRows(participant)).toBe(1);
     }
   });
@@ -617,12 +622,16 @@ describe('match engine', () => {
     engine.state.elapsedMs = 180_000 - 1;
     engine.step(1);
     expect(engine.state.nextPressureAtMs).toBe(195_000);
+    expect(protectedPlayer!.shieldCount).toBe(2);
+    if (engine.state.globalEventHold) engine.step(engine.state.globalEventHold.remainingMs);
+    engine.step(3000); engine.step(SHIELD_PRESENTATION_MS);
     expect(protectedPlayer!.shieldCount).toBe(1);
     if (engine.state.globalEventHold) engine.step(engine.state.globalEventHold.remainingMs);
     engine.state.elapsedMs = 195_000 - 1;
     engine.step(1);
     expect(engine.state.pressureRows).toBe(2);
     expect(engine.state.nextPressureAtMs).toBe(209_000);
+    engine.step(3000); engine.step(SHIELD_PRESENTATION_MS);
     expect(protectedPlayer!.shieldCount).toBe(0);
     expect(grayRows(protectedPlayer!)).toBe(0);
     expect(grayRows(eliminated!)).toBe(0);
@@ -630,6 +639,7 @@ describe('match engine', () => {
     engine.step(1);
     expect(grayRows(protectedPlayer!)).toBe(0);
     while (engine.state.globalEventHold || engine.state.anomalyTransition || engine.state.shieldPresentations.length) engine.step(FIXED_STEP_MS);
+    engine.step(3000);
     expect(grayRows(protectedPlayer!)).toBe(1);
     expect(engine.state.nextPressureAtMs).toBe(222_000);
   });
@@ -669,7 +679,10 @@ describe('match engine', () => {
       expect(candidate.state.elapsedMs).toBe(300_000);
       expect(candidate.state.pressureRows).toBe(14);
       expect(candidate.state.nextPressureAtMs).toBe(305_000);
-      expect(candidate.state.participants[0]!.shieldCount).toBe(86);
+      const spent=100-candidate.state.participants[0]!.shieldCount;
+      expect(spent).toBe(candidate.state.shieldInventorySerial);
+      expect(candidate.state.attackQueues.p1!.filter(e=>e.phase==='queued'||e.phase==='warning').length+spent).toBe(14);
+      expect(candidate.state.attackQueues.p1!.every(event=>event.rows===1&&event.reason==='pressure')).toBe(true);
     }
   });
 
@@ -719,6 +732,9 @@ describe('match engine', () => {
     engine.step(1);
 
     expect(grayRows(participant)).toBe(0);
+    expect(participant.shieldCount).toBe(1);
+    if (engine.state.globalEventHold) engine.step(engine.state.globalEventHold.remainingMs);
+    engine.step(3000);
     expect(participant.shieldCount).toBe(0);
     expect(participant.shieldReady).toBe(false);
   });

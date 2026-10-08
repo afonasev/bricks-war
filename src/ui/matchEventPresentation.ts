@@ -85,44 +85,21 @@ export function globalMatchEvent(
 export function participantMatchEvent(
   state: MatchState,
   participantId: string,
-  messages: MatchMessageTemplates,
+  _messages: MatchMessageTemplates,
   senderNames: readonly string[],
 ): MatchEventDescriptor | null {
-  const burn = state.anomalyBurnEvents.find((event) => event.participantId === participantId);
-  if (burn) return {
-    ...descriptor('anomaly-burn', participantId, 'Аномальный удар!', `Сгорит рядов: ${burn.rows.length}`),
-    lifetimeMs: burn.pulseMs,
-  };
-
-  const impactActive = (state.conflictImpactEvent?.pulseMs ?? 0) > 0;
-
-  const defended = impactActive && (state.conflictImpactEvent?.defendedRecipientIds?.includes(participantId) ?? false);
-  if (defended) return {
-    ...descriptor('active-defense', participantId, messages.activeDefense),
-    lifetimeMs: state.conflictImpactEvent?.pulseMs ?? CONFLICT_IMPACT_PULSE_MS,
-  };
-
   const incomingRows = state.pendingConflict?.incomingRows[participantId] ?? 0;
   if (incomingRows > 0) {
-    const values = { senders: senderNames.join(', '), rows: incomingRows };
+    const current = state.attackQueues[participantId]?.[0];
+    const values = { senders: current?.reason === 'pressure' ? '' : current?.senderLabel ?? senderNames.join(', '), rows: incomingRows };
     return {
-      ...descriptor('incoming-attack', participantId, formatMatchMessage(messages.incomingAttack, values)),
-      lifetimeMs: state.pendingConflict?.remainingWarningMs
-        ?? state.conflictImpactEvent?.pulseMs
-        ?? CONFLICT_IMPACT_PULSE_MS,
-      template: messages.incomingAttack,
-      values,
+      ...descriptor('incoming-attack',participantId, `${values.senders}${values.senders ? ' ' : ''}⚔ ${incomingRows}`),
+      lifetimeMs: current?.remainingMs ?? state.pendingConflict?.remainingWarningMs ?? 3000,
     };
   }
 
-  const charge = state.shieldChargeEvents.find((event) => event.participantId === participantId && event.kind === 'full');
-  if (charge) return {
-    ...descriptor(charge.kind === 'half' ? 'shield-half' : 'shield-full', participantId, charge.kind === 'half' ? 'Щит заряжается!' : 'Щит заряжен!'),
-    lifetimeMs: charge.pulseMs,
-  };
-
   const cleanup = state.cleanupEvents.find((event) => event.participantId === participantId);
-  if (cleanup) return {
+  if (cleanup && !cleanup.amplified) return {
     ...descriptor('cleanup', participantId, `Очищено · ${cleanup.rows}`, 'Серые ряды удалены'),
     lifetimeMs: cleanup.pulseMs,
   };
@@ -133,7 +110,7 @@ const ICON_PATHS: Readonly<Record<MatchEventIcon, string>> = {
   start: '<path d="M5 5v14M6 6h9l-2 3 2 3H6"/>',
   level: '<path d="M12 2l2.2 5.8L20 10l-5.8 2.2L12 18l-2.2-5.8L4 10l5.8-2.2z"/><path d="M19 16v5M16.5 18.5h5"/>',
   pressure: '<path d="M3 6l4 4-4 4M21 6l-4 4 4 4M9 6h6M9 10h6M9 14h6"/>',
-  attack: '<path d="M5 5h14M7 9h10M9 13h6M12 16v5M9 18l3 3 3-3"/>',
+  attack: '<path d="M5 19l4-4M6 12l6 6M9 15L19 5l-4 1-7 7"/>',
   defense: '<path d="M4 6l5 5-5 5M20 6l-5 5 5 5M8 20L16 4"/>',
   'shield-half': '<path d="M12 2l8 3v6c0 5-3 8-8 11-5-3-8-6-8-11V5z"/><path d="M5 13h14"/>',
   shield: '<path d="M12 2l8 3v6c0 5-3 8-8 11-5-3-8-6-8-11V5z"/><path d="M8 11l3 3 5-6"/>',
@@ -166,5 +143,6 @@ export function matchEventPlaqueMarkup(
   event: MatchEventDescriptor,
   titleMarkup = escapeMatchEventHtml(event.title),
 ): string {
+  if(event.kind==='incoming-attack') titleMarkup=titleMarkup.replace('⚔',matchEventIconMarkup('attack'));
   return `<span class="match-event-icon-tile" aria-hidden="true">${matchEventIconMarkup(event.icon)}</span><span class="match-event-copy"><strong>${titleMarkup}</strong>${event.detail ? `<small>${escapeMatchEventHtml(event.detail)}</small>` : ''}</span>`;
 }

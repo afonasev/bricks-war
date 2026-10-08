@@ -241,7 +241,7 @@ function releaseFooterMarkup({ confirm, back, start, roster, keyboard, buildInfo
   const rosterHint = roster && showGamepadActions ? `<span class="release-footer-action"><b class="input-badge input-roster">Y</b>${roster}</span>` : '';
   return `<footer class="release-footer main-menu-footer release-guidance-footer">
     <div class="release-footer-inner${start ? ' release-footer-start-layout' : ''}">
-      ${start ? `${showGamepadActions ? `<div class="release-footer-side release-footer-before-start">${confirmHint}${backHint}</div>` : ''}<button class="primary-button footer-start" id="start-match" type="button">${showGamepadActions ? '<kbd aria-hidden="true">X</kbd>' : ''}<span>${start}</span></button>${showGamepadActions ? `<div class="release-footer-side release-footer-after-start">${rosterHint}</div>` : ''}` : `${confirmHint}${backHint}${rosterHint}`}
+      ${start ? `${showGamepadActions ? `<div class="release-footer-side release-footer-before-start">${confirmHint}${backHint}</div>` : ''}<button class="primary-button footer-start" id="start-match" type="button">${showGamepadActions ? '<kbd aria-hidden="true">X</kbd>' : ''}<span>${start}</span></button>${showGamepadActions ? `<div class="release-footer-side release-footer-after-start">${rosterHint}</div>` : ''}` : `${showGamepadActions ? `<div class="release-footer-actions">${confirmHint}${backHint}${rosterHint}</div>` : ''}`}
       <small>${keyboard}</small>
       ${buildInfo ? `<span class="release-build-info">${formatBuildInfo()}</span>` : ''}
       ${mobileCredits}
@@ -1425,7 +1425,7 @@ export class BricksWarApp {
     input.configure(configs);
     const aiControllers = new Map<string, AiController>();
     for (const config of configs) {
-      if (config.controller === 'ai' && config.difficulty && !isLocalPlaytestFlag('playtest-anomaly-arrival')) {
+      if (config.controller === 'ai' && config.difficulty && !isLocalPlaytestFlag('playtest-anomaly-arrival') && !isLocalPlaytestFlag('playtest-board-events')) {
         aiControllers.set(config.id, new AiController(seed, config.id, config.difficulty, engine.state.options.conflictEnabled, activeTuning ?? undefined));
       }
     }
@@ -1535,6 +1535,9 @@ export class BricksWarApp {
     this.bindVolumeControl();
     this.bindSfxPresetControl();
     if (mobileMatch) this.bindMobileMatchInput(input);
+    if (isLocalPlaytestFlag('playtest-board-events')) {
+      Object.assign(window, {__boardEffectsQA: {engine, prepareClearPlaytest, audio: this.audio}});
+    }
     this.updateHud(engine.state);
     if ((playtestConflictRows && [1, 3, 4].includes(playtestConflictRows)) || playtestCleanup || playtestShield || playtestShieldImpact !== null || playtestLevelUp || playtestSurvivalLevelUp || playtestFinalPush || playtestGlobalCombined || playtestImpact || playtestDefense || playtestShieldBlock || playtestShieldHalf || playtestShieldFull || playtestMessageLower || playtestAnomalyBurn || playtestScore !== null) {
       window.setTimeout(() => {
@@ -1777,7 +1780,7 @@ export class BricksWarApp {
         return `
         <article class="hud-card ${mobileSoloMatch && index === 0 ? 'mobile-player-card' : ''} ${compactMobileAi ? 'mobile-ai-card' : ''} hud-palette-${identity.palette} ${participant.board.alive ? '' : 'is-out'} ${participant.board.active?.definition.source === 'anomaly' ? 'has-active-anomaly' : ''} ${senderRows ? 'is-conflict-sender' : ''} ${incomingRows ? 'is-conflict-target' : ''} ${impactRows ? 'is-conflict-impact' : ''} ${defended || shieldBlocked ? 'is-conflict-defense' : ''} ${cleanupRows ? 'is-cleaning' : ''} ${participant.shieldReady ? 'has-shield' : ''} ${participantEvent ? 'has-player-event' : ''}" style="--player-name-color:${playerAccentForSlot(index)};--sender-color:${senderAccent};${mobileStyle}" data-team="${identity.teamLabel ? identity.palette : ''}" data-tile-style="${participant.resolvedTileStyle}" data-next-piece="${participant.board.nextPiece.id}" data-active-y="${participant.board.active?.y ?? ''}" data-attack-rows="${senderRows}" data-incoming-rows="${incomingRows || impactRows}" data-event-kind="${participantEvent?.kind ?? ''}" data-shield-remaining-ms="${state.shieldPresentations.find(e => e.participantId === participant.config.id)?.remainingMs ?? 0}" data-shield-debt="${state.shieldPresentations.filter(e => e.participantId === participant.config.id).reduce((n,e) => n + e.deferredImpacts.reduce((m,i) => m + i.rows, 0), 0)}" data-gray-rows="${participant.board.grid.filter(row => row.some(cell => cell === 'garbage')).length}">
           ${mobilePlayerMarkup}
-          ${senderRows ? `<b class="conflict-chip is-send">АТАКА · ${senderRows}</b>` : ''}
+
           ${participantEvent ? `<span class="player-event-symbol" data-kind="${participantEvent.kind}" data-accent="${participantEvent.accent}" style="--event-duration:${participantEvent.lifetimeMs}ms" aria-hidden="true">${matchEventIconMarkup(participantEvent.icon)}</span><div class="match-event-plaque player-event-notice is-${noticeRegion}" data-kind="${participantEvent.kind}" data-accent="${participantEvent.accent}" style="--event-duration:${participantEvent.lifetimeMs}ms" role="status" aria-label="${escapeHtml([participantEvent.title, participantEvent.detail].filter(Boolean).join('. '))}">${matchEventPlaqueMarkup(participantEvent, participantEvent.template && participantEvent.values ? formatParticipantEventMarkup(participantEvent.template, participantEvent.values) : escapeHtml(participantEvent.title))}</div>` : ''}
           ${participant.board.alive ? '' : '<b class="out-label">ВЫБЫЛ</b>'}
         </article>

@@ -154,6 +154,7 @@ button { color: inherit; }
 .release-guidance-footer { position: relative; z-index: 3; width: 100vw; min-height: 72px; margin-left: calc(50% - 50vw); margin-right: calc(50% - 50vw); display: grid; place-items: center; padding: 10px 24px; border: 0; border-top: 2px solid #dfc9a5; border-radius: 0; background: #fff8e9ee; color: #173d73; font-weight: 900; box-shadow: 0 -7px 24px #856d4520; }
 .release-footer-inner { width: min(1360px, 100%); display: flex; align-items: center; justify-content: center; gap: clamp(30px, 6vw, 90px); }
 .release-footer-action { display: flex; align-items: center; gap: 11px; white-space: nowrap; }
+.release-footer-actions { display: flex; flex-wrap: nowrap; align-items: center; justify-content: center; gap: clamp(16px, 3vw, 40px); }
 .release-guidance-footer .footer-start { min-height: 42px; padding: 0 16px; border-color: #739c17; background: linear-gradient(#cbee62, #a9d83c); color: #29420e; box-shadow: 0 4px 0 #6c941a, 0 8px 16px #719c1e2b; }
 .footer-start kbd { width: 30px; height: 30px; min-width: 30px; flex: 0 0 30px; display: grid; place-items: center; padding: 0; border: 2px solid #104f9a; border-radius: 50%; background: #1e66c6; color: #fff; font: 900 14px/1 "Trebuchet MS", sans-serif; box-shadow: inset 0 2px #ffffff88, 0 3px 0 #104f9a; }
 .release-guidance-footer small { min-width: 0; color: #687b8f; font-size: .58rem; text-align: center; }
@@ -1573,3 +1574,20 @@ html { touch-action: pan-x pan-y; overscroll-behavior: none; }
   #app.network-root .network-screen .network-actions:has(> [data-net-action="start"]) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   #app.network-root .network-screen [data-net-action="start"] { grid-column: 1 / -1; grid-row: 1; width: min(330px, 100%); min-height: 60px; }
 }
+
+/* Board motion is owned by Phaser; inventory alone never lights the card. */
+.hud-card.has-shield { outline: none; }
+.hud-card.is-conflict-sender::after,
+.hud-card.is-conflict-target::after,
+.hud-card.is-conflict-defense::after { display: none; }
+.player-event-notice[data-kind="incoming-attack"] { background: transparent; box-shadow: none; border: 0; color: #b42a40; }
+
+.player-event-notice[data-kind="incoming-attack"] { top: 4px; left: 50%; transform: translateX(-50%); min-height: 0; padding: 0; gap: 0; width: max-content; max-width: calc(100% - 8px); }
+.player-event-notice[data-kind="incoming-attack"] .match-event-icon-tile { display: none; }
+.player-event-notice[data-kind="incoming-attack"] .match-event-copy strong { font-size: clamp(.65rem,1vw,.86rem); line-height: 1.15; white-space: normal; }
+
+.player-event-symbol[data-kind="incoming-attack"] { display: none; }
+.player-event-notice[data-kind="incoming-attack"] { top: 54px; }
+.player-event-notice[data-kind="incoming-attack"] .match-event-copy strong { color: #b42a40; display: flex; align-items: center; justify-content: center; gap: 4px; }
+.player-event-notice[data-kind="incoming-attack"] .match-event-copy .match-event-icon { width: 14px; height: 14px; flex: 0 0 14px; }
+@media(max-width:600px) { .player-event-notice[data-kind="incoming-attack"] { top: 43px; } }

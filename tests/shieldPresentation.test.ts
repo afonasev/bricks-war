@@ -60,17 +60,19 @@ describe('shield reflection lifecycle', () => {
     for (let n = 0; n < 50; n++) { e.step(FIXED_STEP_MS); restored.step(FIXED_STEP_MS); expect(restored.checkpoint()).toEqual(e.checkpoint()); }
     expect(gray(e)).toBe(3);
   });
-  it('queues later unshielded and shielded impacts without overtaking', () => {
-    const e = fixture(2, 1); e.step(100);
-    e.state.pendingConflict = { serial: 2, remainingWarningMs: 1, senders: [], incomingRows: { p1: 3 } }; e.step(2);
-    expect(e.state.shieldPresentations).toHaveLength(2); expect(gray(e)).toBe(0);
-    e.state.pendingConflict = { serial: 3, remainingWarningMs: 1, senders: [], incomingRows: { p1: 1 } }; e.step(2);
-    e.step(SHIELD_PRESENTATION_MS); expect(gray(e)).toBe(0);
-    e.step(SHIELD_PRESENTATION_MS); expect(gray(e)).toBe(3);
-    expect(e.state.shieldInventoryEvents.filter(x => x.kind === 'burn').reduce((n,x) => n+x.count,0)).toBeLessThanOrEqual(2);
+  it('queues later unshielded and shielded attacks until separate warning windows', () => {
+    const e = fixture(2,1); e.step(100);
+    e.enqueueBoardAttack('p1',3,'conflict'); e.enqueueBoardAttack('p1',1,'conflict');
+    expect(e.state.shieldPresentations).toHaveLength(1);expect(e.state.attackQueues.p1).toHaveLength(3);
+    e.step(SHIELD_PRESENTATION_MS);expect(gray(e)).toBe(0);
+    expect(e.state.attackQueues.p1![0]!.remainingMs).toBe(3000);
+    e.step(3000);expect(e.state.shieldPresentations).toHaveLength(1);expect(gray(e)).toBe(0);
+    e.step(SHIELD_PRESENTATION_MS);expect(gray(e)).toBe(2);e.step(600);
+    expect(e.state.attackQueues.p1![0]!.remainingMs).toBe(3000);e.step(3000);expect(gray(e)).toBe(3);
+    expect(e.state.shieldInventorySerial).toBe(2);
   });
   it('waits for a new clear transaction at the insertion boundary', () => {
-    const e = fixture(); e.step(600);
+    const e = fixture(); e.step(SHIELD_PRESENTATION_MS - 100);
     prepareClearPlaytest(e.state.participants[0]!.board, 'normal', 2); e.step(FIXED_STEP_MS);
     e.step(100); expect(gray(e)).toBe(0); expect(e.state.shieldPresentations[0]?.remainingMs).toBe(0);
     for (let n = 0; n < 100 && e.state.shieldPresentations.length; n++) e.step(FIXED_STEP_MS);
@@ -80,14 +82,16 @@ describe('shield reflection lifecycle', () => {
     const e = fixture(1, 1); e.step(SHIELD_PRESENTATION_MS);
     const p = e.state.participants[0]!; p.shieldCount = 1; p.shieldReady = true;
     e.state.nextPressureAtMs = e.state.elapsedMs + 1; e.step(2);
-    expect(e.state.shieldPresentations).toHaveLength(1); expect(gray(e)).toBe(0);
+    expect(e.state.attackQueues.p1![0]!.reason).toBe('pressure');expect(gray(e)).toBe(0);
+    e.step(3000);expect(e.state.shieldPresentations).toHaveLength(1);
     const next = e.state.nextPressureAtMs; e.step(100); expect(e.state.nextPressureAtMs).toBe(next);
     e.step(SHIELD_PRESENTATION_MS); expect(gray(e)).toBe(0);
   });
-  it('cancels only eliminated debt and keeps timeout results behind residual insertion', () => {
+  it('cancels eliminated debt and unfinished residual insertion at timed expiry', () => {
     const e = fixture(); e.state.durationMs = e.state.elapsedMs;
-    e.step(100); expect(e.state.phase).toBe('playing');
-    e.step(SHIELD_PRESENTATION_MS); expect(gray(e)).toBe(3); expect(e.state.phase).toBe('results');
+    const before=gray(e);e.step(100); expect(e.state.phase).toBe('results');
+    expect(e.state.shieldPresentations).toEqual([]);expect(e.state.attackQueues).toEqual({});
+    e.step(SHIELD_PRESENTATION_MS+600);expect(gray(e)).toBe(before);
     const other = fixture(); other.eliminate('p1'); expect(other.state.shieldPresentations).toEqual([]);
   });
   it('makes phase geometry independent of counts and invalidates the lifted static grid', () => {

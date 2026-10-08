@@ -1,4 +1,5 @@
-import { shieldPresentationForParticipant, shieldVisualFrame } from './shieldPresentation';
+import {drawBoardEventEffects} from './boardEventEffects';
+import { shieldPresentationForParticipant } from './shieldPresentation';
 import { airborneBurnCells } from './airborneBurn';
 import * as Phaser from 'phaser/dist/phaser.esm.js';
 import { HumanInputRouter, isCapturedGameKey, isManualPauseKey } from '../controllers/input';
@@ -17,7 +18,7 @@ import {
   type MatchState,
   type ParticipantState,
 } from '../domain/types';
-import { FIXED_STEP_MS, LEVEL_UP_PULSE_MS } from '../simulation/match';
+import { FIXED_STEP_MS } from '../simulation/match';
 import { landingPiece } from '../simulation/board';
 import { ANOMALY_COLOR, pieceCells, pieceColor, TETROMINO_COLORS } from '../simulation/tetrominoes';
 import {
@@ -342,18 +343,6 @@ export class PlayScene extends Phaser.Scene {
       const y = ARENA_EDGE_PADDING + row * (layout.slotHeight + ARENA_CARD_GAP) + ((layout.slotHeight - layout.cardHeight) / 2);
         this.drawBoardCard(participant, card?.x ?? x, card?.y ?? y, card?.cardWidth ?? layout.cardWidth, card?.cardHeight ?? layout.cardHeight, card?.cellSize ?? layout.cellSize, card?.headerHeight ?? ARENA_CARD_HEADER_HEIGHT);
     });
-    const rareAttack = Math.max(
-      0,
-      ...(state.pendingConflict?.senders.map((sender) => sender.rows) ?? []),
-      (state.conflictImpactEvent?.pulseMs ?? 0) > 0 ? state.conflictImpactEvent?.maxRows ?? 0 : 0,
-    );
-    if (rareAttack >= 4) {
-      const alpha = this.calmEffects ? 0.8 : 0.48 + Math.sin(this.time.now / 55) * 0.22;
-      this.graphics.lineStyle(7, 0xf2b43f, alpha);
-      this.graphics.strokeRoundedRect(5, 5, width - 10, height - 10, 13);
-      this.graphics.lineStyle(2, 0xffffff, Math.min(1, alpha + 0.2));
-      this.graphics.strokeRoundedRect(13, 13, width - 26, height - 26, 10);
-    }
   }
 
   private drawStaticBoardCard(
@@ -399,7 +388,7 @@ export class PlayScene extends Phaser.Scene {
     const settling = this.runtime.engine.state.clearPresentations.some((event) => (
       event.participantId === participant.config.id
     ));
-    const reflecting = shieldPresentationForParticipant(this.runtime.engine.state, participant.config.id);
+    const reflecting = shieldPresentationForParticipant(this.runtime.engine.state, participant.config.id) || (this.runtime.engine.state.attackQueues[participant.config.id]?.[0]?.phase === 'rise' && (this.runtime.engine.state.attackQueues[participant.config.id]?.[0]?.riseRows ?? 0) > 0);
     for (let y = 0; y < VISIBLE_HEIGHT && !settling && !reflecting; y += 1) {
       for (let x = 0; x < BOARD_WIDTH; x += 1) {
         const kind = participant.board.grid[y + HIDDEN_ROWS]?.[x];
@@ -436,28 +425,18 @@ export class PlayScene extends Phaser.Scene {
     const boardHeight = cellSize * VISIBLE_HEIGHT;
     const boardX = cardX + (cardWidth - boardWidth) / 2;
     const boardY = cardY + headerHeight + Math.max(0, (cardHeight - headerHeight - boardHeight) / 2);
-    const levelPulse = this.runtime.engine.state.isSurvival
-      ? (participant.levelUpEvent?.pulseMs ?? 0) > 0
-      : (this.runtime.engine.state.levelUpEvent?.pulseMs ?? 0) > 0;
-    const globalHold = this.runtime.engine.state.globalEventHold;
     const conflict = conflictPresentationForParticipant(this.runtime.engine.state, participant.config.id);
     const shield = shieldPresentationForParticipant(this.runtime.engine.state, participant.config.id);
-    const protectedBoard = !!shield || conflict.shieldReady || conflict.activelyDefended || conflict.shieldBlocked;
-
-    if ((protectedBoard || participant.board.clearFlashMs > 0) && participant.board.alive) {
-      const color = protectedBoard ? 0x15c8ff : 0x15c8ff;
-      this.graphics.lineStyle(3, color, 1);
-      this.graphics.strokeRoundedRect(cardX, cardY, cardWidth, cardHeight, 8);
-      if (protectedBoard) {
-        this.graphics.fillStyle(0x39bfd2, 0.045);
-        this.graphics.fillRect(boardX, boardY, boardWidth, boardHeight);
-      }
+    if (participant.board.clearFlashMs > 0 && participant.board.alive) {
+      this.graphics.lineStyle(3, 0x15c8ff, 1);
+      this.graphics.strokeRoundedRect(cardX,cardY,cardWidth,cardHeight,8);
     }
-
     const originalGraphics = this.graphics;
-    const lift = shield ? shieldVisualFrame(shield, this.calmEffects).liftCells * cellSize : 0;
-    const figureY = boardY - lift;
-    if (shield) {
+    const lift = 0;
+    const rise = this.runtime.engine.state.attackQueues[participant.config.id]?.[0];
+    const riseOffset = rise?.phase === 'rise' && rise.riseRows > 0 ? rise.riseRows * cellSize * Math.min(1,rise.remainingMs/600) : 0;
+    const figureY = boardY - lift + riseOffset;
+    if (shield || riseOffset > 0) {
       let layer = this.shieldLayers.get(participant.config.id);
       if (!layer) {
         const maskGraphics = this.add.graphics().setVisible(false);
@@ -534,61 +513,15 @@ export class PlayScene extends Phaser.Scene {
     }
 
     this.graphics = originalGraphics;
-    if (globalHold && participant.board.alive) {
-      const progress = Math.max(0, Math.min(1, globalHold.remainingMs / globalHold.durationMs));
-      const alpha = this.calmEffects ? 0.16 : 0.08 + progress * 0.1;
-      this.graphics.fillStyle(0x9b68d1, alpha);
-      this.graphics.fillRect(boardX, boardY, boardWidth, boardHeight);
-      this.graphics.lineStyle(globalHold.kind === 'final-push' ? 5 : 3, 0x8a56c4, this.calmEffects ? 0.82 : 0.55 + progress * 0.35);
-      this.graphics.strokeRoundedRect(cardX + 3, cardY + 3, cardWidth - 6, cardHeight - 6, 8);
-    }
-    if (this.runtime.engine.state.pressurePulseMs > 0 && participant.board.alive && !shield) {
-      const alpha = Math.max(0.25, Math.min(1, this.runtime.engine.state.pressurePulseMs / 650));
-      this.graphics.lineStyle(3, 0x9b68d1, alpha);
-      this.graphics.strokeRect(boardX, boardY, boardWidth, boardHeight);
-      this.graphics.fillStyle(0x9b68d1, alpha * 0.1);
-      this.graphics.fillRect(boardX, boardY + boardHeight - cellSize, boardWidth, cellSize);
-    }
-    if (levelPulse && participant.board.alive) {
-      const alpha = Math.max(0.35, (this.runtime.engine.state.isSurvival
-        ? participant.levelUpEvent?.pulseMs ?? 0
-        : this.runtime.engine.state.levelUpEvent?.pulseMs ?? 0) / LEVEL_UP_PULSE_MS);
-      this.graphics.lineStyle(3, ANOMALY_COLOR, alpha);
-      this.graphics.strokeRoundedRect(cardX + 2, cardY + 2, cardWidth - 4, cardHeight - 4, 7);
-    }
-    if (conflict.senderRows > 0 && participant.board.alive) {
-      const width = conflict.tier === 4 ? 7 : conflict.tier === 3 ? 5 : 3;
-      const alpha = this.calmEffects ? 0.9 : 0.58 + Math.sin(this.time.now / (conflict.tier === 4 ? 48 : 80)) * 0.28;
-      this.graphics.lineStyle(width, conflict.tier === 4 ? 0x69d97d : 0x3a965b, alpha);
-      this.graphics.strokeRoundedRect(cardX + width, cardY + width, cardWidth - width * 2, cardHeight - width * 2, 7);
-      this.graphics.lineStyle(Math.max(2, width - 2), 0x3a965b, alpha);
-      for (let index = 0; index < Math.min(3, conflict.senderRows); index += 1) {
-        const y = boardY + boardHeight * 0.5 + index * cellSize * 0.9;
-        const x = boardX + boardWidth - cellSize * 0.35;
-        this.graphics.lineBetween(x - cellSize * 0.45, y + cellSize * 0.3, x, y);
-        this.graphics.lineBetween(x, y, x - cellSize * 0.45, y - cellSize * 0.3);
-      }
-    }
-    if (conflict.incomingRows > 0 && participant.board.alive) {
-      const width = conflict.tier === 4 ? 8 : conflict.tier === 3 ? 6 : 3;
-      const alpha = this.calmEffects ? 0.92 : 0.55 + conflict.warningProgress * 0.4;
-      this.graphics.lineStyle(width, conflict.tier === 4 ? 0xe23c54 : 0xc94761, alpha);
-      this.graphics.strokeRoundedRect(cardX + 2, cardY + 2, cardWidth - 4, cardHeight - 4, 8);
-      this.graphics.lineStyle(Math.max(2, width - 2), 0xc94761, alpha);
-      for (let index = 0; index < Math.min(3, conflict.incomingRows); index += 1) {
-        const x = boardX + boardWidth * 0.5 + (index - Math.min(2, conflict.incomingRows - 1) / 2) * cellSize * 1.35;
-        const y = boardY + cellSize * 0.45;
-        this.graphics.lineBetween(x - cellSize * 0.3, y - cellSize * 0.42, x, y);
-        this.graphics.lineBetween(x, y, x + cellSize * 0.3, y - cellSize * 0.42);
-      }
-    }
+    if (participant.board.alive) drawBoardEventEffects(this.graphics, this.runtime.engine.state,
+      participant.config.id, boardX,boardY,boardWidth,boardHeight,this.calmEffects);
     if (conflict.impactRows > 0 && conflict.impactProgress > 0 && participant.board.alive) {
       const impactProgress = Math.max(0, Math.min(1, conflict.impactProgress));
       const impactAlpha = this.calmEffects ? 0.82 : Math.max(0.2, impactProgress);
       this.graphics.fillStyle(0xc94761, impactAlpha * 0.18);
       this.graphics.fillRect(boardX, boardY + boardHeight - cellSize * Math.min(4, conflict.impactRows), boardWidth, cellSize * Math.min(4, conflict.impactRows));
     }
-    if (conflict.cleanupRows > 0 && conflict.cleanupProgress > 0 && participant.board.alive) {
+    if (conflict.cleanupRows > 0 && conflict.cleanupProgress > 0 && participant.board.alive && !this.runtime.engine.state.cleanupEvents.some(e => e.participantId === participant.config.id && e.amplified)) {
       const progress = Math.max(0, Math.min(1, conflict.cleanupProgress));
       const alpha = this.calmEffects ? 0.8 : Math.max(0.15, progress * 0.72);
       const cleanedHeight = Math.min(boardHeight, Math.max(cellSize, conflict.cleanupRows * cellSize));
@@ -612,49 +545,7 @@ export class PlayScene extends Phaser.Scene {
     } else {
       this.fireBands.get(participant.config.id)?.image.setVisible(false);
     }
-    if (shield) {
-      const layer = this.shieldLayers.get(participant.config.id)!;
-      layer.effect.setVisible(true);
-      this.graphics = layer.effect;
-      this.drawShieldReflection(boardX, boardY, cellSize, shield);
-    }
     this.graphics = originalGraphics;
-  }
-
-  private drawShieldReflection(x: number, y: number, size: number, event: MatchState['shieldPresentations'][number]): void {
-    const frame = shieldVisualFrame(event, this.calmEffects);
-    const bottom = y + VISIBLE_HEIGHT * size;
-    const bandTop = bottom - frame.liftCells * size;
-    const width = BOARD_WIDTH * size;
-    // Only the visible upper half of a gray row, never a real grid mutation.
-    if (frame.rowAlpha > 0) for (let column = 0; column < BOARD_WIDTH; column++) {
-      this.graphics.fillStyle(0x9aa2b7, frame.rowAlpha);
-      this.graphics.fillRect(x + column * size + 1, bandTop, size - 2, bottom - bandTop);
-      this.graphics.lineStyle(Math.max(1, size * .035), 0xe3e7ef, frame.rowAlpha);
-      this.graphics.lineBetween(x + column * size + 2, bandTop + 2, x + (column + 1) * size - 2, bandTop + 2);
-    }
-    if (frame.fragmentAlpha > 0) for (let column = 0; column < BOARD_WIDTH; column++) for (let shard = 0; shard < 3; shard++) {
-      const seed = (column * 13 + shard * 7 + 17) % 23;
-      const px = x + (column + .18 + shard * .24) * size + (seed - 11) * size * .018 * frame.crumble;
-      const py = bottom - size * .45 - Math.sin(frame.crumble * Math.PI) * size * (.22 + seed * .01) + frame.crumble ** 2 * size * .85;
-      this.graphics.fillStyle(shard === 0 ? 0x83b8e5 : 0x9aa2b7, frame.fragmentAlpha);
-      this.graphics.fillTriangle(px, py, px + size * .2, py + size * .04, px + size * .08, py + size * .2);
-    }
-    if (frame.flash <= 0) return;
-    this.graphics.fillStyle(0x159aff, frame.flash * .14);
-    this.graphics.fillRect(x, bottom - size * 2.4, width, size * 2.4);
-    this.graphics.lineStyle(Math.max(3, size * .28), 0x087cff, frame.flash * .4);
-    this.graphics.lineBetween(x, bottom - size * .5, x + width, bottom - size * .5);
-    this.graphics.lineStyle(Math.max(1.5, size * .08), 0xb9f4ff, frame.flash);
-    this.graphics.lineBetween(x, bottom - size * .5, x + width, bottom - size * .5);
-    const cx = x + width / 2, cy = bottom - size * 1.25;
-    const points = [new Phaser.Geom.Point(cx, cy - size * .85), new Phaser.Geom.Point(cx + size * .65, cy - size * .6),
-      new Phaser.Geom.Point(cx + size * .52, cy + size * .12), new Phaser.Geom.Point(cx, cy + size * .65),
-      new Phaser.Geom.Point(cx - size * .52, cy + size * .12), new Phaser.Geom.Point(cx - size * .65, cy - size * .6)];
-    this.graphics.fillStyle(0x087cff, frame.flash);
-    this.graphics.fillPoints(points, true);
-    this.graphics.lineStyle(Math.max(1.5, size * .06), 0xc6f6ff, frame.flash);
-    this.graphics.strokePoints(points, true);
   }
 
   private drawAirborneBurn(piece: NonNullable<ParticipantState['board']['active']>, participant: ParticipantState,

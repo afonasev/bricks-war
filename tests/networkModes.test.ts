@@ -11,6 +11,15 @@ import type {ParticipantConfig} from '../src/domain/types';
 const configs=(count:number):ParticipantConfig[]=>Array.from({length:count},(_,i)=>({id:`p${i}`,label:`Player ${i}`,controller:i<2?'mobile-touch':'ai',...(i>=2?{difficulty:'expert' as const}:{}),teamId:i%2?'team-2':'team-1'}));
 function fixture(){const service=new RoomService(()=>0);const connect=(c:Credential)=>{const l=service.connect(c,PROTOCOL_VERSION,RULES_VERSION);service.command(l.room,l.seat,l.epoch,{type:'ack',revision:l.room.revision,visible:true});return l;};return {service,connect};}
 describe('network Battle and explicit Teams',()=>{
+  it.each(['battle','team-battle'] as const)('publishes immediate timed %s results with no queued impact in any seat projection',mode=>{
+    const engine=new MatchEngine(configs(8),77,5,{...defaultRoomRules(mode),battleTimeMode:'timed'},null,false,'network');engine.step(COUNTDOWN_MS);
+    engine.state.participants[0]!.score=500;
+    for(const p of engine.state.participants){p.shieldCount=2;engine.enqueueBoardAttack(p.config.id,3,'pressure');engine.enqueueBoardAttack(p.config.id,4,'conflict','p0');}
+    engine.state.elapsedMs=engine.state.durationMs-1;engine.state.remainingMs=1;
+    engine.step(1);const restored=MatchEngine.restore(JSON.parse(JSON.stringify(engine.checkpoint())));
+    for(const p of engine.state.participants){const view=projectedState(restored.state,p.config.id);expect(view.phase).toBe('results');expect(view.remainingMs).toBe(0);expect(view.attackQueues).toEqual({});expect(view.pendingConflict).toBeNull();expect(view.participants[0]!.shieldCount).toBe(2);expect(view.winnerIds).toContain('p0');}
+    const frozen=engine.checkpoint();engine.step(5000);expect(engine.checkpoint()).toEqual(frozen);
+  });
   it.each([4,6,8])('preserves interleaved %i-player teams through checkpoints, projection, attacks and victory',count=>{
     const engine=new MatchEngine(configs(count),77,5,defaultRoomRules('team-battle'),null,false,'network');engine.step(COUNTDOWN_MS);
     const competition=engine.state.participants.map((p,i)=>({id:p.config.id,score:p.score,alive:p.board.alive,teamId:participantTeamId(p.config,i)!}));

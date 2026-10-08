@@ -47,6 +47,9 @@ describe('line clear presentation', () => {
         expect(participant.score).toBe(scoreForLines(lines));
         expect(participant.placedPieces).toBe(1);
         if (mode === 'fire') {
+          expect(engine.state.anomalyCueEvents).toHaveLength(1);
+          expect(engine.state.anomalyBurnEvents).toHaveLength(0);
+          engine.step(800);
           expect(engine.state.anomalyBurnEvents).toHaveLength(1);
           expect(participant.board.spawnSerial).toBe(initialSpawn);
           const before = participant.board.grid.map((row) => [...row]);
@@ -111,6 +114,7 @@ describe('line clear presentation', () => {
     engine.step(FIXED_STEP_MS);
     engine.step(180);
     engine.step(clearFallDurationMs(2));
+    if (engine.state.anomalyCueEvents.length) engine.step(800);
     expect(engine.state.anomalyBurnEvents[0]?.rows.at(-1)?.every((cell) => cell === 'garbage')).toBe(false);
     engine.state.pendingConflict = {
       serial: 1,
@@ -119,7 +123,7 @@ describe('line clear presentation', () => {
       incomingRows: { p1: 1 },
     };
     engine.step(50);
-    expect(engine.state.pendingConflict?.remainingWarningMs).toBe(0.001);
+    expect(engine.state.pendingConflict?.remainingWarningMs).toBe(0);
     expect(engine.state.anomalyBurnEvents[0]?.rows.at(-1)?.every((cell) => cell === 'garbage')).toBe(false);
     engine.step(ANOMALY_BURN_PULSE_MS);
     expect(engine.state.anomalyBurnEvents).toHaveLength(0);
@@ -142,11 +146,13 @@ describe('line clear presentation', () => {
     expect(participant.board.spawnSerial).toBe(spawnSerial);
     engine.step(179);
     engine.step(clearFallDurationMs(1));
+    expect(engine.state.attackQueues.p1![0]!.phase).toBe('warning');
+    engine.step(3000);
     expect(participant.board.grid.at(-1)?.every((cell) => cell === 'garbage')).toBe(true);
     expect(participant.board.spawnSerial).toBe(spawnSerial + 1);
   });
 
-  it('waits for the landing commit before deciding a timed result', () => {
+  it('ends at the timed deadline without awarding an unfinished landing', () => {
     const engine = new MatchEngine([
       { id: 'p1', label: 'Player 1', controller: 'human-1' },
       { id: 'p2', label: 'Player 2', controller: 'human-2' },
@@ -155,14 +161,17 @@ describe('line clear presentation', () => {
     const participant = engine.state.participants[0]!;
     prepareClearPlaytest(participant.board, 'normal', 1);
     engine.step(FIXED_STEP_MS);
+    engine.state.nextPressureAtMs = Infinity; // Isolate the landing/outcome barrier from scheduled pressure.
     engine.state.elapsedMs = engine.state.durationMs - 1;
     engine.step(1);
-    expect(engine.state.phase).toBe('playing');
+    expect(engine.state.phase).toBe('results');
     expect(participant.score).toBe(0);
     engine.step(180);
     engine.step(clearFallDurationMs(1));
-    expect(participant.score).toBe(100);
+    expect(participant.score).toBe(0);
+    expect(engine.state.clearPresentations).toEqual([]);
+    expect(engine.state.pendingConflict).toBeNull();
     expect(engine.state.phase).toBe('results');
-    expect(engine.state.winnerIds).toEqual(['p1']);
+    expect(engine.state.winnerIds).toEqual(['p1', 'p2']);
   });
 });

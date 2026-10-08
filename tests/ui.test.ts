@@ -145,11 +145,14 @@ describe('results formatting', () => {
       senders: [{ participantId: 'p1', rows: 4, recipientIds: ['p2'] }],
       incomingRows: { p2: 4 },
     };
+    engine.enqueueBoardAttack('p2',4,'conflict','p1');
+    engine.state.attackQueues.p2![0]!.remainingMs=1500;
+    engine.state.attackLaunchEvents=[{serial:1,participantId:'p1',rows:4,recipientIds:['p2'],remainingMs:750}];
     engine.state.conflictImpactEvent = { serial: 1, incomingRows: { p2: 3 }, maxRows: 3, pulseMs: 350 };
     engine.state.cleanupSerial = 1;
     engine.state.cleanupEvents = [{ serial: 1, participantId: 'p1', rows: 2, pulseMs: 400 }];
     expect(conflictPresentationForParticipant(engine.state, 'p1')).toMatchObject({
-      senderRows: 4, incomingRows: 0, cleanupRows: 2, tier: 4, warningProgress: 0.5, cleanupProgress: 0.5,
+      senderRows: 4, incomingRows: 0, cleanupRows: 2, tier: 4, warningProgress: 0, cleanupProgress: 0.5,
     });
     expect(conflictPresentationForParticipant(engine.state, 'p2')).toMatchObject({
       senderRows: 0, incomingRows: 4, impactRows: 3, tier: 4, warningProgress: 0.5, impactProgress: 0.5, senderIds: ['p1'], shieldReady: false,

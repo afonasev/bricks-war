@@ -167,6 +167,24 @@ export interface ConflictSenderState {
   recipientIds: string[];
 }
 
+/** Durable FIFO entry; serial is assigned at emission, activationSerial at head activation. */
+export interface BoardAttackState {
+  serial: number;
+  activationSerial: number;
+  reason: 'conflict' | 'pressure';
+  senderId?: string;
+  senderLabel?: string;
+  rows: number;
+  phase: 'queued' | 'warning' | 'shield' | 'rise';
+  remainingMs: number;
+  defended: boolean;
+  riseRows: number;
+}
+export interface AttackLaunchState extends ConflictSenderState {
+  serial: number;
+  remainingMs: number;
+}
+
 export interface ConflictBatchState {
   serial: number;
   remainingWarningMs: number;
@@ -282,10 +300,19 @@ export interface MatchState {
   anomalyTransitionSerial: number;
   anomalyArrivalSerial: number;
   lockEvents: LockEventState[];
+  attackSerial: number;
+  attackActivationSerial: number;
+  attackResolutionSerial: number;
+  attackResolutionEvents: {serial: number; participantId: string; defended: boolean}[];
+  attackQueues: Record<string, BoardAttackState[]>;
+  attackLaunchEvents: AttackLaunchState[];
   pendingConflict: ConflictBatchState | null;
   conflictImpactEvent: ConflictImpactEventState | null;
   cleanupSerial: number;
   cleanupEvents: CleanupEventState[];
+  anomalySuccessSerial: number;
+  anomalySuccessEvents: { serial: number; participantId: string }[];
+  anomalyCueEvents: { serial: number; participantId: string; rows: Cell[][]; remainingMs: number }[];
   anomalyBurnSerial: number;
   anomalyBurnEvents: AnomalyBurnEventState[];
   clearPresentationSerial: number;

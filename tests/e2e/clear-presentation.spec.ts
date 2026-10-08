@@ -12,6 +12,7 @@ async function openFire(page: Page, lines: number): Promise<void> {
   await page.locator('#start-match').click();
   const score = [0, 100, 300, 500, 800][lines];
   await page.waitForFunction((expected) => document.querySelector('#hud-grid')?.textContent?.includes(`${expected} очков`), score);
+  await expect.poll(async()=>Number(await page.locator('#game-stage').getAttribute('data-burn-remaining-ms'))).toBeGreaterThan(0);
 }
 
 async function startCycle(page: Page, mode: 'normal' | 'fire', lines: number): Promise<void> {

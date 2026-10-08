@@ -178,7 +178,8 @@ export default defineConfig(async ({ command }) => {
         dontCacheBustURLsMatching: /^assets\/.*-[A-Za-z0-9_-]{8,}\./,
         cleanupOutdatedCaches: true,
         clientsClaim: false,
-        maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
+        // Exact approved WAVs are inlined in the single-file game (currently 5.79 MB).
+        maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
         skipWaiting: false,
       },
     }),

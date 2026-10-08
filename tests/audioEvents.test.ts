@@ -82,7 +82,7 @@ describe('game audio events', () => {
 
     const eventTypes = tracker.sync(engine.state).map((event) => event.type);
     expect(eventTypes).toEqual(expect.arrayContaining([
-      'lock', 'clear-impact', 'anomaly-spawn', 'pressure', 'eliminated',
+      'lock', 'clear-impact', 'anomaly-spawn', 'eliminated',
     ]));
     expect(tracker.sync(engine.state).filter((event) => event.type === 'clear-impact')).toEqual([]);
   });
@@ -113,6 +113,8 @@ describe('game audio events', () => {
       senders: [{ participantId: 'p1', rows: 4, recipientIds: ['p2'] }],
       incomingRows: { p2: 4 },
     };
+    engine.state.attackSerial = 1;
+    engine.state.attackLaunchEvents = [{serial:1,participantId:'p1',rows:4,recipientIds:['p2'],remainingMs:1500}];
     expect(tracker.sync(engine.state)).toContainEqual({ type: 'conflict-launch', rows: 4, pan: -0.72 });
     expect(tracker.sync(engine.state).filter((event) => event.type === 'conflict-launch')).toEqual([]);
     engine.state.pendingConflict = null;
@@ -139,6 +141,7 @@ describe('game audio events', () => {
     engine.state.conflictImpactEvent = {
       serial: 1, incomingRows: {}, maxRows: 0, pulseMs: 700, defendedRecipientIds: ['p1'], shieldedRecipientIds: ['p2'],
     };
+    engine.state.attackResolutionSerial=1;engine.state.attackResolutionEvents=[{serial:1,participantId:'p1',defended:true}];
     engine.state.shieldInventorySerial = 1;
     engine.state.shieldInventoryEvents = [{serial:1, participantId:'p2', kind:'burn', reason:'conflict', firstSlot:0, count:2, pulseMs:1000}];
     const types = tracker.sync(engine.state).map((event) => event.type);

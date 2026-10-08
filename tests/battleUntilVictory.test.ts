@@ -50,8 +50,12 @@ describe('Battle until victory', () => {
       engine.step(1);
       expect(engine.state.pressureRows).toBe(index + 1);
       expect(engine.state.nextPressureAtMs).toBe(time + Math.max(5000, 15000 - index * 1000));
+      for (const participant of engine.state.participants) expect(engine.state.attackQueues[participant.config.id]?.[0]?.reason).toBe('pressure');
+      if (index === 0) expect(globalMatchEvent(engine.state, DEFAULT_GAME_TUNING.messages)).toMatchObject({title:'Фаза давления'});
+      if(engine.state.globalEventHold) engine.step(engine.state.globalEventHold.remainingMs);
+      engine.step(3000);engine.step(600);
       for (const participant of engine.state.participants) expect(participant.board.grid.at(-1)?.every((cell) => cell === 'garbage')).toBe(true);
-      if (index === 0) expect(globalMatchEvent(engine.state, DEFAULT_GAME_TUNING.messages)).toMatchObject({title: 'Фаза давления', detail: 'Серый ряд каждые 15 → 5 секунд'});
+
     }
     const restored = MatchEngine.restore(JSON.parse(JSON.stringify(engine.checkpoint())));
     engine.step(1);
@@ -71,11 +75,12 @@ describe('Battle until victory', () => {
     engine.step(1);
     expect(engine.state.pressureRows).toBe(1);
     expect(engine.state.nextPressureAtMs).toBe(195000);
-    expect(engine.state.participants[0]!.shieldCount).toBe(0);
+    expect(engine.state.participants[0]!.shieldCount).toBe(1);
     expect(engine.state.participants[0]!.board.grid.at(-1)?.every((cell) => cell === 'garbage')).toBe(false);
     const time = engine.state.elapsedMs;
     engine.step(engine.state.globalEventHold!.remainingMs);
     expect(engine.state.elapsedMs).toBe(time);
+    engine.step(3000);expect(engine.state.participants[0]!.shieldCount).toBe(0);
   });
 
   it('retains shared Battle levels and anomalies rather than independent Survival progression', () => {
@@ -103,6 +108,7 @@ describe('Battle until victory', () => {
     engine.eliminate('p1');
     expect(engine.state.phase).toBe('playing');
     engine.step(engine.state.pendingConflict!.remainingWarningMs + 1);
+    engine.step(600);
     expect(engine.state.winnerIds).toEqual(['p2']);
   });
 
@@ -158,6 +164,8 @@ describe('Battle until victory', () => {
     engine.state.pendingConflict = { serial: 1, remainingWarningMs: 500,
       senders: [{ participantId: participants[0]!.config.id, rows: 1, recipientIds: [last.config.id] }],
       incomingRows: { [last.config.id]: 1 } };
+    engine.enqueueBoardAttack(last.config.id,1,'conflict',participants[0]!.config.id);
+    engine.state.attackQueues[last.config.id]![0]!.remainingMs=500;
     participants.slice(0, -1).forEach((participant) => engine.eliminate(participant.config.id));
     expect(engine.state.phase).toBe('playing');
     last.board.grid[0]![0] = 'J';

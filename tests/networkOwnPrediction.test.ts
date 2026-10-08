@@ -125,7 +125,7 @@ describe('shield phase prediction composition', () => {
     const predictor = new OwnPrediction();
     predictor.confirm(snapshot(authority,0),[],0);
     const opponent = structuredClone(predictor.engine!.state.participants[1]);
-    for (let tick=1;tick<=60;tick++) {
+    for (let tick=1;tick<=72;tick++) {
       authority.step(FIXED_STEP_MS);
       predictor.advanceTo(tick,[]);
       expect(predictor.engine!.state.participants[0]).toEqual(authority.state.participants[0]);

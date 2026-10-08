@@ -122,20 +122,17 @@ test('keeps shared team surfaces but personal names and non-numeric team cues', 
   expect(firstColor).not.toBe(secondColor);
 });
 
-test('uses approved sender-colored attack copy without resizing a field', async ({ page }) => {
-  await resetAndOpen(page, 'Битва', '?muted=1&playtest-conflict=3');
-  await fillBattle(page);
-  await page.getByLabel('Имя игрока 1').fill('Аня');
-  await page.getByRole('button', { name: 'Начать' }).click();
-
-  const target = page.locator('.hud-card.is-conflict-target').first();
-  const before = await target.boundingBox();
-  await expect(target.locator('.player-event-notice')).toHaveText('Вас атакует Аня +3');
-  await expect(target.locator('.player-event-notice .match-event-icon-tile')).toHaveCount(1);
-  await expect(target.locator('.player-event-notice .match-event-icon')).toHaveAttribute('data-icon', 'attack');
-  const senderColor = await target.locator('.player-event-sender').evaluate((element) => getComputedStyle(element).color);
-  const anyaColor = await page.locator('.hud-card').first().locator('.hud-identity strong').evaluate((element) => getComputedStyle(element).color);
-  expect(senderColor).toBe(anyaColor);
+test('uses a compact red current-sender caption and sword without resizing a field', async ({page}) => {
+  await resetAndOpen(page,'Битва','?muted=1&playtest-conflict=3');
+  await fillBattle(page);await page.getByLabel('Имя игрока 1').fill('Аня');
+  await page.getByRole('button',{name:'Начать'}).click();
+  const target=page.locator('.hud-card.is-conflict-target').first(),before=await target.boundingBox();
+  const notice=target.locator('.player-event-notice');
+  await expect(notice).toContainText('Аня');await expect(notice).toContainText('3');
+  await expect(notice.locator('strong .match-event-icon')).toHaveAttribute('data-icon','attack');
+  await expect(notice.locator('strong')).toHaveCSS('color','rgb(180, 42, 64)');
+  await expect(notice).toHaveCSS('background-color','rgba(0, 0, 0, 0)');
+  const caption=await notice.boundingBox();expect(caption!.y).toBeGreaterThan(before!.y+35);expect(caption!.width).toBeLessThan(before!.width);
   expect(await target.boundingBox()).toEqual(before);
 });
 
@@ -166,8 +163,8 @@ test.describe('reduced-motion match events', () => {
     await page.getByRole('button', { name: 'Начать' }).click();
     const notice = page.locator('.player-event-notice').first();
     await expect(notice).toBeVisible();
-    await expect(notice).toContainText('+3');
-    await expect(notice.locator('.match-event-icon')).toHaveAttribute('data-icon', 'attack');
+    await expect(notice).toContainText('3');
+    await expect(notice.locator('strong .match-event-icon')).toHaveAttribute('data-icon', 'attack');
     await expect(notice).toHaveCSS('animation-name', 'none');
     await expect(notice).toHaveCSS('opacity', '1');
   });

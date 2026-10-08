@@ -11,6 +11,8 @@ export type GameAudioEvent =
   | { type: 'anomaly-spawn'; pan: number }
   | { type: 'final-tick'; second: number }
   | { type: 'pressure' }
+  | { type: 'attack-warning'; pan: number }
+  | { type: 'anomaly-success'; pan: number }
   | { type: 'conflict-launch'; rows: number; pan: number }
   | { type: 'conflict-impact'; rows: number; pan: number }
   | { type: 'cleanup'; rows: number; pan: number; amplified: boolean }
@@ -40,6 +42,10 @@ interface AudioSnapshot {
   participants: Map<string, ParticipantAudioSnapshot>;
   phase: MatchPhase;
   pressureRows: number;
+  attackSerial: number;
+  attackActivationSerial: number;
+  attackResolutionSerial: number;
+  anomalySuccessSerial: number;
   pendingConflictSerial: number;
   pendingSenderCount: number;
   conflictImpactSerial: number;
@@ -71,6 +77,7 @@ function takeSnapshot(state: MatchState): AudioSnapshot {
     }])),
     phase: state.phase,
     pressureRows: state.pressureRows,
+    attackSerial: state.attackSerial, attackActivationSerial: state.attackActivationSerial, attackResolutionSerial: state.attackResolutionSerial, anomalySuccessSerial: state.anomalySuccessSerial,
     pendingConflictSerial: state.pendingConflict?.serial ?? 0,
     pendingSenderCount: state.pendingConflict?.senders.length ?? 0,
     conflictImpactSerial: state.conflictImpactEvent?.serial ?? 0,
@@ -92,7 +99,15 @@ export class AudioEventTracker {
   sync(state: MatchState): GameAudioEvent[] {
     const current = takeSnapshot(state);
     const previous = this.previous;
-    this.previous = current;
+    this.previous = previous ? {...current,
+      attackSerial: Math.max(previous.attackSerial, current.attackSerial),
+      attackActivationSerial: Math.max(previous.attackActivationSerial, current.attackActivationSerial),
+      attackResolutionSerial: Math.max(previous.attackResolutionSerial,current.attackResolutionSerial),
+      anomalySuccessSerial: Math.max(previous.anomalySuccessSerial, current.anomalySuccessSerial),
+      conflictImpactSerial: Math.max(previous.conflictImpactSerial, current.conflictImpactSerial),
+      shieldInventorySerial: Math.max(previous.shieldInventorySerial, current.shieldInventorySerial),
+      shieldChargeSerial: Math.max(previous.shieldChargeSerial, current.shieldChargeSerial),
+    } : current;
 
     if (!previous) {
       return current.phase === 'countdown' ? [{ type: 'countdown', second: current.countdownSecond }] : [];
@@ -107,7 +122,13 @@ export class AudioEventTracker {
     if (!state.isSurvival && current.anomalyArrivalSerial > previous.anomalyArrivalSerial) {
       events.push({ type: 'anomaly-spawn', pan: 0 });
     }
-    if (current.pressureRows > previous.pressureRows) events.push({ type: 'pressure' });
+    if (current.anomalySuccessSerial > previous.anomalySuccessSerial) {
+      for (let i = 0; i < state.anomalySuccessEvents.filter(e => e.serial > previous.anomalySuccessSerial).length; i++) events.push({type: 'anomaly-success', pan: 0});
+    }
+    if (current.attackActivationSerial > previous.attackActivationSerial) {
+      const heads = Object.entries(state.attackQueues).filter(([,q]) => q[0]?.phase === 'warning' && q[0].activationSerial > previous.attackActivationSerial);
+      if (heads.length) events.push({type: 'attack-warning', pan: heads.length === 1 ? participantPan(Math.max(0,state.participants.findIndex(p => p.config.id === heads[0]![0])),state.participants.length) : 0});
+    }
     if (current.finalPushSerial > previous.finalPushSerial) events.push({ type: 'final-push' });
     if (current.clearImpactSerial > previous.clearImpactSerial) {
       for (const impact of state.clearImpactEvents.filter((event) => event.serial > previous.clearImpactSerial)) {
@@ -116,16 +137,9 @@ export class AudioEventTracker {
       }
     }
 
-    if (current.pendingConflictSerial > previous.pendingConflictSerial && state.pendingConflict) {
-      const startIndex = previous.pendingConflictSerial > 0 ? previous.pendingSenderCount : 0;
-      for (const sender of state.pendingConflict.senders.slice(startIndex)) {
-        const participantIndex = state.participants.findIndex((participant) => participant.config.id === sender.participantId);
-        events.push({
-          type: 'conflict-launch',
-          rows: sender.rows,
-          pan: participantPan(Math.max(0, participantIndex), state.participants.length),
-        });
-      }
+    for (const sender of state.attackLaunchEvents.filter(e => e.serial > previous.attackSerial)) {
+      const index = state.participants.findIndex(p => p.config.id === sender.participantId);
+      events.push({type: 'conflict-launch', rows: sender.rows, pan: participantPan(Math.max(0,index),state.participants.length)});
     }
     if (current.conflictImpactSerial > previous.conflictImpactSerial && state.conflictImpactEvent) {
       const recipientIndexes = Object.keys(state.conflictImpactEvent.incomingRows)
@@ -139,11 +153,10 @@ export class AudioEventTracker {
         rows: state.conflictImpactEvent.maxRows,
         pan: participantPan(averageIndex, state.participants.length),
       });
-      for (const participantId of state.conflictImpactEvent.defendedRecipientIds ?? []) {
-        const index = state.participants.findIndex((participant) => participant.config.id === participantId);
-        events.push({ type: 'active-defense', pan: participantPan(Math.max(0, index), state.participants.length) });
-      }
-
+    }
+    for(const resolution of state.attackResolutionEvents.filter(e=>e.defended&&e.serial>previous.attackResolutionSerial)){
+      const index=state.participants.findIndex(p=>p.config.id===resolution.participantId);
+      events.push({type:'active-defense',pan:participantPan(Math.max(0,index),state.participants.length)});
     }
     if (current.shieldInventorySerial > previous.shieldInventorySerial) {
       for (const event of state.shieldInventoryEvents.filter(event => event.kind === 'burn' && event.serial > previous.shieldInventorySerial)) {

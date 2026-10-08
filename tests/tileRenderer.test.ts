@@ -190,6 +190,7 @@ describe('procedural tile renderer', () => {
     engine.step(clearFallDurationMs(2));
     expect(participant.score).toBe(300);
     expect(participant.board.grid.flat().filter((cell) => cell === 'garbage')).toHaveLength(20);
+    expect(engine.state.anomalyCueEvents).toHaveLength(1);engine.step(800);
     expect(engine.state.anomalyBurnEvents[0]).toMatchObject({ participantId: 'p1' });
     expect(engine.state.anomalyBurnEvents[0]?.rows).toHaveLength(2);
     engine.step(ANOMALY_BURN_PULSE_MS);

@@ -16,6 +16,19 @@ describe('playfield render invalidation', () => {
     expect(key(engine, 0)).toBe(key(engine, 500));
   });
 
+  it('updates selected board waves each frame, including sender-free pressure, without idle redraw',()=>{
+    const e=new MatchEngine(humanPair(),12);e.state.phase='playing';e.enqueueBoardAttack('p1',1,'pressure');
+    expect(key(e,0)).not.toBe(key(e,17));e.pause('manual');expect(key(e,0)).toBe(key(e,17));
+  });
+
+  it('retains settled tiles during a block and moves them to the dynamic layer only for actual rising rows',()=>{
+    const e=new MatchEngine(humanPair(),12);e.state.phase='playing';e.enqueueBoardAttack('p1',1,'pressure');
+    const baseline=staticPlayfieldRenderKey(e.state,'layout',1200,800),head=e.state.attackQueues.p1![0]!;
+    head.phase='rise';head.defended=true;head.riseRows=0;
+    expect(staticPlayfieldRenderKey(e.state,'layout',1200,800)).toBe(baseline);
+    head.defended=false;head.riseRows=1;expect(staticPlayfieldRenderKey(e.state,'layout',1200,800)).not.toBe(baseline);
+  });
+
   it('redraws dynamic content for active-piece and visible-effect changes', () => {
     const engine = new MatchEngine(humanPair(), 13);
     const initial = key(engine);
