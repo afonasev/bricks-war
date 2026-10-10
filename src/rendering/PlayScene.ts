@@ -23,6 +23,7 @@ import { landingPiece } from '../simulation/board';
 import { ANOMALY_COLOR, pieceCells, pieceColor, TETROMINO_COLORS } from '../simulation/tetrominoes';
 import {
   ARENA_CARD_GAP,
+  LOCAL_ARENA_CARD_GAP,
   ARENA_CARD_HEADER_HEIGHT,
   ARENA_EDGE_PADDING,
   chooseArenaLayout,
@@ -312,8 +313,8 @@ export class PlayScene extends Phaser.Scene {
     const controlsReservedHeight = width > height ? 28 : 42;
     const layout = this.runtime.engine.kind === 'network' ? chooseNetworkLayout(width,height,count,this.runtime.mobileSolo) : this.runtime.mobileSolo
       ? chooseMobileSoloLayout(width, height, count, controlsReservedHeight)
-      : chooseArenaLayout(width, height, count);
-    const layoutKey = `${layout.mode}:${layout.columns}:${layout.rows}:${layout.cellSize}:${layout.participantCards?.map((card) => `${card.x}:${card.y}:${card.cellSize}:${card.headerHeight ?? ARENA_CARD_HEADER_HEIGHT}`).join('|') ?? ''}`;
+      : chooseArenaLayout(width, height, count, LOCAL_ARENA_CARD_GAP);
+    const layoutKey = `${layout.mode}:${layout.columns}:${layout.rows}:${layout.gap ?? ARENA_CARD_GAP}:${layout.cellSize}:${layout.participantCards?.map((card) => `${card.x}:${card.y}:${card.cellSize}:${card.headerHeight ?? ARENA_CARD_HEADER_HEIGHT}`).join('|') ?? ''}`;
     if (layoutKey !== this.lastLayoutKey) {
       this.lastLayoutKey = layoutKey;
       this.runtime.onLayout(layout);
@@ -323,8 +324,10 @@ export class PlayScene extends Phaser.Scene {
     if (staticKey !== this.lastStaticRenderKey) {
       this.lastStaticRenderKey = staticKey;
       this.staticGraphics.clear();
-      this.staticGraphics.fillStyle(this.runtime.mobileSolo ? 0xffe6bf : 0xfff8e9, 1);
-      this.staticGraphics.fillRect(0, 0, width, height);
+      if (this.runtime.mobileSolo || this.runtime.engine.kind === 'network') {
+        this.staticGraphics.fillStyle(this.runtime.mobileSolo ? 0xffe6bf : 0xfff8e9, 1);
+        this.staticGraphics.fillRect(0, 0, width, height);
+      }
       if (this.runtime.mobileSolo) {
         const zoneTop = Math.floor(height * (1 - MOBILE_TOUCH_BUTTON_ZONE_FRACTION));
         const third = width / 3;
@@ -342,8 +345,8 @@ export class PlayScene extends Phaser.Scene {
         const card = layout.participantCards?.[index];
         const column = index % layout.columns;
         const row = Math.floor(index / layout.columns);
-        const x = ARENA_EDGE_PADDING + column * (layout.slotWidth + ARENA_CARD_GAP) + ((layout.slotWidth - layout.cardWidth) / 2);
-        const y = ARENA_EDGE_PADDING + row * (layout.slotHeight + ARENA_CARD_GAP) + ((layout.slotHeight - layout.cardHeight) / 2);
+        const x = ARENA_EDGE_PADDING + column * (layout.slotWidth + (layout.gap ?? ARENA_CARD_GAP)) + ((layout.slotWidth - layout.cardWidth) / 2);
+        const y = ARENA_EDGE_PADDING + row * (layout.slotHeight + (layout.gap ?? ARENA_CARD_GAP)) + ((layout.slotHeight - layout.cardHeight) / 2);
         this.drawStaticBoardCard(participant, this.runtime.engine.kind === 'network' ? Number(participant.config.controllerLabel ?? index) : index, state.options.matchVariant, card?.x ?? x, card?.y ?? y, card?.cardWidth ?? layout.cardWidth, card?.cardHeight ?? layout.cardHeight, card?.cellSize ?? layout.cellSize, card?.headerHeight ?? ARENA_CARD_HEADER_HEIGHT);
       });
     }
@@ -357,8 +360,8 @@ export class PlayScene extends Phaser.Scene {
         const card = layout.participantCards?.[index];
       const column = index % layout.columns;
       const row = Math.floor(index / layout.columns);
-      const x = ARENA_EDGE_PADDING + column * (layout.slotWidth + ARENA_CARD_GAP) + ((layout.slotWidth - layout.cardWidth) / 2);
-      const y = ARENA_EDGE_PADDING + row * (layout.slotHeight + ARENA_CARD_GAP) + ((layout.slotHeight - layout.cardHeight) / 2);
+      const x = ARENA_EDGE_PADDING + column * (layout.slotWidth + (layout.gap ?? ARENA_CARD_GAP)) + ((layout.slotWidth - layout.cardWidth) / 2);
+      const y = ARENA_EDGE_PADDING + row * (layout.slotHeight + (layout.gap ?? ARENA_CARD_GAP)) + ((layout.slotHeight - layout.cardHeight) / 2);
         this.drawBoardCard(participant, card?.x ?? x, card?.y ?? y, card?.cardWidth ?? layout.cardWidth, card?.cardHeight ?? layout.cardHeight, card?.cellSize ?? layout.cellSize, card?.headerHeight ?? ARENA_CARD_HEADER_HEIGHT);
     });
   }

@@ -22,7 +22,9 @@ for (const mode of ['Битва', 'Командный бой']) {
     await page.getByRole('button', { name: 'Начать' }).click();
     await expect(page.locator('#round-timer')).toHaveAttribute('aria-label', 'Прошедшее время матча');
     await expect(page.locator('#match-clock')).toHaveText('00:02', { timeout: 10000 });
-    await page.locator('#manual-pause').click();
+    await expect(page.locator('.arena-screen')).toBeVisible();
+    await expect(page.locator('.match-loading')).toHaveCount(0);
+    await page.keyboard.press('Escape');
     const time = await page.locator('#match-clock').textContent();
     await page.waitForTimeout(1200);
     await expect(page.locator('#match-clock')).toHaveText(time!);

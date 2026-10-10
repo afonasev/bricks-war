@@ -1,4 +1,5 @@
 export const ARENA_CARD_GAP = 4;
+export const LOCAL_ARENA_CARD_GAP = 16;
 export const ARENA_EDGE_PADDING = 4;
 export const ARENA_CARD_HEADER_HEIGHT = 52;
 export const ARENA_CARD_HORIZONTAL_PADDING = 4;
@@ -16,6 +17,7 @@ export interface ArenaLayout {
   cardWidth: number;
   cardHeight: number;
   cellSize: number;
+  gap?: number;
   participantCards?: ArenaCardLayout[];
 }
 
@@ -98,12 +100,13 @@ function measureLayout(
   columns: number,
   rows: number,
   mode: ArenaLayoutMode,
+  gap: number,
 ): ArenaLayout {
   const slotWidth = (
-    width - (ARENA_EDGE_PADDING * 2) - (ARENA_CARD_GAP * (columns - 1))
+    width - (ARENA_EDGE_PADDING * 2) - (gap * (columns - 1))
   ) / columns;
   const slotHeight = (
-    height - (ARENA_EDGE_PADDING * 2) - (ARENA_CARD_GAP * (rows - 1))
+    height - (ARENA_EDGE_PADDING * 2) - (gap * (rows - 1))
   ) / rows;
   const cellSize = Math.max(0, Math.floor(Math.min(
     (slotWidth - ARENA_CARD_HORIZONTAL_PADDING) / 10,
@@ -111,14 +114,14 @@ function measureLayout(
   )));
   const cardWidth = (cellSize * 10) + ARENA_CARD_HORIZONTAL_PADDING;
   const cardHeight = ARENA_CARD_HEADER_HEIGHT + (cellSize * 20) + ARENA_CARD_BOTTOM_PADDING;
-  return { mode, columns, rows, slotWidth, slotHeight, cardWidth, cardHeight, cellSize };
+  return { mode, columns, rows, slotWidth, slotHeight, cardWidth, cardHeight, cellSize, gap };
 }
 
-export function chooseArenaLayout(width: number, height: number, participantCount: number): ArenaLayout {
+export function chooseArenaLayout(width: number, height: number, participantCount: number, gap = ARENA_CARD_GAP): ArenaLayout {
   const count = Math.max(1, Math.min(4, participantCount));
-  const horizontal = measureLayout(width, height, count, 1, 'horizontal');
+  const horizontal = measureLayout(width, height, count, 1, 'horizontal', gap);
   if (count <= 2) return horizontal;
-  const grid = measureLayout(width, height, 2, 2, 'grid-2x2');
+  const grid = measureLayout(width, height, 2, 2, 'grid-2x2', gap);
   return grid.cellSize > horizontal.cellSize ? grid : horizontal;
 }
 

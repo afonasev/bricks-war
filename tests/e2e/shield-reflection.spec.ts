@@ -35,7 +35,9 @@ test('freezes and resumes the residual debt with ordinary pause', async ({page})
   await start(page,4);
   const card = page.locator('.hud-card').first();
   await expect.poll(async () => Number(await card.getAttribute('data-shield-remaining-ms'))).toBeGreaterThan(0);
-  await page.locator('#manual-pause').click();
+  await expect(page.locator('.arena-screen')).toBeVisible();
+  await expect(page.locator('.match-loading')).toHaveCount(0);
+  await page.keyboard.press('Escape');
   const remaining = await card.getAttribute('data-shield-remaining-ms');
   await page.waitForTimeout(800);
   await expect(card).toHaveAttribute('data-shield-remaining-ms',remaining!);

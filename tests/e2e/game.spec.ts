@@ -36,11 +36,10 @@ test('launches four compact fields with complete unframed previews and stable pe
   await expect(page.locator('.hud-next-piece')).toHaveCount(4);
   await expect(page.locator('.hud-next-cell')).toHaveCount(16);
   await expect(page.getByText('NEXT', { exact: true })).toHaveCount(0);
-  await expect(page.locator('.arena-topline')).toHaveCSS('height', '62px');
-  await expect(page.locator('.arena-brand')).toContainText('BRICKS WAR');
-  await expect(page.locator('.arena-brand')).toContainText(/ПОДГОТОВКА|УРОВЕНЬ 1/);
-  await expect(page.locator('.arena-utilities')).toContainText('АВТОПАУЗА ВКЛАДКИ');
-  await expect(page.locator('#round-timer')).toHaveCSS('background-image', /linear-gradient/);
+  await expect(page.locator('.arena-topline, .arena-brand, .arena-utilities, #manual-pause')).toHaveCount(0);
+  await expect(page.locator('#round-timer small')).toHaveCount(0);
+  await expect(page.locator('#match-clock')).toHaveText(/^\d{2}:\d{2}$/);
+  await expect(page.locator('#round-timer')).toHaveCSS('background-image', 'none');
   expect(await cards.evaluateAll((items) => items.every((card) => card.scrollWidth <= card.clientWidth))).toBe(true);
   const names = cards.locator('.hud-identity strong');
   await expect(names.nth(0)).toHaveText('Аня');
@@ -58,7 +57,7 @@ test('keeps a one-player Survival surface tightly around the maximum-height boar
   await page.getByRole('button', { name: 'Начать' }).click();
 
   await expect(page.locator('#round-timer')).toHaveAttribute('aria-label', 'Прошедшее время матча');
-  await expect(page.locator('#round-timer small')).toHaveText('ПРОШЛО ВРЕМЕНИ');
+  await expect(page.locator('#round-timer small')).toHaveCount(0);
   await expect(page.locator('#match-clock')).toHaveText('00:00');
 
   const stage = page.locator('.game-stage');
@@ -94,11 +93,13 @@ test('counts down the selected duration in competitive modes and freezes on paus
   const timer = page.locator('#round-timer');
   const clock = page.locator('#match-clock');
   await expect(timer).toHaveAttribute('aria-label', 'Оставшееся время матча');
-  await expect(timer.locator('small')).toHaveText('ОСТАЛОСЬ ВРЕМЕНИ');
+  await expect(timer.locator('small')).toHaveCount(0);
   await expect(clock).toHaveText('02:00');
   await expect(clock).not.toHaveText('02:00', { timeout: 6_000 });
 
-  await page.getByRole('button', { name: 'Поставить матч на паузу' }).click();
+  await expect(page.locator('.arena-screen')).toBeVisible();
+  await expect(page.locator('.match-loading')).toHaveCount(0);
+  await page.keyboard.press('Escape');
   const pausedClock = await clock.textContent();
   await page.waitForTimeout(1_100);
   await expect(clock).toHaveText(pausedClock ?? '');
@@ -173,10 +174,14 @@ test.describe('reduced-motion match events', () => {
 test('keeps the arena paused while Settings opens and restores it with Back', async ({ page }) => {
   await resetAndOpen(page, 'Битва');
   await page.getByRole('button', { name: 'Начать' }).click();
-  await page.getByRole('button', { name: 'Поставить матч на паузу' }).click();
+  await expect(page.locator('.arena-screen')).toBeVisible();
+  await expect(page.locator('.match-loading')).toHaveCount(0);
+  await page.keyboard.press('Escape');
 
   const overlay = page.locator('#pause-overlay');
   await expect(overlay).toBeVisible();
+  await expect(page.locator('#pause-copy')).toBeHidden();
+  await expect(overlay.locator('kbd')).toHaveCount(0);
   expect(await page.locator('.pause-panel:visible').evaluate((panel) => getComputedStyle(panel).backgroundImage))
     .not.toContain('radial-gradient');
   await expect(overlay.getByRole('button')).toContainText(['Продолжить', 'Заново', 'Настройки', 'Главное меню']);
@@ -213,10 +218,14 @@ test('keeps the arena paused while Settings opens and restores it with Back', as
   await expect(page.locator('#pause-settings-panel .is-ui-selected')).toHaveCount(1);
   await expect(page.locator('#pause-menu-panel .is-ui-selected')).toHaveCount(0);
   await page.getByLabel('Громкость музыки').fill('42');
+  await expect(page.locator('.arena-screen')).toBeVisible();
+  await expect(page.locator('.match-loading')).toHaveCount(0);
   await page.keyboard.press('Escape');
   await expect(overlay.getByRole('button', { name: 'Продолжить' })).toBeVisible();
   await page.waitForTimeout(150);
   expect(await page.locator('#match-clock').textContent()).toBe(pausedClock);
+  await expect(page.locator('.arena-screen')).toBeVisible();
+  await expect(page.locator('.match-loading')).toHaveCount(0);
   await page.keyboard.press('Escape');
   await expect(overlay).toBeHidden();
 });
@@ -225,11 +234,15 @@ test('restarts with the same roster and exits pause to the real main menu', asyn
   await resetAndOpen(page, 'Битва');
   await page.getByLabel('Имя игрока 1').fill('Мира');
   await page.getByRole('button', { name: 'Начать' }).click();
-  await page.getByRole('button', { name: 'Поставить матч на паузу' }).click();
+  await expect(page.locator('.arena-screen')).toBeVisible();
+  await expect(page.locator('.match-loading')).toHaveCount(0);
+  await page.keyboard.press('Escape');
   await page.getByRole('button', { name: 'Заново' }).click();
   await expect(page.locator('.hud-card').first()).toContainText('Мира');
   await expect(page.locator('#countdown')).toBeVisible();
-  await page.getByRole('button', { name: 'Поставить матч на паузу' }).click();
+  await expect(page.locator('.arena-screen')).toBeVisible();
+  await expect(page.locator('.match-loading')).toHaveCount(0);
+  await page.keyboard.press('Escape');
   await page.getByRole('button', { name: 'Главное меню' }).click();
   await expect(page.locator('[data-screen="main-menu"]')).toBeVisible();
 });
@@ -300,8 +313,10 @@ test('retains board geometry without overflow at wide and narrow supported viewp
     await expect(page.locator('.hud-card')).toHaveCount(4);
     expect(await page.locator('.hud-card').evaluateAll((cards) => cards.every((card) => card.scrollWidth <= card.clientWidth))).toBe(true);
     const stage = await page.locator('.game-stage').boundingBox();
-    expect(stage?.height).toBe(viewport.height - 62);
-    await page.getByRole('button', { name: 'Поставить матч на паузу' }).click();
+    expect(stage?.height).toBe(viewport.height - 80);
+    await expect(page.locator('.arena-screen')).toBeVisible();
+    await expect(page.locator('.match-loading')).toHaveCount(0);
+    await page.keyboard.press('Escape');
     await page.getByRole('button', { name: 'Главное меню' }).click();
   }
 });
@@ -327,3 +342,42 @@ for (const viewport of [{width: 1440, height: 960}, {width: 390, height: 844}]) 
     await page.screenshot({path: `evidence/increase-attack-defense-window/after-${viewport.width}.png`});
   });
 }
+
+
+test('Start Menu opens pause on every connected gamepad and resumes only after release', async ({ page }) => {
+  await page.addInitScript(() => {
+    const pads = Array.from({ length: 2 }, (_, index) => ({ id: `Pause Pad ${index}`, index, connected: true, axes: [0,0], buttons: Array.from({length:16},()=>({pressed:false,touched:false,value:0})), mapping:'standard', timestamp:0 }));
+    Object.assign(window, { __pausePads: pads });
+    Object.defineProperty(navigator,'getGamepads',{configurable:true,value:()=>pads});
+  });
+  await page.goto('/?muted=1');
+  await page.getByRole('button', { name: /^Выживание/ }).click();
+  await page.getByRole('button', { name: 'Начать' }).click();
+  await expect(page.locator('#countdown')).toBeHidden({timeout:6000});
+  const press = async (index: number, down: boolean) => {
+    await page.evaluate(({index,down}) => {
+      const pads = (window as typeof window & {__pausePads:Array<{buttons:Array<{pressed:boolean}>}>}).__pausePads;
+      pads[index]!.buttons[9]!.pressed = down;
+    }, {index,down});
+  };
+  for (let index = 0; index < 2; index++) {
+    await press(index,true);
+    await expect(page.locator('#pause-overlay')).toBeVisible();
+    await expect(page.locator('#pause-copy')).toBeHidden();
+    const time = await page.locator('#match-clock').textContent();
+    await page.waitForTimeout(1100);
+    await expect(page.locator('#match-clock')).toHaveText(time!);
+    await expect(page.locator('#pause-overlay')).toBeVisible();
+    await press(index,false);
+    await page.waitForTimeout(100);
+    await press(index,true);
+    await expect(page.locator('#pause-overlay')).toBeHidden();
+    await press(index,false);
+    await page.waitForTimeout(100);
+  }
+  await press(1,true);
+  await expect(page.locator('#pause-overlay')).toBeVisible();
+  await press(1,false);
+  await page.locator('#return-to-menu').click();
+  await expect(page.getByRole('navigation',{name:'Главное меню'})).toBeVisible();
+});

@@ -1453,14 +1453,7 @@ export class BricksWarApp {
 
     this.root.innerHTML = `
       <main class="arena-screen premium-surface${mobileMatch ? ' mobile-solo-arena' : ''}" data-battle-difficulty="${engine.state.options.battleDifficulty}" data-soft-drop="${engine.state.options.softDrop}" data-pressure="${engine.state.options.pressure}" data-conflict="${engine.state.options.conflictEnabled ? 'on' : 'off'}" data-debug-tuning="${activeTuning ? 'on' : 'off'}" data-tile-styles="${engine.state.participants.map((participant) => participant.resolvedTileStyle).join(',')}" data-pressure-start-ms="${engine.state.pressureStartMs}" data-gravity-interval-ms="${engine.state.gravityIntervalMs}" data-soft-drop-interval-ms="${engine.state.options.softDropIntervalMs}">
-        ${mobileMatch ? '' : `<div class="arena-topline">
-          <div class="arena-brand"><strong>BRICKS WAR</strong><span id="match-status" class="match-status">ПОДГОТОВКА</span></div>
-          <div id="round-timer" class="round-timer" aria-label="${initialClock.ariaLabel}">
-            <span id="match-clock" class="round-timer-value">${formatClock(initialClock.milliseconds)}</span>
-            <small>${initialClock.label}</small>
-          </div>
-          <div class="arena-utilities"><em id="pressure-status">АВТОПАУЗА ВКЛАДКИ</em><button id="manual-pause" class="pause-control" type="button" aria-label="Поставить матч на паузу" aria-pressed="false"><span aria-hidden="true">Ⅱ</span><b>ПАУЗА</b></button>${this.audioButtonMarkup()}</div>
-        </div>`}
+        ${mobileMatch ? '' : `<div class="arena-backdrop" aria-hidden="true"><svg class="arena-shape arena-shape-left" viewBox="0 0 300 300"><path d="M100 0h200v100H200v100H0V100h100Z"/></svg><svg class="arena-shape arena-shape-right" viewBox="0 0 300 300"><path d="M0 0h300v100H200v100H100V100H0Z"/></svg></div><div id="round-timer" class="round-timer" aria-label="${initialClock.ariaLabel}"><span id="match-clock" class="round-timer-value">${formatClock(initialClock.milliseconds)}</span></div>`}
         <div class="game-stage" id="game-stage">
           <div id="game-canvas" class="game-canvas"></div>
           <div id="hud-grid" class="hud-grid" aria-live="polite"></div>
@@ -1469,8 +1462,8 @@ export class BricksWarApp {
           <div id="pause-overlay" class="pause-overlay" role="dialog" aria-modal="true" aria-labelledby="pause-title" hidden>
             <section id="pause-menu-panel" class="pause-panel">
               <span id="pause-title">Матч на паузе</span>
-              <small id="pause-copy">${mobileMatch ? 'Коснитесь кнопки ниже, чтобы продолжить' : 'Нажмите Escape или кнопку ниже, чтобы продолжить'}</small>
-              <button id="continue-match" class="pause-continue" type="button">Продолжить ${mobileMatch ? '' : '<kbd>Esc</kbd>'}</button>
+              <small id="pause-copy" hidden></small>
+              <button id="continue-match" class="pause-continue" type="button">Продолжить</button>
               <div id="manual-pause-actions" class="pause-actions" hidden><button id="restart-match" type="button">Заново</button><button id="pause-settings" type="button">Настройки</button><button id="return-to-menu" type="button">Главное меню</button></div>
             </section>
             <section id="pause-settings-panel" class="pause-panel pause-settings-panel" hidden>
@@ -1517,7 +1510,7 @@ export class BricksWarApp {
       type: Phaser.AUTO,
       parent: 'game-canvas',
       backgroundColor: '#071b4a',
-      transparent: false,
+      transparent: !mobileMatch,
       antialias: true,
       render: { pixelArt: false, roundPixels: true },
       scale: {
@@ -1722,6 +1715,11 @@ export class BricksWarApp {
     this.latestArenaLayout = layout;
     const hud = this.root.querySelector<HTMLElement>('#hud-grid');
     if (!hud) return;
+    const arena = hud.closest<HTMLElement>('.arena-screen:not(.mobile-solo-arena)');
+    arena?.style.setProperty('--clock-board-height', `${layout.cardHeight}px`);
+    arena?.style.setProperty('--clock-board-rows', String(layout.rows));
+    arena?.style.setProperty('--clock-grid-insets', `${8 + (layout.rows - 1) * (layout.gap ?? 4)}px`);
+    hud.style.setProperty('--arena-card-gap', `${layout.gap ?? 4}px`);
     hud.dataset.layout = layout.mode;
     hud.dataset.cellSize = String(layout.cellSize);
     hud.style.setProperty('--arena-columns', String(layout.columns));
@@ -1841,8 +1839,9 @@ export class BricksWarApp {
     const mobileMatch = this.root.querySelector('.mobile-solo-arena') !== null;
     this.root.querySelector<HTMLElement>('.arena-screen')?.classList.toggle('is-mobile-pause-open', mobileMatch && state.phase === 'paused');
     if (pauseCopy) {
+      pauseCopy.hidden = manuallyPaused && !hiddenPaused;
       pauseCopy.textContent = manuallyPaused
-        ? hiddenPaused ? 'Матч останется на паузе после возвращения во вкладку' : mobileMatch ? 'Коснитесь кнопки ниже, чтобы продолжить' : 'Нажмите Escape или кнопку ниже, чтобы продолжить'
+        ? hiddenPaused ? 'Матч останется на паузе после возвращения во вкладку' : ''
         : 'Вернитесь во вкладку, чтобы продолжить';
     }
     const continueButton = this.root.querySelector<HTMLButtonElement>('#continue-match');

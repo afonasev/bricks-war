@@ -410,7 +410,7 @@ kbd { min-width: 28px; padding: 6px 7px; border: 1px solid var(--line); border-b
 .round-timer.is-final small { color: #a33b51; }
 .game-stage { position: relative; min-height: 0; background: linear-gradient(115deg, #fff8e9 0%, #f7fbf2 48%, #edf8ff 100%); }
 .game-canvas, .game-canvas canvas { position: absolute; inset: 0; width: 100% !important; height: 100% !important; }
-.hud-grid { position: absolute; inset: 4px; z-index: 3; display: grid; grid-template-columns: repeat(var(--arena-columns, 2), 1fr); grid-template-rows: repeat(var(--arena-rows, 1), 1fr); gap: 4px; pointer-events: none; }
+.hud-grid { position: absolute; inset: 4px; z-index: 3; display: grid; grid-template-columns: repeat(var(--arena-columns, 2), 1fr); grid-template-rows: repeat(var(--arena-rows, 1), 1fr); gap: var(--arena-card-gap, 4px); pointer-events: none; }
 .hud-card { --hud-bg: rgba(210, 238, 249, 0.96); --hud-border: #4a9fd1; --hud-text: #173d73; --hud-meta: #386283; --hud-score: #8b5900; position: relative; justify-self: center; align-self: center; box-sizing: border-box; width: var(--arena-card-width); height: var(--arena-card-height); min-width: 0; padding: 6px 8px; border: 2px solid var(--hud-border); border-radius: 8px; background: linear-gradient(to bottom, var(--hud-bg) 0 52px, transparent 52px); overflow: hidden; box-shadow: 0 2px 0 color-mix(in srgb, var(--hud-border) 58%, #fff); }
 .hud-card::after { content: ""; position: absolute; inset: 2px; z-index: 4; border: 3px solid transparent; border-radius: 7px; pointer-events: none; }
 .hud-card.is-conflict-sender::after { border-color: #3a965b; }
@@ -1591,3 +1591,28 @@ html { touch-action: pan-x pan-y; overscroll-behavior: none; }
 .player-event-notice[data-kind="incoming-attack"] .match-event-copy strong { color: #b42a40; display: flex; align-items: center; justify-content: center; gap: 4px; }
 .player-event-notice[data-kind="incoming-attack"] .match-event-copy .match-event-icon { width: 14px; height: 14px; flex: 0 0 14px; }
 @media(max-width:600px) { .player-event-notice[data-kind="incoming-attack"] { top: 43px; } }
+
+/* Local match: digits only; reserve clock space without a navigation strip. */
+.arena-screen:not(.network-arena):not(.mobile-solo-arena) { position: relative; --clock-reserved-height: 80px; grid-template-rows: var(--clock-reserved-height) minmax(0, 1fr); background: radial-gradient(ellipse at 50% 38%, #f8fcff 0%, #e7f2fa 55%, #d8eaf6 100%); }
+.arena-screen:not(.network-arena) > .round-timer { position: static; translate: none; display: grid; place-items: center; grid-column: auto; grid-row: auto; min-width: 0; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; color: #174d7c; }
+.arena-screen:not(.network-arena) > .round-timer .round-timer-value { font-size: 1.5rem; }
+
+/* Board height and row count come from the existing layout; percentages follow
+   even sub-cell viewport resizes without changing gameplay or board geometry. */
+.arena-screen:not(.network-arena):not(.mobile-solo-arena) > .game-stage { grid-row: 2; }
+.arena-screen:not(.network-arena):not(.mobile-solo-arena) > .round-timer {
+  position: absolute; inset: 0 0 auto; z-index: 3; pointer-events: none;
+  height: calc(var(--clock-reserved-height) + 4px + ((100% - var(--clock-reserved-height) - var(--clock-grid-insets, 8px)) / var(--clock-board-rows, 1) - var(--clock-board-height, calc(100% - var(--clock-reserved-height) - 8px))) / 2);
+}
+.arena-screen:not(.network-arena):not(.mobile-solo-arena) > .round-timer .round-timer-value { font-size: clamp(1.75rem, 2.4vw, 2.25rem); line-height: 1; }
+
+/* Quiet edge decoration stays behind the unchanged fields and interaction layers. */
+.arena-backdrop { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.arena-shape { position: absolute; width: clamp(180px, 23vw, 340px); fill: #a3c5df; opacity: .18; }
+.arena-shape-left { left: -7%; top: 8%; rotate: -15deg; }
+.arena-shape-right { right: -7%; bottom: 4%; rotate: 16deg; }
+.arena-screen:not(.network-arena):not(.mobile-solo-arena) > .game-stage { background: transparent; }
+.arena-screen:not(.network-arena):not(.mobile-solo-arena) > .round-timer .round-timer-value {
+  min-width: 140px; padding: 9px 22px; text-align: center; border: 2px solid #9bbad1; border-bottom-width: 5px; border-radius: 20px;
+  background: linear-gradient(#fffef8, #eef6fa); box-shadow: inset 0 1px #fff, 0 5px 12px #426b8e18;
+}

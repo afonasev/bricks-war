@@ -65,7 +65,9 @@ test('keeps authoritative HUD and field changes at each visual landing', async (
 test('pauses the real burn frame and resumes its remaining time', async ({ page }) => {
   await openFire(page, 2);
   await page.waitForTimeout(220);
-  await page.locator('#manual-pause').click();
+  await expect(page.locator('.arena-screen')).toBeVisible();
+  await expect(page.locator('.match-loading')).toHaveCount(0);
+  await page.keyboard.press('Escape');
   await expect(page.locator('#pause-overlay')).toBeVisible();
   const stage = page.locator('#game-stage');
   const paused = Number(await stage.getAttribute('data-burn-remaining-ms'));

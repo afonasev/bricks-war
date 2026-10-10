@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chooseArenaLayout, chooseMobileSoloLayout, chooseNetworkLayout } from '../src/rendering/arenaLayout';
+import { LOCAL_ARENA_CARD_GAP, chooseArenaLayout, chooseMobileSoloLayout, chooseNetworkLayout } from '../src/rendering/arenaLayout';
 
 describe('adaptive arena layout', () => {
   it.each([
@@ -131,5 +131,16 @@ describe('adaptive arena layout', () => {
     expect(firstAi!.x + firstAi!.cardWidth).toBeLessThanOrEqual(secondAi!.x);
     expect(secondAi!.x + secondAi!.cardWidth).toBeLessThanOrEqual(840);
     expect((player!.x + secondAi!.x + secondAi!.cardWidth) / 2).toBe(422);
+  });
+});
+
+describe('local desktop field spacing', () => {
+  it.each([[1440,880],[800,920],[1280,400]])('fits four fields with 16px slots at %ix%i', (width,height) => {
+    const layout = chooseArenaLayout(width,height,4,LOCAL_ARENA_CARD_GAP);
+    expect(layout.gap).toBe(16);
+    expect(layout.slotWidth * layout.columns + 16 * (layout.columns - 1) + 8).toBe(width);
+    expect(layout.slotHeight * layout.rows + 16 * (layout.rows - 1) + 8).toBe(height);
+    expect(layout.cardWidth).toBeLessThanOrEqual(layout.slotWidth);
+    expect(layout.cardHeight).toBeLessThanOrEqual(layout.slotHeight);
   });
 });
