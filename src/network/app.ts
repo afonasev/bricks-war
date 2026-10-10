@@ -1,3 +1,4 @@
+import { MatchLoading } from '../ui/matchLoading';
 import { shieldInventoryMarkup, shieldInventoryKey } from '../ui/shieldInventory';
 import * as Phaser from 'phaser/dist/phaser.esm.js';
 import { NetworkMatchSession, loadCredential, storeCredential, networkRequest } from './client';
@@ -34,6 +35,7 @@ export class NetworkApp {
   private audioGeneration:string|null=null;
   private credential=loadCredential();
   private game:Phaser.Game|null=null;
+  private matchLoading:MatchLoading|null=null;
   private arenaElement:HTMLElement|null=null;
   private arenaRuntime:PlayRuntime|null=null;
   private arenaIdentity:string|null=null;
@@ -93,6 +95,7 @@ export class NetworkApp {
     } catch(error){this.status(error instanceof Error?error.message:'Не удалось выполнить действие.');}
   }
   private destroyArena():void {
+    this.matchLoading?.cancel();this.matchLoading=null;
     const game=this.game;this.game=null;this.arenaElement=null;this.arenaRuntime=null;this.arenaIdentity=null;this.layout=null;
     if(game){game.destroy(true);if(game.isBooted)game.loop.tick();}
   }
@@ -100,6 +103,7 @@ export class NetworkApp {
     return JSON.stringify([snapshot.serviceId,snapshot.room.id,snapshot.ownId,snapshot.matchId]);
   }
   private async showList():Promise<void> {
+    this.matchLoading?.cancel();this.matchLoading=null;
     if(this.game&&this.view==='arena') {
       this.game.loop.sleep();this.arenaElement?.remove();
       for(const source of this.sources.keys())this.blocked.add(source);this.sources.clear();
@@ -223,7 +227,8 @@ export class NetworkApp {
       this.audioGeneration=generation;
     } else { this.audioGeneration=null; this.audio?.enterMenu(); }
     if(snapshot.state && snapshot.state.phase!=='results') {
-      if(this.view!=='arena')this.arena();
+      if(this.view!=='arena'&&this.view!=='preparing')this.arena();
+      if(snapshot.state.phase==='paused'||session.status!=='Подключено')this.matchLoading?.suppress();
       this.updateArena();return;
     }
     this.destroyArena();
@@ -272,6 +277,23 @@ export class NetworkApp {
     this.status(session.status);
   }
   private arena():void {
+    const session=this.session;if(!session?.snapshot)return;
+    const identity=this.matchIdentity(session.snapshot);
+    if(this.game&&this.arenaIdentity===identity){this.buildArena();return;}
+    this.destroyArena();this.view='preparing';
+    const loading=new MatchLoading(this.root,()=>this.destroyArena());this.matchLoading=loading;
+    void loading.painted().then(painted=>{
+      if(!painted||this.matchLoading!==loading||this.session!==session||!session.snapshot)return;
+      if(this.matchIdentity(session.snapshot)!==identity){this.destroyArena();this.view='lobby';this.renderSession();return;}
+      this.buildArena();this.updateArena();
+    }).catch(error=>{
+      if(this.matchLoading!==loading)return;
+      this.destroyArena();this.view='ended';
+      this.shell('Не удалось подготовить матч', `<p>Попробуйте вернуться в комнату.</p>${this.button('К списку','list')}`);
+      this.status(error instanceof Error?error.message:'Ошибка подготовки матча');
+    });
+  }
+  private buildArena():void {
     if(!this.session?.snapshot)return;
     const identity=this.matchIdentity(this.session.snapshot);
     if(this.game&&this.arenaElement&&this.arenaRuntime&&this.arenaIdentity===identity) {
@@ -279,7 +301,7 @@ export class NetworkApp {
       this.view='arena';this.renderKey='';this.updateArena();
       this.game.scale.getParentBounds();this.game.scale.refresh();this.game.loop.wake();return;
     }
-    this.destroyArena();this.view='arena';this.renderKey='';
+    this.view='arena';this.renderKey='';
     this.root.innerHTML=`<main class="network-arena arena-screen premium-surface">
       <header class="network-arena-heading arena-topline">
         <div class="arena-brand"><strong>BRICKS WAR</strong><output id="network-status" class="match-status network-status"></output></div>
@@ -307,13 +329,19 @@ export class NetworkApp {
       el.onlostpointercapture=e=>this.release(`pointer-${e.pointerId}`);
     });
     this.arenaElement=this.root.querySelector<HTMLElement>('.network-arena');this.arenaIdentity=identity;
-    this.arenaRuntime={engine:this.session,input:new HumanInputRouter(),aiControllers:new Map(),get mobileSolo(){return isMobilePlayViewport();},onReady:()=>{},onState:()=>this.updateArena(),
+    this.arenaRuntime={engine:this.session,input:new HumanInputRouter(),aiControllers:new Map(),get mobileSolo(){return isMobilePlayViewport();},onReady:()=>{
+        const loading=this.matchLoading;
+        if(loading)void loading.ready().then(ready=>{
+          if(!ready||this.matchLoading!==loading)return;
+          this.matchLoading=null;this.updateArena();
+        });
+      },onState:()=>this.updateArena(),
       onLayout:layout=>{this.layout=layout;this.updateArena();},onFinished:()=>{}};
     const scene=new PlayScene(this.arenaRuntime);
     this.game=new Phaser.Game({type:Phaser.AUTO,parent:'network-canvas',backgroundColor:'#fff8e9',scale:{mode:Phaser.Scale.RESIZE,width:'100%',height:'100%'},scene:[scene],audio:{noAudio:true}});
   }
   private updateArena():void {
-    const session=this.session;const snapshot=session?.snapshot;if(!session||!snapshot?.state||this.view!=='arena')return;
+    const session=this.session;const snapshot=session?.snapshot;if(!session||!snapshot?.state||this.view!=='arena'||!this.arenaElement)return;
     this.status(session.status);
     const arena=this.root.querySelector<HTMLElement>('.network-arena')!;
     arena.classList.toggle('mobile-solo-arena',isMobilePlayViewport());
@@ -360,7 +388,7 @@ export class NetworkApp {
     } else delete overlay.dataset.renderKey;
   }
   private press(source:string,action:string):void {
-    if(this.blocked.has(source)||this.sources.has(source))return;
+    if(this.matchLoading?.visible||this.blocked.has(source)||this.sources.has(source))return;
     if(!this.session?.acceptsGameplayInput()){this.blocked.add(source);return;}
     this.sources.set(source,action);this.sendControls(action==='rotate');
   }

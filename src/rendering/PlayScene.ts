@@ -74,6 +74,7 @@ export interface PlayRuntime {
   input: HumanInputRouter;
   aiControllers: ReadonlyMap<string, AiController>;
   onReady: () => void;
+  isPresentationReady?: () => boolean;
   onState: (state: MatchState) => void;
   onLayout: (layout: ArenaLayout) => void;
   onFinished: (state: MatchState) => void;
@@ -94,6 +95,7 @@ function playtestSimulationScale(): number {
 }
 
 export class PlayScene extends Phaser.Scene {
+  private presentationStarted = false;
   private staticGraphics!: Phaser.GameObjects.Graphics;
   private graphics!: Phaser.GameObjects.Graphics;
   private readonly shieldLayers = new Map<string, { graphics: Phaser.GameObjects.Graphics; effect: Phaser.GameObjects.Graphics; maskGraphics: Phaser.GameObjects.Graphics; mask: Phaser.Display.Masks.GeometryMask }>();
@@ -145,10 +147,15 @@ export class PlayScene extends Phaser.Scene {
       this.activePieceInterpolation.reset(this.runtime.engine.state.participants);
       this.renderState();
     });
-    this.runtime.onReady();
     this.lastWallClockMs = Date.now();
     this.activePieceInterpolation.reset(this.runtime.engine.state.participants);
+    this.runtime.onState(this.runtime.engine.state);
     this.renderState();
+    // create() only builds draw commands. POST_RENDER confirms the first frame.
+    this.game.events.once(Phaser.Core.Events.POST_RENDER, this.runtime.onReady);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.game.events.off(Phaser.Core.Events.POST_RENDER, this.runtime.onReady);
+    });
   }
 
   update(_time: number, delta: number): void {
@@ -160,6 +167,17 @@ export class PlayScene extends Phaser.Scene {
       return;
     }
     const state = this.runtime.engine.state;
+    if (this.runtime.isPresentationReady?.() === false) {
+      this.lastWallClockMs = Date.now();
+      this.runtime.input.setEnabled(false);
+      this.renderState();
+      return;
+    }
+    if (this.runtime.isPresentationReady && !this.presentationStarted) {
+      // Never charge time spent behind loading to the first visible countdown tick.
+      this.presentationStarted = true;
+      this.lastWallClockMs = Date.now();
+    }
     if (this.runtime.captureAnomalyBurnAtMs !== undefined && state.anomalyTransition?.phase === 'burning'
       && state.anomalyTransition.remainingMs <= this.runtime.captureAnomalyBurnAtMs) {
       this.runtime.onState(state);this.renderState();return;

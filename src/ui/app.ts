@@ -1,3 +1,4 @@
+import { MatchLoading } from './matchLoading';
 import { prepareAnomalyArrivalPlaytest } from './anomalyArrivalPlaytest';
 import { rulesScreenMarkup, bindRulesScreen } from './visualRules';
 import './visualRules.css';
@@ -251,6 +252,7 @@ function releaseFooterMarkup({ confirm, back, start, roster, keyboard, buildInfo
 
 export class BricksWarApp {
   private game: Phaser.Game | null = null;
+  private matchLoading: MatchLoading | null = null;
   private network: NetworkApp | null = null;
   private readonly slots: SlotValue[] = loadSlotSelections();
   private readonly playerNames = loadPlayerNames();
@@ -415,6 +417,12 @@ export class BricksWarApp {
   }
 
   private navigateBack(): void {
+    if (this.matchLoading) {
+      this.destroyGame();
+      this.router.back();
+      this.renderCurrentScreen();
+      return;
+    }
     if (this.profileChoices.length) { this.profileChoices.shift(); this.renderSetup(); return; }
     if (this.game) {
       if (this.router.current() === 'settings') {
@@ -1371,13 +1379,26 @@ export class BricksWarApp {
   }
 
   private startMatch(): void {
-    if (!this.showValidation()) return;
+    if (this.matchLoading || !this.showValidation()) return;
+    const loading = new MatchLoading(this.root, () => this.destroyGame(), () => this.navigateBack());
+    this.matchLoading = loading;
+    // Keep Web Audio unlock inside the initiating user gesture.
+    this.audio.unlock();
+    this.menuFocus.suspend();
+    this.router.open('arena', this.router.current());
+    void this.prepareMatch(loading).catch(error => {
+      if (this.matchLoading !== loading) return;
+      this.destroyGame();
+      window.dispatchEvent(new ErrorEvent('error', { error, message: String(error) }));
+    });
+  }
+
+  private async prepareMatch(loading: MatchLoading): Promise<void> {
+    if (!await loading.painted() || this.matchLoading !== loading) return;
     this.disconnectPlayerNameResizeObserver();
     this.countdownReady = false;
     this.playerEventRegions.clear();
-    this.audio.unlock();
     this.audio.startGame();
-    this.router.open('arena', this.router.current());
     desktop?.setSafeMenu(false);
     this.menuFocus.suspend();
     const configs = this.configs();
@@ -1473,10 +1494,15 @@ export class BricksWarApp {
       engine: new LocalMatchSession(engine),
       input,
       aiControllers,
+      isPresentationReady: () => this.matchLoading === null,
       onReady: () => {
-        this.countdownReady = true;
-        this.lastHudKey = '';
-        this.updateHud(engine.state);
+        void loading.ready().then(ready => {
+          if (!ready || this.matchLoading !== loading) return;
+          this.matchLoading = null;
+          this.countdownReady = true;
+          this.lastHudKey = '';
+          this.updateHud(engine.state);
+        });
       },
       onState: (state) => this.updateHud(state),
       onLayout: (layout) => this.updateArenaLayout(layout),
@@ -1711,7 +1737,7 @@ export class BricksWarApp {
   private updateHud(state: MatchState): void {
     this.latestHudState = state;
     if (this.countdownReady || state.phase !== 'countdown') this.audio.sync(state);
-    this.audio.syncMusic(state, `local:${state.seed}`, state.seed);
+    if (!this.matchLoading) this.audio.syncMusic(state, `local:${state.seed}`, state.seed);
     if (isLocalPlaytestFlag('playtest-anomaly-arrival')) {
       const stage = this.root.querySelector<HTMLElement>('#game-stage');
       if (stage) {
@@ -2119,6 +2145,8 @@ export class BricksWarApp {
   }
 
   private destroyGame(): void {
+    this.matchLoading?.cancel();
+    this.matchLoading = null;
     if (this.router.current() === 'results') this.menuFocus.suspend();
     this.mobileInputCleanup?.(); this.mobileInputCleanup = null;
     this.game?.destroy(true);

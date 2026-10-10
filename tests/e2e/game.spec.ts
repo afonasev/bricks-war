@@ -249,9 +249,29 @@ test('offers only Repeat and Main Menu in results and Repeat preserves identitie
   await expect(results.locator('#play-again')).toBeVisible();
   await expect(results.getByRole('button')).toHaveCount(2);
   await expect(results.getByRole('button')).toContainText(['Повторить', 'Главное меню']);
+  // At 20x the visible countdown lasts 150ms: observe its real reveal instead of
+  // missing that window while sequential assertions cross the browser boundary.
+  await page.evaluate(() => {
+    (window as any).__repeatPresentation = null;
+    const observer = new MutationObserver(() => {
+      const countdown = document.querySelector<HTMLElement>('#countdown');
+      if (!countdown || countdown.hidden || document.querySelector('.match-loading')) return;
+      (window as any).__repeatPresentation = {
+        visible: getComputedStyle(countdown).visibility !== 'hidden',
+        countdown: countdown.textContent,
+        canvasReady: !!document.querySelector('#game-canvas canvas'),
+        identityPreserved: document.querySelector('.hud-card')?.textContent?.includes('Мира') ?? false,
+      };
+      observer.disconnect();
+    });
+    observer.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['hidden'] });
+  });
   await results.getByRole('button', { name: 'Повторить' }).click();
+  await expect(page.locator('.match-loading')).toBeVisible();
+  await page.locator('.match-loading').waitFor({ state: 'detached' });
+  await expect.poll(() => page.evaluate(() => (window as any).__repeatPresentation))
+    .toEqual({ visible: true, countdown: '3', canvasReady: true, identityPreserved: true });
   await expect(page.locator('.hud-card').first()).toContainText('Мира');
-  await expect(page.locator('#countdown')).toBeVisible();
 });
 
 test('uses the Menu gamepad button to pause and shared gamepad focus to continue', async ({ page }) => {
