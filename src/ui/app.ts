@@ -71,6 +71,7 @@ import { ScreenRouter, type AppScreen } from './screenRouter';
 import { loadReleaseSettings, saveReleaseSettings } from './releaseSettings';
 import { isMobilePlayViewport, loadMobileSettings, saveMobileSettings, type MobileSettings } from './mobileSettings';
 import { clientUpdate } from '../pwa/clientUpdate';
+import { updatePresentation } from '../pwa/updatePresentation';
 import { dismissIosInstallHint, shouldShowIosInstallHint } from './pwaInstall';
 import { fromEntries } from '../runtime/compat';
 import { prepareClearPlaytest } from './clearPlaytest';
@@ -360,14 +361,15 @@ export class BricksWarApp {
     const announcement = this.root.querySelector<HTMLElement>('.client-update-announcement');
     if (!button || !status) return;
     const state = clientUpdate.snapshot();
-    button.hidden = !state.available;
+    const presentation = updatePresentation(state);
+    button.hidden = !presentation.visible;
     const download = this.root.querySelector<HTMLButtonElement>('.desktop-download');
     if (download) { download.hidden = state.available || !this.downloadUrl || isMobilePlayViewport(); }
     if (announcement) announcement.hidden = !state.available;
-    button.disabled = state.applying || state.blocked;
-    button.textContent = state.applying ? 'Обновление…' : 'Обновить';
-    status.textContent = state.blocked ? 'Сначала завершите сетевую игру' : state.error ? 'Не удалось обновить. Попробуйте ещё раз.' : '';
-    status.hidden = !state.available || !status.textContent;
+    button.disabled = presentation.disabled;
+    button.textContent = presentation.label;
+    status.textContent = presentation.status;
+    status.hidden = !presentation.visible || !status.textContent;
     this.menuFocus.reconcileItems();
   }
 
@@ -518,7 +520,10 @@ export class BricksWarApp {
       desktop?.setSafeMenu(false);
       this.network = new NetworkApp(this.root, () => {this.router.open('main-menu'); this.renderMainMenu();}, this.audio);
     });
-    this.root.querySelector('.client-update-button')?.addEventListener('click', () => { clientUpdate.apply(); });
+    this.root.querySelector('.client-update-button')?.addEventListener('click', () => {
+      if (clientUpdate.snapshot().available) clientUpdate.apply();
+      else void clientUpdate.check(true);
+    });
     this.root.querySelector('#desktop-exit')?.addEventListener('click', () => { clientUpdate.refresh(); void desktop?.exit(); });
     this.root.querySelector('.desktop-download')?.addEventListener('click', () => {
       if (!this.downloadUrl) return;

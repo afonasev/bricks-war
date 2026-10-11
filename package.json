@@ -1,6 +1,6 @@
 {
   "name": "bricks-war",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "private": true,
   "type": "module",
   "scripts": {
@@ -29,7 +29,9 @@
     "desktop:build:win": "npm run desktop:prepare && electron-builder --win --publish never",
     "test:desktop": "node --test tests/desktop/*.test.mjs",
     "desktop:publish": "node scripts/desktop/publish.mjs --installers",
-    "desktop:publish:content": "node scripts/desktop/publish.mjs",
+    "desktop:publish:content": "node scripts/desktop/publish-content-github.mjs --publish",
+    "desktop:publish:content:plan": "node scripts/desktop/publish-content-github.mjs",
+    "desktop:publish:content:legacy": "node scripts/desktop/publish.mjs",
     "desktop:release": "node scripts/desktop/github-release.mjs"
   },
   "dependencies": {

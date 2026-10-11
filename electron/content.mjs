@@ -30,8 +30,8 @@ async function atomicJson(path, data) {
 }
 
 export class ContentStore {
-  constructor({ root, bundled, publicKey, shellVersion, download }) {
-    Object.assign(this, { root, bundled, publicKey, shellVersion, download });
+  constructor({ root, bundled, publicKey, shellVersion, download, onProgress = () => {} }) {
+    Object.assign(this, { root, bundled, publicKey, shellVersion, download, onProgress });
     this.state = { highWater: 0, current: null, previous: null, pending: null, trial: false };
     this.active = bundled; this.ready = null;
   }
@@ -52,12 +52,20 @@ export class ContentStore {
     for (const k of ['current', 'previous', 'pending']) if (this.state[k] != null && !/^release-\d+$/.test(this.state[k])) throw Error('Invalid content state path');
     if (this.state.trial) { this.state.current = this.state.previous; this.state.trial = false; this.state.pending = null; }
     if (this.state.current) {
-      try { await this.inventory(join(this.root, this.state.current)); this.active = join(this.root, this.state.current); }
+      try {
+        const current = await this.inventory(join(this.root, this.state.current));
+        if (current.sequence > this.bundledManifest.sequence) this.active = join(this.root, this.state.current);
+        else { this.state.previous = this.state.current; this.state.current = null; }
+      }
       catch { this.state.current = null; }
     }
     this.manifest = await this.inventory(this.active);
     if (this.state.pending) {
-      try { this.ready = await this.inventory(join(this.root, this.state.pending)); }
+      try {
+        const pending = await this.inventory(join(this.root, this.state.pending));
+        if (pending.sequence > this.manifest.sequence) this.ready = pending;
+        else this.state.pending = null;
+      }
       catch { this.state.pending = null; }
     }
     await this.save();
@@ -74,6 +82,7 @@ export class ContentStore {
     return this.checking;
   }
   async stage() {
+    this.onProgress('checking');
     const raw = await this.download('latest.json', 512_000);
     const envelope = JSON.parse(raw.toString());
     const m = validateManifest(envelope, this.publicKey, this.shellVersion);
@@ -81,8 +90,9 @@ export class ContentStore {
     const name = `release-${m.sequence}`, stage = join(this.root, `${name}.staging`);
     await rm(stage, { recursive: true, force: true }); await mkdir(stage);
     try {
+      this.onProgress('downloading');
       for (const f of m.files) {
-        const bytes = await this.download(`${m.sequence}/${f.path}`, f.size);
+        const bytes = await this.download(`${m.sequence}/${f.path}`, f.size, { sequence: m.sequence, sha256: f.sha256 });
         if (bytes.length !== f.size || digest(bytes) !== f.sha256) throw Error('Content hash mismatch');
         const path = join(stage, f.path); await mkdir(join(path, '..'), { recursive: true }); await writeFile(path, bytes);
       }

@@ -9,11 +9,11 @@
 | Публичный снимок исходников | `https://github.com/afonasev/bricks-war`, ветка `main` |
 | DMG, ZIP, EXE, blockmap, `latest.yml`, `latest-mac.yml`, `SHA256SUMS` | GitHub Releases, тег `v<версия оболочки>` |
 | Web-сборка | `https://bricks.afonasev.tech/`, VPS `/opt/bricks-war` |
-| Подписанный игровой контент | `/desktop/game/latest.json` и каталог его sequence на VPS |
+| Подписанный игровой контент | GitHub Pages `https://afonasev.github.io/bricks-war/desktop/game/latest.json`; immutable assets GitHub Releases `content-<sequence>/<sha256>` |
 | Ссылки для скачивания | `/desktop/latest.json`, прямые URL assets в GitHub Releases |
 | Совместимость старых оболочек | `/desktop/installers/latest*.yml` на VPS с абсолютными GitHub URL |
 
-На VPS нет EXE/DMG/ZIP/blockmap. Подписанный игровой контент остаётся на VPS: это отдельный канал обновления, доступный уже установленной игре. Загруженный контент применяется кнопкой «Обновить» в безопасном главном меню и не прерывает матч.
+На VPS нет EXE/DMG/ZIP/blockmap. Новые оболочки получают подписанный игровой контент через GitHub Pages и Releases. Старые оболочки продолжают использовать VPS до одноразовой замены приложения. Загруженный контент применяется кнопкой «Обновить» в безопасном главном меню и не прерывает матч.
 
 ## Перед началом
 
@@ -34,11 +34,12 @@ make prepare-deploy VERSION_BUMP=patch
 
 Команда меняет `package.json`, `package-lock.json` и ignored `config/deployment-build.json`. Сохраните metadata в durable evidence и используйте его в checkout, из которого публикуете релиз и проверяете live identity. При новом установщике отдельно задайте `extraMetadata.version` в `electron-builder.yml`; для нового установщика с текущей игрой выбирайте ту же SemVer-версию. При content-only релизе версия оболочки остаётся прежней.
 
-Выберите проверки по `.agents/references/qa-scope.md`. Для release gate:
+Выберите проверки по `.agents/references/qa-scope.md`. Полный набор требует отдельной явной команды человека. Для выбранного desktop-контракта:
 
 ```sh
-npm run test:full -- --reason "release: describe changed behavior and consumers"
 npm run test:desktop
+# Добавить только затронутые unit/browser/native проверки по сохранённому diff.
+# npm run test:full — исключительно при отдельной авторизации полного прогона.
 ```
 
 Добавьте затронутые network/native/device gates. Если timing-тестам нужна изоляция, существует `BRICKS_QA_WORKERS`; это не разрешение менять пороги, сценарии или считать неуспешный прогон успешным. Непройденный gate фиксируется и блокирует публикацию согласно правилам проекта.
@@ -66,7 +67,7 @@ node scripts/desktop/export-public.mjs /private/tmp/bricks-war-public-next-relea
 node scripts/desktop/prepare.mjs
 ```
 
-Перед этой командой `dist/` должен быть свежим build текущей версии; успешный `test:full` уже выполняет сборку. После изменения кода или metadata снова выполните `npm run build` и нужные проверки.
+Перед этой командой `dist/` должен быть свежим build текущей версии; если был отдельно разрешён `test:full`, он уже выполняет сборку. После изменения кода или metadata снова выполните `npm run build` и нужные проверки.
 
 **Новый установщик или оболочка:** очистите только принадлежащий задаче устаревший `build/installers`, затем:
 
@@ -100,27 +101,30 @@ COPYFILE_DISABLE=1 tar -C dist -czf - . | ssh -o BatchMode=yes gfe 'set -eu; ins
 После web upload выберите **одну** команду:
 
 ```sh
-# Обычное обновление игры: сохраняет существующие GitHub ссылки и metadata.
+# Обновление для новых оболочек: не требует SSH/VPS.
 npm run desktop:publish:content
+
+# Только при отдельной необходимости поддержать старые установленные оболочки:
+# npm run desktop:publish:content:legacy
 
 # Новый проверенный installer release: использует build/github-catalog.json.
 # npm run desktop:publish
 ```
 
-`DEPLOY_HOST` переопределяет SSH-хост desktop publisher; его серверные пути фиксированы в `scripts/desktop/publish.mjs`. Publisher создаёт отдельный `/opt/bricks-war-desktop/release-*`, проверяет подписанный manifest, переключает symlink `/opt/bricks-war/desktop` и выполняет публичный readback. Старый desktop-каталог удаляется только после успешной проверки; при сбое readback desktop symlink откатывается. Web upload и desktop switch не являются общей атомарной транзакцией: при частичном сбое отдельно проверьте сайт и desktop-канал и восстановите нужный результат из зафиксированных артефактов.
+`DEPLOY_HOST` переопределяет SSH-хост desktop publisher; его серверные пути фиксированы в `scripts/desktop/publish.mjs`. Legacy VPS publisher (`desktop:publish` / `desktop:publish:content:legacy`) создаёт отдельный `/opt/bricks-war-desktop/release-*`, проверяет подписанный manifest, переключает symlink `/opt/bricks-war/desktop` и выполняет публичный readback. Старый desktop-каталог удаляется только после успешной проверки; при сбое readback desktop symlink откатывается. Web upload и desktop switch не являются общей атомарной транзакцией: при частичном сбое отдельно проверьте сайт и desktop-канал и восстановите нужный результат из зафиксированных артефактов.
 
-`make deploy` остаётся короткой командой обычного content-only релиза: сам делает prepare/bump, build, подпись и upload. **Не запускайте его после отдельного `prepare-deploy`, build установщиков или подготовки проверенного релиза той же версии.** Он не выполняет QA, экспорт исходников или создание GitHub installer release. Для последовательности с проверками после bump используйте шаги выше.
+`make deploy` теперь публикует **текущую закоммиченную версию**, без автоматического bump: build, подпись, проверенная публикация контента на GitHub, затем web upload на VPS. Перед ним выполните `prepare-deploy`, выбранные проверки, commit и экспорт/push соответствующего публичного снимка. GitHub publisher откажет при грязных исходниках или несовпадающем `SOURCE_REVISION` **до web upload**. Для уже проверенного dist используйте отдельные шаги, чтобы не пересобирать его. Команда не создаёт установщики и не запускает QA.
 
 ## 5. Readback, evidence и завершение
 
 Проверьте и запишите:
 
 - `node tools/check-release.mjs`: точные версия/дата и главное меню live-сайта. Один HTTP 200 недостаточен.
-- `/desktop/game/latest.json`: валидная подпись, ожидаемые gameVersion, source commit и sequence; офлайн-запуск bundled игры и применимость обновления в меню.
+- Новый канал `https://afonasev.github.io/bricks-war/desktop/game/latest.json`: валидная подпись, ожидаемые gameVersion, source commit и sequence; офлайн-запуск bundled игры и применимость обновления в меню.
 - `/desktop/latest.json`: EXE и DMG указывают на правильный GitHub tag; публичные assets доступны и соответствуют проверенным хешам.
 - Скачивание с опубликованного сайта для Windows/macOS; на телефоне и в native-клиенте кнопки установки нет. Готовое web-обновление имеет приоритет.
 - `/desktop/installers/latest.yml` и `latest-mac.yml`: старый generic updater получает абсолютные GitHub URL текущего shell release.
-- На VPS отсутствуют EXE/DMG/ZIP/blockmap, подписанный game content и metadata сохранены. В GitHub остаются опубликованные релизы; не удаляйте их при обычной очистке VPS.
+- На VPS отсутствуют EXE/DMG/ZIP/blockmap; legacy game content и metadata сохраняются только для старых оболочек. В GitHub остаются опубликованные релизы; не удаляйте их при обычной очистке VPS.
 
 Evidence связывает локальный source commit, публичный source commit/tag, версии игры и оболочки, checksums, metadata, QA и реальные URL. Не выводите signing key или credentials в логи.
 
@@ -131,3 +135,22 @@ Windows-установщик использует проектную иконк�
 Перед удалением claimed worktree сохраните и интегрируйте его запись, выполните `flow.py release` из ещё существующего worktree, затем закоммитьте и интегрируйте owner-free record. Удалите только собственные временные сборки, checkout и ветку после проверки сохранности исходников/артефактов. Cleanup и `finalize` выполняйте из стабильного checkout. При ожидающей приёмке результат остаётся `awaiting-acceptance`; архивирование требует явной приёмки.
 
 Изменение только инструкций не требует bump, пересборки приложения или новой выкладки. Достаточно проверить diff, ссылки и соответствие реальным scripts, сохранить Git-коммит и убрать временные ресурсы задачи.
+
+## GitHub-only канал игры: первоначальная настройка и миграция
+
+Новая оболочка проверяет фиксированный `https://afonasev.github.io/bricks-war/desktop/game/latest.json`, скачивает файлы с `https://github.com/afonasev/bricks-war/releases/download/content-<sequence>/<sha256>` и не использует VPS для обновлений. Сетевые матчи продолжают обращаться к прежнему сервису. Подпись Ed25519, high-water sequence, hash каждого файла, atomic staging, rollback и явное применение в меню сохраняются.
+
+Первую настройку GitHub Pages, push и выпуск новой оболочки выполняйте только по отдельной команде человека. Создайте публичную ветку `gh-pages` с `.nojekyll` и включите Pages: Deploy from a branch, `gh-pages`, `/`, **без custom domain**. Runtime URL остаётся на `github.io`, поэтому DNS сайта игры/VPS не участвует. Publisher проверяет настройки read-only и не включает Pages сам. Не копируйте signing key в GitHub или ветку Pages.
+
+Порядок обычного контентного выпуска: проверить/закоммитить исходники и version metadata, экспортировать публичный снимок с совпадающим SOURCE_REVISION, собрать dist, `node scripts/desktop/prepare.mjs`, затем:
+
+```sh
+npm run desktop:publish:content:plan # только локальный план, без сетевых записей
+npm run desktop:publish:content      # отдельная явная команда на публикацию
+```
+
+Publisher создаёт или продолжает draft `content-<sequence>`, загружает deduplicated SHA256 assets и `manifest.json`, проверяет GitHub digests и публичные байты, публикует **prerelease, latest=false**, затем обновляет только Pages pointer. Stable latest остаётся установщиком. Указатель нельзя откатить на меньший sequence или повторно использовать sequence с другими байтами; push без force защищает от конкурирующего publisher. Предыдущие content releases не удаляются: они нужны запущенным загрузкам. При сбое повторяйте **тот же подготовленный контент**, без `--clobber` и новой подписи/sequence. Если Pages readback ещё не подтвердился, выпуск не считать завершённым; сохранить артефакты и повторить проверку.
+
+Нельзя переводить старую оболочку HTTP redirect с VPS: она запрещает redirects и адрес зашит в main process. Подготовьте один новый macOS/Windows установщик с этим кодом; версию `extraMetadata.version` повысить в отдельном release scope. Во время тестового периода unsigned macOS заменяется вручную; не заявляйте проверенный автоматический shell update. Сохранить профиль userData, настройки и старую рабочую копию. После разовой замены следующие игровые updates идут с GitHub без пересборки установщиков.
+
+В меню появились состояния Проверка / Загрузка и ошибка с Повторить. Ошибка повторной проверки не уничтожает готовый проверенный пакет. Native smoke нового установщика должен проверить отсутствие запросов обновления к VPS, GitHub/CDN redirects, safe-menu apply, сохранность настроек, restart и offline play. Browser/native mock smoke не заменяет реальные Windows/macOS gates.

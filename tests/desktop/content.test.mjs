@@ -59,3 +59,34 @@ test('window settings accept listed resolutions and fit smaller monitors', () =>
   assert.deepEqual(windowPreferences({width:NaN,height:-1,fullscreen:'true'}), {width:1280,height:720,fullscreen:false});
   assert.deepEqual(fitWindow(windowPreferences({width:1920,height:1080,fullscreen:false}), {width:1280,height:800}), {width:1280,height:760});
 });
+test('one-time shell replacement uses a newer bundle while retaining a newer cached release', async t => {
+  const f = await fixture(t); const store = await new ContentStore(f.options).open();
+  await store.check(); await store.activate(); await store.healthy();
+  // Reinstalling the same old shell must keep newer downloaded content.
+  assert.equal((await new ContentStore(f.options).open()).manifest.sequence, 2);
+  const c = Buffer.from('game C');
+  await writeFile(join(f.options.bundled, 'index.html'), c);
+  await writeFile(join(f.options.bundled, 'manifest.json'), JSON.stringify(envelope(3, c)));
+  const replaced = await new ContentStore(f.options).open();
+  assert.equal(replaced.manifest.sequence, 3);
+  assert.equal(await readFile(join(replaced.active, 'index.html'), 'utf8'), 'game C');
+  assert.equal(await replaced.check(), false);
+});
+test('new shell bundle supersedes obsolete pending content, but preserves newer pending content', async t => {
+  const f = await fixture(t); const store = await new ContentStore(f.options).open(); await store.check();
+  const c = Buffer.from('game C');
+  await writeFile(join(f.options.bundled, 'index.html'), c);
+  await writeFile(join(f.options.bundled, 'manifest.json'), JSON.stringify(envelope(3, c)));
+  const replaced = await new ContentStore(f.options).open();
+  assert.equal(replaced.ready, null); assert.equal(replaced.state.pending, null);
+  f.set(envelope(4, f.b), f.b); await replaced.check();
+  assert.equal((await new ContentStore(f.options).open()).ready.sequence, 4);
+});
+test('stage progress and download identity come only from verified inventory', async t => {
+  const f = await fixture(t), progress = [], files = [], original = f.options.download;
+  f.options.onProgress = phase => progress.push(phase);
+  f.options.download = (path, size, file) => { if (file) files.push(file); return original(path, size); };
+  const store = await new ContentStore(f.options).open(); await store.check();
+  assert.deepEqual(progress, ['checking', 'downloading']);
+  assert.deepEqual(files, [{ sequence: 2, sha256: digest(f.b) }]);
+});

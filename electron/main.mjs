@@ -4,6 +4,7 @@ import { join, dirname, extname, relative, isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import updater from 'electron-updater';
 import { ContentStore } from './content.mjs';
+import { githubContentDownload } from './update-source.mjs';
 import { windowPreferences, fitWindow, RESOLUTIONS } from './window.mjs';
 
 const ORIGIN = 'https://bricks.afonasev.tech';
@@ -18,9 +19,11 @@ const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.
   '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg', '.wav': 'audio/wav', '.woff2': 'font/woff2' };
 if (!app.requestSingleInstanceLock()) app.quit();
 let win, store, safeMenu = false, shellReady = false, updateError = false, applying = false;
+let contentPhase = 'idle';
 let preferences = windowPreferences();
 const autoUpdater = updater.autoUpdater;
-const state = () => ({ available: Boolean(store?.ready || shellReady), applying, error: updateError });
+const state = () => ({ available: Boolean(store?.ready || shellReady), applying, error: updateError,
+  phase: contentPhase !== 'idle' ? contentPhase : store?.ready || shellReady ? 'ready' : updateError ? 'error' : 'idle' });
 const allowedSender = event => win && event.sender === win.webContents && event.senderFrame === win.webContents.mainFrame
   && event.senderFrame.url === `${ORIGIN}/`;
 const handle = (channel, fn) => ipcMain.handle(`desktop:${channel}`, (event, ...args) => {
@@ -38,25 +41,21 @@ app.whenReady().then(async () => {
   ses.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
   ses.setPermissionCheckHandler(() => false);
   if (process.env.BRICKS_DESKTOP_QA_OFFLINE === '1') await ses.setProxy({ proxyRules: '127.0.0.1:9' });
-  async function download(path, limit) {
+  // Electron session.fetch cancels manual redirects. Node fetch exposes each response
+  // and stays outside the local HTTPS protocol handler and renderer permissions.
+  const githubDownload = githubContentDownload(globalThis.fetch);
+  async function download(path, limit, file) {
     if (!app.isPackaged && process.env.BRICKS_DESKTOP_QA_PROFILE && process.env.BRICKS_DESKTOP_QA_FEED) {
       const bytes = await readFile(join(process.env.BRICKS_DESKTOP_QA_FEED, path));
       if (bytes.length > limit) throw Error('Oversized fixture');
       return bytes;
     }
-    const url = new URL(`/desktop/game/${path}`, ORIGIN);
-    if (url.origin !== ORIGIN) throw Error('Invalid update origin');
-    const response = await ses.fetch(url.href, { bypassCustomProtocolHandlers: true, redirect: 'error', cache: 'no-store', signal: AbortSignal.timeout(30_000) });
-    if (!response.ok || Number(response.headers.get('content-length') ?? 0) > limit) throw Error('Update unavailable');
-    const reader = response.body.getReader(), chunks = []; let size = 0;
-    try {
-      for (;;) { const { value, done } = await reader.read(); if (done) break;
-        size += value.length; if (size > limit) throw Error('Oversized update'); chunks.push(Buffer.from(value)); }
-    } finally { await reader.cancel(); }
-    return Buffer.concat(chunks);
+    if (process.env.BRICKS_DESKTOP_QA_PROFILE && process.env.BRICKS_DESKTOP_QA_OFFLINE === '1') throw Error('Offline QA transport');
+    return githubDownload(path, limit, file);
   }
   store = await new ContentStore({ root: join(profile, 'content'), bundled: join(here, '..', 'build', 'desktop-content'),
-    publicKey: await readFile(join(here, 'content-public-key.pem'), 'utf8'), shellVersion: SHELL_ABI, download }).open();
+    publicKey: await readFile(join(here, 'content-public-key.pem'), 'utf8'), shellVersion: SHELL_ABI, download,
+    onProgress: phase => { contentPhase = phase; } }).open();
   let serving = store.active;
   let inventory = new Set(store.manifest.files.map(f => f.path));
   ses.protocol.handle('https', async request => {
@@ -93,7 +92,12 @@ app.whenReady().then(async () => {
   win.on('close', () => { safeMenu = false; });
   win.once('ready-to-show', () => win.show());
   handle('update-state', state);
-  handle('check', async () => { try { await store.check(); updateError = false; } catch { /* Offline checks must not remove a ready update. */ } return state(); });
+  handle('check', async () => {
+    try { await store.check(); updateError = false; }
+    catch { updateError = true; console.warn('Game update check failed; current and ready releases retained.'); }
+    finally { contentPhase = 'idle'; }
+    return state();
+  });
   ipcMain.on('desktop:safe-menu', (event, safe) => { if (allowedSender(event)) safeMenu = safe === true; });
   handle('apply', async () => {
     if (!safeMenu || applying || !state().available) return false;

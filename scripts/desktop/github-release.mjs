@@ -19,7 +19,8 @@ for (const name of names) {
 }
 if (!catalog.mac || !catalog.win || !names.includes('latest.yml') || !names.includes('latest-mac.yml')) throw Error('Both platforms and updater metadata required');
 await writeFile('build/installers/SHA256SUMS', [...hashes].map(([name, hash]) => `${hash}  ${name}`).join('\n') + '\n');
-const releases = () => JSON.parse(gh(['api', `repos/${repo}/releases`]));
+// Content prereleases may fill the first page; native draft recovery must see all releases.
+const releases = () => JSON.parse(gh(['api', '--paginate', '--slurp', `repos/${repo}/releases?per_page=100`])).flat();
 let release = releases().find(release => release.tag_name === tag);
 if (!release) {
   gh(['release', 'create', tag, '-R', repo, '--target', 'main', '--draft', '--title', `Bricks War ${version}`, '--notes', 'Windows: system Program Files installation, game icon, desktop shortcut and launch options together on the finish page. macOS: universal build. Unsigned builds; native platform acceptance remains pending.']);

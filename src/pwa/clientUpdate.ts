@@ -1,18 +1,19 @@
 import { isNetworkParticipationActive } from './participation';
-import { desktop } from '../platform/desktop';
+import { desktop, type DesktopUpdate } from '../platform/desktop';
 
 export interface ClientUpdateState {
   available: boolean;
   applying: boolean;
   blocked: boolean;
   error: boolean;
+  phase?: DesktopUpdate['phase'];
 }
 
 /** Update consent belongs to this document, never to other tabs. */
 export class ClientUpdate {
   private registration?: ServiceWorkerRegistration;
   private obsolete = false;
-  private nativeState = { available: false, applying: false, error: false };
+  private nativeState: DesktopUpdate = { available: false, applying: false, error: false };
   private requested = false;
   private reloaded = false;
   private error = false;
@@ -124,7 +125,14 @@ export class ClientUpdate {
   }
 
   check(force = false): Promise<void> {
-    if (desktop) return desktop.check().then(state => { this.nativeState = state; this.refresh(); }).catch(() => undefined);
+    if (desktop) {
+      if (this.checking) return this.checking;
+      this.nativeState = { ...this.nativeState, phase: 'checking' }; this.refresh();
+      this.checking = desktop.check().then(state => { this.nativeState = state; })
+        .catch(() => { this.nativeState = { ...this.nativeState, error: true, phase: 'error' }; })
+        .finally(() => { this.checking = undefined; this.refresh(); });
+      return this.checking;
+    }
     if (!this.registration?.update) return Promise.resolve();
     if (this.checking) return this.checking;
     if (!force && Date.now() - this.lastCheck < 15_000) return Promise.resolve();

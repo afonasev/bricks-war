@@ -1,5 +1,8 @@
 export interface DisplayPreferences { width: number; height: number; fullscreen: boolean; resolutions?: number[][]; }
-interface DesktopUpdate { available: boolean; applying: boolean; error: boolean; }
+export interface DesktopUpdate {
+  available: boolean; applying: boolean; error: boolean;
+  phase?: 'idle' | 'checking' | 'downloading' | 'ready' | 'error';
+}
 export interface DesktopBridge {
   updateState(): Promise<DesktopUpdate>;
   check(): Promise<DesktopUpdate>;
