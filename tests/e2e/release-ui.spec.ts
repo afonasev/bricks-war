@@ -275,15 +275,13 @@ test('persists independent release settings and opens the controls reference', a
   await expect(page.locator('.audio-prototype-wrap')).toHaveCount(0);
   await page.getByLabel('Громкость музыки').fill('61');
   await page.getByLabel('Громкость эффектов').fill('34');
-  await page.getByRole('combobox', { name: 'Набор звуковых эффектов' }).click();
-  await expect(page.getByRole('option')).toContainText(['Soft Toy', 'Neon Workshop', 'Original']);
-  await page.getByRole('option', { name: 'Original' }).click();
+  await expect(page.locator('#sfx-preset')).toHaveCount(0);
   await page.getByLabel('Спокойные эффекты').check();
   await page.reload();
   await page.getByRole('button', { name: /Настройки/ }).click();
   await expect(page.getByLabel('Громкость музыки')).toHaveValue('61');
   await expect(page.getByLabel('Громкость эффектов')).toHaveValue('34');
-  await expect(page.locator('#sfx-preset')).toHaveValue('original');
+  await expect(page.locator('#sfx-preset')).toHaveCount(0);
   await expect(page.getByLabel('Спокойные эффекты')).toBeChecked();
   await page.getByRole('button', { name: /Управление/ }).click();
   await expect(page.locator('.keyboard-cluster.arrows kbd')).toHaveText(['↑', '←', '↓', '→']);

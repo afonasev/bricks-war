@@ -34,21 +34,23 @@ describe('release settings', () => {
   it('clamps, saves, and restores independent values', () => {
     const storage = memoryStorage();
     expect(saveReleaseSettings({ music: 1.4, effects: -1, muted: false, calmEffects: true, musicDirection: 'brickbeat', sfxDirection: 'arcade', sfxPreset: 'original' }, storage)).toBe(true);
-    expect(loadReleaseSettings(storage)).toEqual({ music: 1, effects: 0, muted: false, calmEffects: true, musicDirection: 'brickbeat', sfxDirection: 'arcade', sfxPreset: 'original' });
+    expect(loadReleaseSettings(storage)).toEqual({ music: 1, effects: 0, muted: false, calmEffects: true, musicDirection: 'brickbeat', sfxDirection: 'arcade', sfxPreset: 'soft-toy' });
   });
 
-  it('saves and restores Quiet Mechanism with independent levels and legacy SFX direction', () => {
+  it('migrates Quiet Mechanism while preserving independent levels and legacy SFX direction', () => {
     const storage = memoryStorage();
     const settings: ReleaseSettings = { ...DEFAULT_RELEASE_SETTINGS, music: 0.73, effects: 0.28, muted: true, sfxDirection: 'construction', sfxPreset: 'quiet-mechanism' };
     expect(saveReleaseSettings(settings, storage)).toBe(true);
-    expect(loadReleaseSettings(storage)).toEqual(settings);
+    expect(loadReleaseSettings(storage)).toEqual({ ...settings, sfxPreset: 'soft-toy' });
   });
 
   it('migrates realistic and defaults invalid or missing SFX packs to Soft Toy', () => {
     expect(normalizeReleaseSettings({ sfxPreset: 'realistic' }).sfxPreset).toBe('soft-toy');
     expect(normalizeReleaseSettings({ sfxPreset: 'unknown' }).sfxPreset).toBe('soft-toy');
     expect(normalizeReleaseSettings({}).sfxPreset).toBe('soft-toy');
-    expect(normalizeReleaseSettings({ sfxPreset: 'neon-workshop' }).sfxPreset).toBe('neon-workshop');
+    for (const sfxPreset of ['neon-workshop', 'original', 'quiet-mechanism', 'soft-toy']) {
+      expect(normalizeReleaseSettings({ sfxPreset }).sfxPreset).toBe('soft-toy');
+    }
   });
 });
 

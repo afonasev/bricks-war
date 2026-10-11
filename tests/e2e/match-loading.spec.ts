@@ -29,7 +29,7 @@ async function observe(page: Page): Promise<void> {
 }
 
 for (const viewport of [{ width: 1440, height: 960 }, { width: 1280, height: 480 }, { width: 390, height: 844 }, { width: 844, height: 390 }]) {
-  test(`loading paints, stays one second and reveals a fresh countdown ${viewport.width}x${viewport.height}`, async ({ page }) => {
+  test(`loading paints, stays two seconds and reveals a fresh countdown ${viewport.width}x${viewport.height}`, async ({ page }) => {
     await page.setViewportSize(viewport);
     for (const mode of (viewport.width <= 760 || (viewport.width <= 900 && viewport.height <= 600)) ? ['Выживание', 'Битва'] : ['Выживание', 'Битва', 'Командный бой']) {
       await setup(page, mode); await observe(page);
@@ -48,11 +48,11 @@ for (const viewport of [{ width: 1440, height: 960 }, { width: 1280, height: 480
           overlaps: rects.some((r, i) => rects.slice(i + 1).some(q => Math.min(r.right, q.right) - Math.max(r.left, q.left) > 1 && Math.min(r.bottom, q.bottom) - Math.max(r.top, q.top) > 1)) };
       });
       expect(layout).toEqual({ readable: true, inside: true, overlaps: false });
-      if (mode === 'Выживание') await page.screenshot({ path: `evidence/add-match-loading-screen/screenshots/loading-${viewport.width}x${viewport.height}.png` });
+      if (mode === 'Выживание') await page.screenshot({ path: `evidence/add-workshop-startup-loading/match/loading-${viewport.width}x${viewport.height}.png` });
       await expect(loading).toHaveCount(0);
       await expect(page.locator('#countdown')).toBeVisible(); await expect(page.locator('#countdown')).toHaveText('3');
       const samples = await page.evaluate(() => (window as any).__loadingSamples);
-      expect(samples.count).toBe(1); expect(samples.removed - samples.appeared).toBeGreaterThanOrEqual(1_000);
+      expect(samples.count).toBe(1); expect(samples.removed - samples.appeared).toBeGreaterThanOrEqual(2_000);
       expect(samples.canvasAtRelease).toBe(true); expect(samples.readyCountdown).toBe('3');
     }
   });
@@ -64,7 +64,7 @@ test('repeated Start initializes once and Escape cancels pending preparation', a
   await expect(page.locator('.match-loading')).toHaveCount(1);
   await page.keyboard.press('Escape');
   await expect(page.locator('.match-loading')).toHaveCount(0); await expect(page.locator('#start-match')).toBeVisible();
-  await page.waitForTimeout(1_200); await expect(page.locator('canvas')).toHaveCount(0);
+  await page.waitForTimeout(2_400); await expect(page.locator('canvas')).toHaveCount(0);
   expect(await page.evaluate(() => (window as any).__loadingSamples.count)).toBe(1);
 });
 
@@ -72,12 +72,13 @@ test('reduced motion is static, startup errors clear loading, and a rematch load
   await page.emulateMedia({ reducedMotion: 'reduce' }); await setup(page);
   await page.locator('#start-match').click(); await expect(page.locator('.match-loading')).toBeVisible();
   expect(await page.locator('.loading-piece').first().evaluate(el => getComputedStyle(el).animationName)).toBe('none');
-  await page.screenshot({ path: 'evidence/add-match-loading-screen/screenshots/loading-reduced-motion.png' });
+  await page.screenshot({ path: 'evidence/add-workshop-startup-loading/match/loading-reduced-motion.png' });
   await page.evaluate(() => window.dispatchEvent(new ErrorEvent('error', { message: 'Loading QA failure', error: new Error('Loading QA failure') })));
   await expect(page.locator('.match-loading')).toHaveCount(0); await expect(page.locator('#startup-error')).toContainText('Loading QA failure');
   await setup(page); await page.locator('#start-match').click(); await expect(page.locator('.match-loading')).toHaveCount(0);
   await expect(page.locator('#countdown')).toBeHidden({ timeout: 6_000 });
-  await page.getByRole('button', { name: 'Поставить матч на паузу' }).click();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#pause-overlay')).toBeVisible();
   await page.locator('#restart-match').click(); await expect(page.locator('.match-loading')).toBeVisible();
   await expect(page.locator('.match-loading')).toHaveCount(0); await expect(page.locator('#countdown')).toHaveText('3');
   await expect(page.locator('canvas')).toHaveCount(1);

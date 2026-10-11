@@ -1,6 +1,6 @@
 import './matchLoading.css';
 
-export const MATCH_LOADING_MINIMUM_MS = 1_000;
+export const MATCH_LOADING_MINIMUM_MS = 2_000;
 
 /** Loading owns only presentation time; it never changes server time. */
 export class MatchLoading {

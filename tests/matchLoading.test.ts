@@ -26,15 +26,15 @@ beforeEach(() => {
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe('match loading presentation lifecycle', () => {
-  it('keeps a fast ready arena behind loading for a full second after paint', async () => {
+  it('keeps a fast ready arena behind loading for two full seconds after paint', async () => {
     const loading = new MatchLoading(); await painted(loading);
     let done = false; const completion = loading.ready().then(value => { done = value; });
-    await vi.advanceTimersByTimeAsync(999); await frame(); expect(done).toBe(false); expect(removed).toBe(false);
+    await vi.advanceTimersByTimeAsync(1_999); await frame(); expect(done).toBe(false); expect(removed).toBe(false);
     await vi.advanceTimersByTimeAsync(1); expect(done).toBe(false);
     await vi.advanceTimersByTimeAsync(180); await frame(); await completion;
     expect(done).toBe(true); expect(removed).toBe(true); expect(listeners.size).toBe(0);
   });
-  it('does not add another second after a slow arena becomes ready', async () => {
+  it('does not add another two seconds after a slow arena becomes ready', async () => {
     const loading = new MatchLoading(); await painted(loading);
     await vi.advanceTimersByTimeAsync(2_400);
     const completion = loading.ready(); await vi.advanceTimersByTimeAsync(180); await frame(); expect(await completion).toBe(true);
@@ -52,7 +52,7 @@ describe('match loading presentation lifecycle', () => {
   it('lets network recovery supersede the surface without changing readiness', async () => {
     const loading = new MatchLoading(); await painted(loading); loading.suppress();
     expect(loading.visible).toBe(false); expect(element.hidden).toBe(true);
-    const completion = loading.ready(); await vi.advanceTimersByTimeAsync(1_000); await frame();
+    const completion = loading.ready(); await vi.advanceTimersByTimeAsync(2_000); await frame();
     expect(await completion).toBe(true);
   });
   it('ignores layout notices but clears loading and its owner on fatal startup failure', async () => {
@@ -66,14 +66,14 @@ describe('match loading presentation lifecycle', () => {
 
 it('cancels during the closing dissolve without letting stale completion release the arena', async () => {
   const loading = new MatchLoading(); await painted(loading);
-  const completion = loading.ready(); await vi.advanceTimersByTimeAsync(1_000);
+  const completion = loading.ready(); await vi.advanceTimersByTimeAsync(2_000);
   loading.cancel(); expect(await completion).toBe(false);
   await vi.advanceTimersByTimeAsync(180); expect(frames.size).toBe(0); expect(listeners.size).toBe(0);
 });
 
-it('skips the closing dissolve for reduced motion while keeping the one-second minimum', async () => {
+it('skips the closing dissolve for reduced motion while keeping the two-second minimum', async () => {
   (window.matchMedia as unknown) = () => ({ matches: true });
   const loading = new MatchLoading(); await painted(loading);
-  const completion = loading.ready(); await vi.advanceTimersByTimeAsync(1_000); await frame();
+  const completion = loading.ready(); await vi.advanceTimersByTimeAsync(2_000); await frame();
   expect(await completion).toBe(true); expect(vi.getTimerCount()).toBe(0);
 });

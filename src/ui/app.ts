@@ -10,10 +10,12 @@ import { nextPiecePreviewMarkup } from './nextPiecePreview';
 import { NetworkApp } from '../network/app';
 import { LocalMatchSession } from '../sessions/matchSession';
 import * as Phaser from 'phaser/dist/phaser.esm.js';
+import conceptLogoUrl from '../assets/brand/concept-logo.webp';
+import './brandLogo.css';
 import controlsGamepadPanelUrl from '../assets/controls-gamepad-panel.webp';
 import { GameAudio } from '../audio/GameAudio';
 import { MUSIC_DIRECTIONS, type AudioPreviewCategory, type MusicDirectionId } from '../audio/audioDirections';
-import { isSfxPresetId, SFX_PACK_OPTIONS, type SfxPresetId } from '../audio/sfxPresets';
+import { isSfxPresetId, SFX_PACK_OPTIONS } from '../audio/sfxPresets';
 import { AiController } from '../controllers/ai';
 import { HumanInputRouter } from '../controllers/input';
 import { connectedGamepads, type ConnectedGamepad, type GamepadControls } from '../controllers/gamepads';
@@ -229,14 +231,14 @@ interface ReleaseFooterOptions {
   back?: string;
   start?: string;
   roster?: string;
-  keyboard: string;
+  keyboard?: string;
   buildInfo?: boolean;
 }
 
 function releaseFooterMarkup({ confirm, back, start, roster, keyboard, buildInfo = false }: ReleaseFooterOptions): string {
   const showGamepadActions = !isMobilePlayViewport();
-  const mobileCredits = buildInfo && !showGamepadActions
-    ? '<span class="release-footer-credits">Автор Афонасьев Евгений · при поддержке Codex · 2026</span>'
+  const credits = buildInfo
+    ? '<span class="release-footer-credits">© 2026 Evgeniy Afonasev · afonasev.tech · Made with Codex</span>'
     : '';
   const confirmHint = confirm && showGamepadActions ? `<span class="release-footer-action"><b class="input-badge input-confirm">A</b>${confirm}</span>` : '';
   const backHint = back && showGamepadActions ? `<span class="release-footer-action"><b class="input-badge input-back">B</b>${back}</span>` : '';
@@ -244,9 +246,9 @@ function releaseFooterMarkup({ confirm, back, start, roster, keyboard, buildInfo
   return `<footer class="release-footer main-menu-footer release-guidance-footer">
     <div class="release-footer-inner${start ? ' release-footer-start-layout' : ''}">
       ${start ? `${showGamepadActions ? `<div class="release-footer-side release-footer-before-start">${confirmHint}${backHint}</div>` : ''}<button class="primary-button footer-start" id="start-match" type="button">${showGamepadActions ? '<kbd aria-hidden="true">X</kbd>' : ''}<span>${start}</span></button>${showGamepadActions ? `<div class="release-footer-side release-footer-after-start">${rosterHint}</div>` : ''}` : `${showGamepadActions ? `<div class="release-footer-actions">${confirmHint}${backHint}${rosterHint}</div>` : ''}`}
-      <small>${keyboard}</small>
+      ${keyboard ? `<small>${keyboard}</small>` : ''}
       ${buildInfo ? `<span class="release-build-info">${formatBuildInfo()}</span>` : ''}
-      ${mobileCredits}
+      ${credits}
     </div>
   </footer>`;
 }
@@ -280,7 +282,6 @@ export class BricksWarApp {
   private readonly pendingPlayerNameFits = new Set<HTMLInputElement | HTMLTextAreaElement>();
   private playerNameObservedWidths = new WeakMap<HTMLInputElement | HTMLTextAreaElement, number>();
   private readonly releaseSettings = loadReleaseSettings();
-  private sfxPreferenceRevision = 0;
   private readonly mobileSettings: MobileSettings = loadMobileSettings();
   private readonly audio = new GameAudio(startsMutedForPlaytest() || this.releaseSettings.muted, {
     music: this.releaseSettings.music,
@@ -334,8 +335,6 @@ export class BricksWarApp {
   };
 
   start(): void {
-    // Navigation may abort an audio load; its old completion must not roll back saved preferences.
-    window.addEventListener('pagehide', () => { this.sfxPreferenceRevision += 1; });
     this.updateDesktopLayout();
     window.addEventListener('resize', () => {
       this.updateDesktopLayout();
@@ -468,8 +467,7 @@ export class BricksWarApp {
         <section class="main-menu-layout">
           <div class="main-menu-primary">
             <header class="release-brand main-menu-brand">
-              <p class="menu-kicker">${mobile ? 'СОЛО-ИГРА НА ТЕЛЕФОНЕ' : 'ЛОКАЛЬНАЯ ИГРА · ДО 4 ИГРОКОВ'}</p>
-              <div class="main-menu-brand-row"><h1><span>BRICKS</span><span>WAR</span></h1><div class="client-update-slot"><p class="client-update-announcement" hidden><strong>Вышла новая версия игры,</strong> готовы обновиться?</p><button class="client-update-button" type="button" hidden>Обновить</button><p class="client-update-status" role="status" hidden></p><button type="button" class="desktop-download" data-ui-focus hidden aria-label="Скачать игру для установки" title="Скачать игру"><span aria-hidden="true">⇩</span><span>Скачать игру</span></button></div></div>
+              <div class="main-menu-brand-row"><h1 class="concept-brand-heading"><img class="concept-brand-logo" src="${conceptLogoUrl}" alt="BRICKS WAR" /></h1><div class="client-update-slot"><p class="client-update-announcement" hidden><strong>Вышла новая версия игры,</strong> готовы обновиться?</p><button class="client-update-button" type="button" hidden>Обновить</button><p class="client-update-status" role="status" hidden></p><button type="button" class="desktop-download" data-ui-focus hidden aria-label="Скачать игру для установки" title="Скачать игру"><span aria-hidden="true">⇩</span><span>Скачать игру</span></button></div></div>
             </header>
             ${shouldShowIosInstallHint() || isLocalPlaytestFlag('pwa-install-hint') ? '<aside class="pwa-install-hint" role="status"><span aria-hidden="true">⇧</span><p>Хотите играть как в приложении? Нажмите <b>Поделиться</b> в Safari, затем <b>На экран «Домой»</b>.</p><button type="button" data-dismiss-pwa-hint aria-label="Закрыть подсказку установки">×</button></aside>' : ''}
             <nav class="mode-menu" aria-label="Главное меню">
@@ -502,7 +500,7 @@ export class BricksWarApp {
             <div id="showcase-content" class="showcase-content" aria-hidden="true">${mainMenuPreviewMarkup('survival')}</div>
           </aside>
         </section>
-        ${releaseFooterMarkup({ confirm: mobile ? 'Открыть' : 'Выбрать', back: 'Назад', keyboard: mobile ? 'Коснитесь карточки, чтобы открыть режим' : '↑↓ / WASD · выбор &nbsp;·&nbsp; Enter · открыть', buildInfo: true })}
+        ${releaseFooterMarkup({ confirm: mobile ? 'Открыть' : 'Выбрать', back: 'Назад', buildInfo: true })}
       </main>
     `;
     this.root.querySelectorAll<HTMLButtonElement>('[data-destination]').forEach((button) => {
@@ -608,7 +606,6 @@ export class BricksWarApp {
     this.bindMenuAudioUnlock();
     this.bindAudioToggle();
     this.bindVolumeControl();
-    this.bindSfxPresetControl();
     this.activateMenuFocus('settings');
   }
 
@@ -1557,7 +1554,6 @@ export class BricksWarApp {
     this.root.querySelector('#return-to-menu')?.addEventListener('click', returnToMenu);
     this.bindAudioToggle();
     this.bindVolumeControl();
-    this.bindSfxPresetControl();
     if (mobileMatch) this.bindMobileMatchInput(input);
     if (isLocalPlaytestFlag('playtest-board-events')) {
       Object.assign(window, {__boardEffectsQA: {engine, prepareClearPlaytest, audio: this.audio}});
@@ -2010,19 +2006,13 @@ export class BricksWarApp {
           <input id="effects-volume" type="range" min="0" max="100" step="1" value="${effects}" aria-label="Громкость эффектов" />
           <output id="effects-volume-value" for="effects-volume">${effects}%</output>
         </label>
-        <label class="sfx-preset-control" for="sfx-preset">
-          <span><strong>Набор эффектов</strong><small>Цельный стиль для меню и матча</small></span>
-          <select id="sfx-preset" aria-label="Набор звуковых эффектов">
-            ${SFX_PACK_OPTIONS.map((pack) => `<option value="${pack.id}" ${this.releaseSettings.sfxPreset === pack.id ? 'selected' : ''}>${pack.label}</option>`).join('')}
-          </select>
-        </label>
       </div>
     `;
   }
 
   private audioPrototypeGalleryMarkup(): string {
     const batch = (category: AudioPreviewCategory, title: string, directions: readonly { id: string; label: string }[]) => `<section class="release-panel audio-prototype-gallery"><header><p class="eyebrow">АУДИО-ПРОТОТИПЫ</p><h2>${title}</h2></header><div class="audio-prototype-buttons">${directions.map((direction) => `<button type="button" data-audio-preview="${category}" data-audio-direction="${direction.id}"><strong>${direction.label}</strong><small>▶ Прослушать</small></button>`).join('')}</div></section>`;
-    const sfx = SFX_PACK_OPTIONS;
+    const sfx = SFX_PACK_OPTIONS.filter(pack => pack.id === 'soft-toy');
     return `<section class="audio-prototype-wrap" aria-label="Галерея аудиопрототипов">
       ${batch('gameplay-music', 'Темы матча · Calm / Escalation / Final Push', MUSIC_DIRECTIONS)}
       ${batch('menu-music', 'Тема меню', MUSIC_DIRECTIONS.map((direction) => ({ id: direction.id, label: direction.menuLabel })))}
@@ -2100,24 +2090,6 @@ export class BricksWarApp {
     };
     bind('music');
     bind('effects');
-  }
-
-  private bindSfxPresetControl(): void {
-    const select = this.root.querySelector<HTMLSelectElement>('#sfx-preset');
-    if (!select) return;
-    select.addEventListener('change', async () => {
-      const preset = select.value as SfxPresetId;
-      if (!isSfxPresetId(preset)) return;
-      const revision = ++this.sfxPreferenceRevision;
-      this.audio.unlock();
-      this.releaseSettings.sfxPreset = preset;
-      saveReleaseSettings(this.releaseSettings);
-      const active = await this.audio.setSfxPreset(preset);
-      if (this.sfxPreferenceRevision !== revision) return;
-      this.releaseSettings.sfxPreset = active;
-      select.value = active;
-      saveReleaseSettings(this.releaseSettings);
-    });
   }
 
   private refreshAudioButtons(): void {

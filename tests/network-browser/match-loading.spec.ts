@@ -39,18 +39,18 @@ for (const mode of ['Выживание', 'Битва', 'Командный бо
       }
       await host!.getByRole('button', { name: 'Начать', exact: true }).click();
       await expect(host!.locator('.match-loading')).toBeVisible(); await expect(guest!.locator('.match-loading')).toBeVisible();
-      await mkdir('evidence/add-match-loading-screen/network', { recursive: true });
-      if (mode === 'Выживание') await Promise.all([host!.screenshot({ path: 'evidence/add-match-loading-screen/network/loading-wide.png' }), guest!.screenshot({ path: 'evidence/add-match-loading-screen/network/loading-phone.png' })]);
+      await mkdir('evidence/add-workshop-startup-loading/network', { recursive: true });
+      if (mode === 'Выживание') await Promise.all([host!.screenshot({ path: 'evidence/add-workshop-startup-loading/network/loading-wide.png' }), guest!.screenshot({ path: 'evidence/add-workshop-startup-loading/network/loading-phone.png' })]);
       for (const p of [host!, guest!]) {
         await expect(p.locator('.match-loading')).toHaveCount(0);
         const timing = await p.evaluate(() => (window as any).__loading);
-        expect(timing.count).toBe(1); expect(timing.removed - timing.added).toBeGreaterThanOrEqual(1_000);
-        // One second of server countdown has elapsed, rather than a new local 3 being replayed.
-        expect(Number(timing.countdown)).toBeGreaterThan(0);
+        expect(timing.count).toBe(1); expect(timing.removed - timing.added).toBeGreaterThanOrEqual(2_000);
+        // Loading does not restart the server countdown; slow clients can already be playing.
+        expect(['0', '1', '2', '']).toContain(timing.countdown);
         const credential = await p.evaluate(() => JSON.parse(localStorage.getItem('bricks-network-seat-v1')!));
         const response = await p.request.post(`${baseURL}/api/network/current`, { headers: { Origin: baseURL! }, data: { credential } });
         expect(response.ok()).toBe(true); const snapshot = await response.json();
-        await writeFile(`evidence/add-match-loading-screen/network/diagnostic-${modeId}-${p === host ? 'host' : 'guest'}.json`, JSON.stringify({ timing, state: snapshot.state, tick: snapshot.tick }, null, 2));
+        await writeFile(`evidence/add-workshop-startup-loading/network/diagnostic-${modeId}-${p === host ? 'host' : 'guest'}.json`, JSON.stringify({ timing, state: snapshot.state, tick: snapshot.tick }, null, 2));
         expect(snapshot.state.countdownMs).toBeLessThan(2_000);
         expect(Number(timing.countdown)).toBeLessThanOrEqual(2);
         results.push({ mode, timing, serverCountdownMs: snapshot.state.countdownMs });
@@ -65,7 +65,7 @@ for (const mode of ['Выживание', 'Битва', 'Командный бо
       expect(await guest!.evaluate(() => document.querySelector('canvas') === (window as any).__canvas)).toBe(true);
       await expect(guest!.locator('.match-loading')).toHaveCount(0); expect(await guest!.evaluate(() => (window as any).__loading.count)).toBe(1);
       expect(errors).toEqual([]);
-      await writeFile(`evidence/add-match-loading-screen/network/${mode === 'Выживание' ? 'survival' : mode === 'Битва' ? 'battle' : 'teams'}.json`, JSON.stringify({ results, errors }, null, 2));
+      await writeFile(`evidence/add-workshop-startup-loading/network/${mode === 'Выживание' ? 'survival' : mode === 'Битва' ? 'battle' : 'teams'}.json`, JSON.stringify({ results, errors }, null, 2));
     } finally { for (const context of contexts) await context.close(); }
   });
 }

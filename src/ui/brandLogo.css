@@ -1,0 +1,25 @@
+/* Shared artwork; rules remain local to the main-menu header. */
+#app .main-menu-screen .main-menu-brand-row .concept-brand-heading {
+  display: block; flex: 0 1 270px; width: 270px; max-width: 100%;
+  margin: 0; padding: 0; font-size: 0; line-height: 0; text-shadow: none; filter: none;
+}
+#app .main-menu-screen .concept-brand-logo { display: block; width: 100%; height: auto; filter: none; }
+#app .main-menu-screen .main-menu-brand-row { justify-content: center; gap: 12px; }
+#app[data-layout="desktop"] .main-menu-screen .main-menu-brand-row { flex-wrap: nowrap; }
+#app[data-layout="desktop"] .main-menu-screen .main-menu-brand-row .client-update-slot { flex: 0 1 210px; }
+#app[data-layout="mobile"] .main-menu-screen .main-menu-brand-row .concept-brand-heading { flex: 0 1 auto; width: min(82vw, 320px); }
+#app[data-layout="mobile"] .main-menu-screen .main-menu-brand-row:has(.client-update-slot > :not([hidden])) .concept-brand-heading { width: min(66vw, 250px); }
+@media (max-height: 600px) {
+  #app[data-layout="mobile"] .main-menu-screen .main-menu-brand-row .concept-brand-heading { width: min(38vw, 245px); flex: 0 1 245px; }
+}
+/* Keep the artwork's approved colour under the app's existing global colour filter. */
+#app .main-menu-screen .concept-brand-logo { filter: contrast(.921659) saturate(.617284); }
+#app[data-layout="desktop"] .main-menu-screen .main-menu-brand-row .concept-brand-heading { flex-basis: 320px; width: 320px; }
+#app[data-layout="desktop"] .main-menu-screen:has(.mode-exit) .mode-menu { grid-template-rows: repeat(6, minmax(58px, 1fr)); }
+#app[data-layout="desktop"] .main-menu-screen:has(.mode-exit) .mode-choice { min-height: 58px; }
+@media (max-height: 600px) {
+  #app[data-layout="mobile"] .main-menu-screen:has(.mode-exit) .main-menu-brand-row .concept-brand-heading { flex-basis: 180px; width: 180px; }
+  #app[data-layout="mobile"] .main-menu-screen:has(.mode-exit) .mode-choice { min-height: 62px; padding-block: 7px; }
+}
+/* The old 2.8rem arrow overflowed compact cards, including when invisible. */
+#app .main-menu-screen:has(.mode-exit) .mode-forward { height: auto; font-size: 28px; line-height: 1; }

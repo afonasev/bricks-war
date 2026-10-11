@@ -38,8 +38,6 @@ export function normalizeReleaseSettings(value: unknown): ReleaseSettings {
   if (!value || typeof value !== 'object') return { ...DEFAULT_RELEASE_SETTINGS };
   const stored = value as Partial<ReleaseSettings> & { volume?: unknown; masterVolume?: unknown };
   const legacy = level(stored.volume ?? stored.masterVolume, DEFAULT_RELEASE_SETTINGS.music);
-  const rawSfxPreset = (value as { sfxPreset?: unknown }).sfxPreset;
-  const migratedSfxPreset = rawSfxPreset === 'realistic' ? 'soft-toy' : rawSfxPreset;
   return {
     music: level(stored.music, legacy),
     effects: level(stored.effects, legacy),
@@ -47,7 +45,7 @@ export function normalizeReleaseSettings(value: unknown): ReleaseSettings {
     calmEffects: typeof stored.calmEffects === 'boolean' ? stored.calmEffects : false,
     musicDirection: ['neon-workshop', 'toybox-tactics', 'arcade-skyline', 'glass-gravity', 'brickbeat'].includes(stored.musicDirection ?? '') ? stored.musicDirection as MusicDirectionId : DEFAULT_RELEASE_SETTINGS.musicDirection,
     sfxDirection: ['soft-toy', 'construction', 'arcade', 'glassy-future'].includes(stored.sfxDirection ?? '') ? stored.sfxDirection as SfxDirectionId : DEFAULT_RELEASE_SETTINGS.sfxDirection,
-    sfxPreset: isSfxPresetId(migratedSfxPreset) ? migratedSfxPreset : DEFAULT_RELEASE_SETTINGS.sfxPreset,
+    sfxPreset: DEFAULT_RELEASE_SETTINGS.sfxPreset,
   };
 }
 
@@ -70,4 +68,4 @@ export function saveReleaseSettings(settings: ReleaseSettings, storage: StorageL
   }
 }
 import type { MusicDirectionId, SfxDirectionId } from '../audio/audioDirections';
-import { isSfxPresetId, type SfxPresetId } from '../audio/sfxPresets';
+import type { SfxPresetId } from '../audio/sfxPresets';
