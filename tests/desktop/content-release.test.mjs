@@ -31,7 +31,7 @@ function fixture(fail = '') {
   const events = []; let release = null;
   const remote = {
     find: async () => release,
-    create: async () => { events.push('create'); return release = { draft: true, prerelease: true, assets: [] }; },
+    create: async () => { events.push('create'); return release = { id: 77, draft: true, prerelease: true, assets: [] }; },
     upload: async (_tag, asset) => {
       events.push('upload'); if (fail === 'upload') throw Error('upload failed');
       release.assets.push({ name: asset.name, size: asset.size, digest: fail === 'digest' ? 'bad' : `sha256:${sha256}` });
@@ -70,4 +70,14 @@ test('published incomplete or conflicting assets cannot be overwritten', async (
 test('stable shell release cannot be used as a content publication', async () => {
   const f = fixture(); await f.remote.create(); f.release.prerelease = false;
   await assert.rejects(publishContentRelease(f.plan, f.remote), /prerelease/);
+});
+test('post-upload verification addresses the created release by ID instead of a stale release list', async () => {
+  const f = fixture(), ids = [];
+  f.remote.find = async (_tag, id) => {
+    ids.push(id);
+    return id === 77 ? f.release : null;
+  };
+  await publishContentRelease(f.plan, f.remote);
+  assert.deepEqual(ids, [undefined, 77]);
+  assert.equal(f.events.at(-1), 'pointer');
 });

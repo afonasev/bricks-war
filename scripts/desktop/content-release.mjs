@@ -22,7 +22,7 @@ export async function contentReleasePlan(directory, publicKey) {
 export async function publishContentRelease(plan, remote) {
   let release = await remote.find(plan.tag);
   if (!release) release = await remote.create(plan.tag);
-  if (!release.prerelease) throw Error('Content release must be a prerelease');
+  if (!release?.prerelease) throw Error('Content release must be a prerelease');
   for (const asset of plan.assets) {
     const existing = release.assets.find(entry => entry.name === asset.name);
     if (existing) {
@@ -33,7 +33,7 @@ export async function publishContentRelease(plan, remote) {
     }
   }
   // Refresh uploaded metadata: never publish using an unverified upload response.
-  release = await remote.find(plan.tag);
+  release = await remote.find(plan.tag, release.id);
   for (const asset of plan.assets) {
     const actual = release.assets.find(entry => entry.name === asset.name);
     if (!actual || actual.size !== asset.size || actual.digest !== `sha256:${asset.sha256}`) throw Error('Uploaded asset readback mismatch');

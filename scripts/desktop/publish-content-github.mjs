@@ -38,7 +38,8 @@ if (!process.argv.includes('--publish')) {
       if (old.sequence > plan.manifest.sequence || old.sequence === plan.manifest.sequence
         && JSON.stringify(previous) !== JSON.stringify(plan.envelope)) throw Error('Refusing discovery rollback or sequence reuse');
     }
-    const find = async tag => {
+    const find = async (tag, id) => {
+      if (id) return JSON.parse(gh('api', `repos/${CONTENT_REPOSITORY}/releases/${id}`));
       // Listing a known endpoint distinguishes a missing release from authentication/network failure.
       const releases = JSON.parse(gh('api', '--paginate', '--slurp', `repos/${CONTENT_REPOSITORY}/releases?per_page=100`)).flat();
       return releases.find(release => release.tag_name === tag) ?? null;
@@ -47,10 +48,13 @@ if (!process.argv.includes('--publish')) {
     await publishContentRelease(plan, {
       find,
       create: async tag => {
-        gh('release', 'create', tag, '--repo', CONTENT_REPOSITORY, '--draft', '--prerelease', '--latest=false',
-          '--title', `Game content ${plan.manifest.gameVersion} (${plan.manifest.sequence})`,
-          '--notes', `Signed game content; source ${plan.manifest.commit}. Not a native installer release.`);
-        return find(tag);
+        const request = join(scratch, 'create-release.json');
+        await writeFile(request, JSON.stringify({ tag_name: tag, target_commitish: 'main', draft: true,
+          prerelease: true, make_latest: 'false',
+          name: `Game content ${plan.manifest.gameVersion} (${plan.manifest.sequence})`,
+          body: `Signed game content; source ${plan.manifest.commit}. Not a native installer release.` }));
+        // The release list can lag creation; use the authoritative POST response.
+        return JSON.parse(gh('api', '--method', 'POST', `repos/${CONTENT_REPOSITORY}/releases`, '--input', request));
       },
       upload: async (tag, asset) => {
         const path = join(scratch, asset.name); await copyFile(asset.path, path);

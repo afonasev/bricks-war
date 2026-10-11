@@ -23,8 +23,11 @@ await writeFile('build/installers/SHA256SUMS', [...hashes].map(([name, hash]) =>
 const releases = () => JSON.parse(gh(['api', '--paginate', '--slurp', `repos/${repo}/releases?per_page=100`])).flat();
 let release = releases().find(release => release.tag_name === tag);
 if (!release) {
-  gh(['release', 'create', tag, '-R', repo, '--target', 'main', '--draft', '--title', `Bricks War ${version}`, '--notes', 'Windows: system Program Files installation, game icon, desktop shortcut and launch options together on the finish page. macOS: universal build. Unsigned builds; native platform acceptance remains pending.']);
-  release = releases().find(release => release.tag_name === tag);
+  const request = 'build/github-native-release-request.json';
+  await writeFile(request, JSON.stringify({ tag_name: tag, target_commitish: 'main', draft: true,
+    prerelease: false, make_latest: 'false', name: `Bricks War ${version}`,
+    body: 'Desktop game updates now use signed GitHub Pages discovery and immutable GitHub Releases assets. Checks and downloads show progress; failed checks offer Retry. Replace the old desktop shell once, keeping settings.\n\nmacOS: Universal test distribution, without Developer ID/notarization. Windows: x64 NSIS with existing Program Files and shortcut defaults. Physical platform acceptance remains pending.' }));
+  release = JSON.parse(gh(['api', '--method', 'POST', `repos/${repo}/releases`, '--input', request]));
 }
 // Resume a draft safely: never replace an asset already carrying a different digest.
 for (const [name, hash] of hashes) {
