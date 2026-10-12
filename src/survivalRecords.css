@@ -130,3 +130,22 @@
   #app[data-layout="mobile"] .mobile-survival-records .record-metrics { display: flex; align-items: center; gap: 6px; }
   #app[data-layout="mobile"] .mobile-survival-records .record-duration { margin: 0; }
 }
+
+#app :is(.survival-records, .survival-record-list) .record-identity { min-width: 0; display: grid; gap: 1px; }
+#app :is(.survival-records, .survival-record-list) .record-date {
+  margin: 0; color: #607895; font-size: 10px; line-height: 1; font-weight: 500;
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+#app[data-layout="desktop"] .desktop-menu-stage .mode-setup-screen[data-screen="survival"] .survival-records li small.record-date { font-size: 10px; line-height: 1; }
+#app[data-layout="mobile"] :is(.survival-records, .survival-record-list) .record-date { font-size: 9px; }
+/* Compact phones keep the date alongside the name so all ten rows stay visible. */
+@media (max-height: 700px) {
+  #app[data-layout="mobile"] :is(.survival-records, .survival-record-list) .record-identity { display: flex; align-items: center; gap: 4px; }
+  #app[data-layout="mobile"] :is(.survival-records, .survival-record-list) .record-identity strong { flex: 1; min-width: 0; }
+  #app[data-layout="mobile"] :is(.survival-records, .survival-record-list) .record-date { flex-shrink: 0; }
+}
+#app .survival-record-list .record-secondary { display: flex; align-items: center; gap: 6px; }
+#app .survival-record-list .record-secondary .record-duration { margin: 0; }
+@media (max-height: 700px) {
+  #app[data-layout="mobile"] .survival-record-list li strong { font-size: 12px; line-height: 1.1; }
+}

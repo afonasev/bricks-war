@@ -743,8 +743,8 @@ export class GameAudio {
     if (!context || !destination || !buffer) return;
     const source = context.createBufferSource(), gain = context.createGain(), panner = context.createStereoPanner();
     source.buffer = buffer;
-    // The WAVs already contain the approved audition mix. Alarm is intentionally quieter.
-    gain.gain.value = name === 'warning' ? .45 : 1;
+    // Preserve the audition mix, with the requested 20% reduction for shield charge.
+    gain.gain.value = name === 'warning' ? .45 : name === 'charge' ? .8 : 1;
     panner.pan.value = pan;
     source.connect(gain); gain.connect(panner); panner.connect(destination);
     if (name === 'warning') {
@@ -795,9 +795,9 @@ export class GameAudio {
     // One common alarm motif across presets; all tones still use the Effects bus.
     for (let index = 0; index < 3; index += 1) {
       const at = start + index * 0.28;
-      this.tone(1100, at, 0.20, 0.095, 'square', pan, 4500, undefined, 0.004, undefined, false, 0.045);
-      this.tone(1650, at, 0.20, 0.05, 'triangle', pan, 4800, undefined, 0.004, undefined, false, 0.045);
-      this.tone(2200, at, 0.075, 0.027, 'sine', pan, 5000, undefined, 0.004, undefined, false, 0.045);
+      this.tone(1100, at, 0.20, 0.095 * 0.8, 'square', pan, 4500, undefined, 0.004, undefined, false, 0.045);
+      this.tone(1650, at, 0.20, 0.05 * 0.8, 'triangle', pan, 4800, undefined, 0.004, undefined, false, 0.045);
+      this.tone(2200, at, 0.075, 0.027 * 0.8, 'sine', pan, 5000, undefined, 0.004, undefined, false, 0.045);
     }
   }
 

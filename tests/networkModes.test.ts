@@ -38,7 +38,7 @@ describe('network Battle and explicit Teams',()=>{
     attacker.board.active=activePiece('I',1,2,BOARD_HEIGHT-4);attacker.board.gravityElapsedMs=0;attacker.board.lockElapsedMs=LOCK_DELAY_MS-FIXED_STEP_MS;
     engine.step(FIXED_STEP_MS);
     for(let n=0;n<6&&engine.state.clearPresentations.length;n++)engine.step(engine.state.globalEventHold?.remainingMs??engine.state.clearPresentations[0]!.remainingMs);
-    expect(engine.state.pendingConflict?.incomingRows).toEqual({p1:4,p3:4,p5:4,p7:4});
+    expect(engine.state.pendingConflict?.incomingRows).toEqual({p1:3,p3:3,p5:3,p7:3});
     expect(MatchEngine.restore(engine.checkpoint()).state.pendingConflict).toEqual(engine.state.pendingConflict);
   });
   it('rejects unequal or missing network teams without changing local 2x2 validation',()=>{

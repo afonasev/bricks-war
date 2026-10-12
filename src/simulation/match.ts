@@ -128,10 +128,7 @@ export function scoreForLines(lines: number): number {
 }
 
 export function attackRowsForLines(lines: number): number {
-  if (lines >= 4) return 4;
-  if (lines === 3) return 3;
-  if (lines === 2) return 1;
-  return 0;
+  return Math.max(0, lines - 1);
 }
 
 export function nextShieldCharge(

@@ -230,11 +230,11 @@ describe('match engine', () => {
     expect(engine.state.shieldInventoryEvents.some(e => e.kind === 'burn')).toBe(false);
   });
 
-  it('maps qualifying clears to capped conflict rows', () => {
-    expect([0, 1, 2, 3, 4, 5].map(attackRowsForLines)).toEqual([0, 0, 1, 3, 4, 4]);
+  it('maps qualifying clears to one fewer conflict row', () => {
+    expect([0, 1, 2, 3, 4, 5].map(attackRowsForLines)).toEqual([0, 0, 1, 2, 3, 4]);
   });
 
-  it.each([[1, 0], [2, 1], [3, 3], [4, 4]] as const)(
+  it.each([[1, 0], [2, 1], [3, 2], [4, 3]] as const)(
     'turns a %i-line normal lock into %i attack rows',
     (lines, rows) => {
       const engine = createFixture();
@@ -256,7 +256,7 @@ describe('match engine', () => {
     prepareClassicClear(enabled.state.participants[0]!, 3);
     enabled.step(FIXED_STEP_MS);
     finishPlayableClear(enabled, 3);
-    expect(enabled.state.pendingConflict?.incomingRows).toEqual({ p2: 3, p3: 3 });
+    expect(enabled.state.pendingConflict?.incomingRows).toEqual({ p2: 2, p3: 2 });
 
     const disabled = new MatchEngine(configs, 91, 5, { conflictEnabled: false });
     disabled.step(COUNTDOWN_MS);
@@ -277,7 +277,7 @@ describe('match engine', () => {
     prepareClassicClear(freeForAll.state.participants[0]!, 4);
     freeForAll.step(FIXED_STEP_MS);
     finishPlayableClear(freeForAll, 4);
-    expect(freeForAll.state.pendingConflict?.senders).toEqual([{ participantId: 'p1', rows: 4, recipientIds: ['p2'] }]);
+    expect(freeForAll.state.pendingConflict?.senders).toEqual([{ participantId: 'p1', rows: 3, recipientIds: ['p2'] }]);
 
     const teams = new MatchEngine([
       { id: 'p1', label: 'P1', controller: 'human-1' },
@@ -289,7 +289,7 @@ describe('match engine', () => {
     prepareClassicClear(teams.state.participants[0]!, 3);
     teams.step(FIXED_STEP_MS);
     finishPlayableClear(teams, 3);
-    expect(teams.state.pendingConflict?.senders).toEqual([{ participantId: 'p1', rows: 3, recipientIds: ['p3', 'p4'] }]);
+    expect(teams.state.pendingConflict?.senders).toEqual([{ participantId: 'p1', rows: 2, recipientIds: ['p3', 'p4'] }]);
   });
 
   it('collects simultaneous attacks fairly and accumulates a later warning-window attack', () => {
@@ -371,9 +371,9 @@ describe('match engine', () => {
     expect(engine.state.pendingConflict?.remainingWarningMs).toBeCloseTo(1);
     engine.resume();
     engine.step(2);
-    expect(grayRows(engine.state.participants[1]!)).toBe(3);
+    expect(grayRows(engine.state.participants[1]!)).toBe(2);
     expect(engine.state.pressureRows).toBe(pressureRows);
-    expect(engine.state.conflictImpactEvent).toMatchObject({ maxRows: 3 });
+    expect(engine.state.conflictImpactEvent).toMatchObject({ maxRows: 2 });
   });
 
   it('retains an earned attack after sender death and discards it for a dead recipient', () => {
@@ -430,12 +430,12 @@ describe('match engine', () => {
     finishPlayableClear(engine, 3);
     engine.step(CONFLICT_WARNING_MS + 1);
     expect(grayRows(engine.state.participants[1]!)).toBe(0);
-    expect(grayRows(engine.state.participants[2]!)).toBe(3);
+    expect(grayRows(engine.state.participants[2]!)).toBe(2);
     expect(engine.state.participants[1]!.shieldReady).toBe(false);
     expect(engine.state.conflictImpactEvent?.shieldedRecipientIds).toEqual(['p2']);
     while (engine.state.globalEventHold || engine.state.anomalyTransition) engine.step(FIXED_STEP_MS);
     engine.step(SHIELD_PRESENTATION_MS);
-    expect(grayRows(engine.state.participants[1]!)).toBe(2);
+    expect(grayRows(engine.state.participants[1]!)).toBe(1);
   });
 
   it('defers a last-survivor result until an earned impact resolves', () => {

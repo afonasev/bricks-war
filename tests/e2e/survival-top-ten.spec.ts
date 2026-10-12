@@ -10,6 +10,7 @@ async function expectTenFit(page: Page, results = false) {
   await expect(page.locator(`${selector} > li:visible`)).toHaveCount(10);
   await expect(page.locator('.desktop-record-pages')).toHaveCount(0);
   await expect(page.locator(`${selector} .record-duration:visible`)).toHaveCount(10);
+  await expect(page.locator(`${selector} .record-date:visible`)).toHaveCount(10);
   const issues = await page.evaluate(({selector,results}) => {
     const list = document.querySelector<HTMLElement>(selector)!;
     const scope = document.querySelector<HTMLElement>(results ? '.results-panel' : '.mode-setup-screen')!;
@@ -26,9 +27,11 @@ async function expectTenFit(page: Page, results = false) {
       if(Math.min(r.right,a.right)>Math.max(r.left,a.left)+1 && Math.min(r.bottom,a.bottom)>Math.max(r.top,a.top)+1) errors.push(['action-overlap',i]);
       if(i && r.top<rows[i-1]!.getBoundingClientRect().bottom-1) errors.push(['row-overlap',i]);
       const duration = row.querySelector<HTMLElement>('.record-duration')!;
-      const score = row.querySelector<HTMLElement>('time')!;
+      const score = row.querySelector<HTMLElement>('.record-metrics time')!;
       if(parseFloat(getComputedStyle(duration).fontSize) >= parseFloat(getComputedStyle(score).fontSize)) errors.push(['time-not-secondary',i]);
-      const parts = [...row.querySelectorAll<HTMLElement>('b,.result-place,strong,time,.record-duration')];
+      const date = row.querySelector<HTMLElement>('.record-date')!;
+      if(parseFloat(getComputedStyle(date).fontSize) >= parseFloat(getComputedStyle(score).fontSize)) errors.push(['date-not-secondary',i]);
+      const parts = [...row.querySelectorAll<HTMLElement>('b,.result-place,strong,time,.record-duration,.record-date')];
       parts.forEach(part => {
         const range=document.createRange();range.selectNodeContents(part);const t=range.getBoundingClientRect();
         if(t.left<r.left-1 || t.right>r.right+1 || t.top<r.top-1 || t.bottom>r.bottom+1 || part.scrollWidth>part.clientWidth+1) errors.push(['text-clipped',i,part.textContent]);
