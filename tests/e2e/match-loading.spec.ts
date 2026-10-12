@@ -28,7 +28,7 @@ async function observe(page: Page): Promise<void> {
   });
 }
 
-for (const viewport of [{ width: 1440, height: 960 }, { width: 1280, height: 480 }, { width: 390, height: 844 }, { width: 844, height: 390 }]) {
+for (const viewport of [{ width: 1440, height: 960 }, { width: 1280, height: 480 }, { width: 390, height: 844 }, { width: 320, height: 568 }, { width: 844, height: 390 }]) {
   test(`loading paints, stays two seconds and reveals a fresh countdown ${viewport.width}x${viewport.height}`, async ({ page }) => {
     await page.setViewportSize(viewport);
     for (const mode of (viewport.width <= 760 || (viewport.width <= 900 && viewport.height <= 600)) ? ['Выживание', 'Битва'] : ['Выживание', 'Битва', 'Командный бой']) {
@@ -47,8 +47,11 @@ for (const viewport of [{ width: 1440, height: 960 }, { width: 1280, height: 480
           inside: rects.every(r => r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight),
           overlaps: rects.some((r, i) => rects.slice(i + 1).some(q => Math.min(r.right, q.right) - Math.max(r.left, q.left) > 1 && Math.min(r.bottom, q.bottom) - Math.max(r.top, q.top) > 1)) };
       });
+      if (!layout.readable) console.log(await loading.evaluate(el => [...el.querySelectorAll<HTMLElement>('.match-loading-brand,h1,p,.match-loading-pattern,.match-loading-indicator')].map(e => ({ name:e.className || e.tagName, width:e.clientWidth, scrollWidth:e.scrollWidth, height:e.clientHeight, scrollHeight:e.scrollHeight }))));
       expect(layout).toEqual({ readable: true, inside: true, overlaps: false });
-      if (mode === 'Выживание') await page.screenshot({ path: `evidence/add-workshop-startup-loading/match/loading-${viewport.width}x${viewport.height}.png` });
+      const size = await loading.locator('.match-loading-pattern').evaluate(el => ({ width: (el as HTMLElement).clientWidth, minimum: Math.min(innerWidth * .7, innerHeight <= 520 ? innerHeight * .7 : 600) }));
+      expect(size.width).toBeGreaterThanOrEqual(size.minimum);
+      if (mode === 'Выживание') await page.screenshot({ path: `${process.env.BRICKS_MATCH_LOADING_SCREENSHOTS ?? 'evidence/add-workshop-startup-loading/match'}/loading-${viewport.width}x${viewport.height}.png` });
       await expect(loading).toHaveCount(0);
       await expect(page.locator('#countdown')).toBeVisible(); await expect(page.locator('#countdown')).toHaveText('3');
       const samples = await page.evaluate(() => (window as any).__loadingSamples);
@@ -72,7 +75,7 @@ test('reduced motion is static, startup errors clear loading, and a rematch load
   await page.emulateMedia({ reducedMotion: 'reduce' }); await setup(page);
   await page.locator('#start-match').click(); await expect(page.locator('.match-loading')).toBeVisible();
   expect(await page.locator('.loading-piece').first().evaluate(el => getComputedStyle(el).animationName)).toBe('none');
-  await page.screenshot({ path: 'evidence/add-workshop-startup-loading/match/loading-reduced-motion.png' });
+  await page.screenshot({ path: `${process.env.BRICKS_MATCH_LOADING_SCREENSHOTS ?? 'evidence/add-workshop-startup-loading/match'}/loading-reduced-motion.png` });
   await page.evaluate(() => window.dispatchEvent(new ErrorEvent('error', { message: 'Loading QA failure', error: new Error('Loading QA failure') })));
   await expect(page.locator('.match-loading')).toHaveCount(0); await expect(page.locator('#startup-error')).toContainText('Loading QA failure');
   await setup(page); await page.locator('#start-match').click(); await expect(page.locator('.match-loading')).toHaveCount(0);
