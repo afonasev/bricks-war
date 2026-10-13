@@ -178,8 +178,8 @@ export default defineConfig(async ({ command }) => {
         dontCacheBustURLsMatching: /^assets\/.*-[A-Za-z0-9_-]{8,}\./,
         cleanupOutdatedCaches: true,
         clientsClaim: false,
-        // Exact approved WAVs are inlined in the single-file game (currently 5.79 MB).
-        maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
+        // Approved audio and workshop menu art are inlined (currently 8.46 MB).
+        maximumFileSizeToCacheInBytes: 12 * 1024 * 1024,
         runtimeCaching: [{
           urlPattern: /\/audio\/music\/.*\.mp3$/,
           handler: 'CacheFirst',

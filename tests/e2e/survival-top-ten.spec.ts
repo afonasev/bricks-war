@@ -67,7 +67,7 @@ for(const [width,height] of [[1920,1080],[390,844]] as const) {
     await page.addInitScript(() => localStorage.setItem('bricks-war:solo-records:v1',JSON.stringify(Array.from({length:10},(_,i)=>({id:`r${i}`,name:i%2 ? 'WWWWWWWWWWWWWWWWWW' : 'Александр Великий',elapsedMs:600000,lineScore:123456-i,finishedAt:1780000000000,placedPieces:1000})))));
     await page.goto('/?muted=1&playtest-fast=20&playtest-score=123456');
     await page.getByRole('button',{name:/^Выживание/}).click();
-    await page.getByRole('button',{name:/^Начать/}).click();
+    await page.getByRole('button',{name:/^Start/}).click();
     await expect(page.locator('.hud-card').first()).toBeVisible();
     // Natural accelerated playtest: retain real game-over and result handling.
     await page.keyboard.down('s');await page.keyboard.down('ArrowDown');

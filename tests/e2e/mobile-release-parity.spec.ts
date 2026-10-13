@@ -27,7 +27,7 @@ test('keeps the supported phone release flow touch-accessible', async ({ page })
   expect(mainMenuMetrics.overflow).toBe('hidden');
   expect(mainMenuMetrics.footerHeight).toBeLessThanOrEqual(90);
   expect(mainMenuMetrics.footerBottom).toBeLessThanOrEqual(mainMenuMetrics.clientHeight);
-  await expect(page.locator('.release-build-info')).toHaveText(/^Версия \d+\.\d+\.\d+(?:-dev)?(?: · Деплой .+)?$/);
+  await expect(page.locator('.release-build-info')).toHaveText(/^Version \d+\.\d+\.\d+(?:-dev)?(?: · .+)?$/);
 
   const menu = page.getByRole('navigation', { name: 'Главное меню' });
   await expect(menu.getByRole('button')).toHaveCount(4);
@@ -42,13 +42,13 @@ test('keeps the supported phone release flow touch-accessible', async ({ page })
   await expect(page.locator('.mobile-survival-records')).toContainText('5 400');
   await expect(page.getByLabel('Имя игрока 1')).toBeVisible();
   await expect(page.locator('[data-mobile-setting="inputMode"], [data-mobile-tilt-setup]')).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Начать' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Start' })).toBeVisible();
   await expect(page.locator('.is-ui-selected')).toHaveCount(0);
-  await page.getByRole('button', { name: 'Начать' }).hover();
+  await page.getByRole('button', { name: 'Start' }).hover();
   await expect(page.locator('.is-ui-selected')).toHaveCount(0);
   await expect(page.locator('.footer-start kbd')).toHaveCount(0);
 
-  await page.getByRole('button', { name: 'Начать' }).click();
+  await page.getByRole('button', { name: 'Start' }).click();
   const pause = page.getByRole('button', { name: 'Поставить матч на паузу' });
   await expect(pause).toBeVisible();
   const touchZones = page.locator('.mobile-touch-zones');
@@ -98,7 +98,7 @@ test('keeps phone Battle context in side zones and makes Pause exclusive', async
   await expect(attackMode).toContainText('Только лидеру');
   await page.getByRole('combobox', { name: 'Соперники' }).click();
   await page.getByRole('option', { name: /3 ИИ/ }).click();
-  await page.getByRole('button', { name: 'Начать', exact: true }).click();
+  await page.getByRole('button', { name: 'Start', exact: true }).click();
   await expect(page.locator('.hud-card')).toHaveCount(4);
   await expect(page.locator('.arena-screen')).toHaveAttribute('data-conflict', 'on');
 
@@ -148,7 +148,7 @@ test('shows all ten Survival records above Start without scrolling', async ({ pa
   await expect(page.locator('.mobile-survival-records li:visible')).toHaveCount(10);
   const [lastRecord, start] = await Promise.all([
     page.locator('.mobile-survival-records li').last().boundingBox(),
-    page.getByRole('button', { name: 'Начать', exact: true }).boundingBox(),
+    page.getByRole('button', { name: 'Start', exact: true }).boundingBox(),
   ]);
   expect(lastRecord).not.toBeNull();
   expect(start).not.toBeNull();
@@ -167,7 +167,7 @@ test('legacy tilt preference still offers screen controls only', async ({ page }
   await expect(page.getByRole('combobox', { name: 'Соперники' })).toContainText('3 ИИ');
   await expect(page.getByRole('combobox', { name: 'Сложность ИИ' })).toContainText('Сложная');
   await expect(page.locator('.mobile-solo-setup')).not.toContainText('Наклоны');
-  await page.getByRole('button', { name: 'Начать', exact: true }).click();
+  await page.getByRole('button', { name: 'Start', exact: true }).click();
   await expect(page.locator('.mobile-touch-zones')).toBeVisible();
   await expect(page.locator('[data-mobile-tilt-status]')).toHaveCount(0);
 });

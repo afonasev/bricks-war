@@ -137,7 +137,7 @@ test('phone solo ignores Y and keeps only the touch player', async ({ page }) =>
   await page.getByLabel('Имя игрока 1').fill('Александр Великий');
   await press(page, 0);
   await expect(page.getByRole('dialog')).toHaveCount(0);
-  await page.getByRole('button', { name: 'Начать', exact: true }).click();
+  await page.getByRole('button', { name: 'Start', exact: true }).click();
   await expect(page.locator('.hud-card')).toHaveCount(1);
   await expect(page.locator('.hud-identity strong')).toHaveText('Александр Великий');
 });

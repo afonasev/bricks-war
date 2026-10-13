@@ -1,3 +1,4 @@
+import { releaseMetadataMarkup } from './releaseMetadata';
 import { RULE_EXAMPLES as E, SCORE_EXAMPLES, RISING_EXAMPLE } from './visualRulesExamples';
 interface RuleCard {
   topic: string; mode: string; title: string; lead: string;
@@ -75,7 +76,7 @@ export const RULE_CARDS: readonly RuleCard[] = [
 ];
 
 export function rulesScreenMarkup(): string {
-  return `<main class="rules-screen" data-screen="rules"><header class="rules-heading"><button class="screen-back" id="rules-back" type="button">← Настройки</button><div><p class="eyebrow">BRICKS WAR · ИЛЛЮСТРИРОВАННЫЙ ГИД</p><h1>Правила игры</h1></div><output id="rules-progress" aria-label="Номер карточки"></output></header><article id="rules-card" class="rules-card" aria-live="polite" aria-atomic="true"></article><nav class="rules-topics" aria-label="Темы правил">${RULE_CARDS.map((card,index)=>`<button type="button" data-rule-topic="${index}" aria-label="${index+1}. ${card.topic}">${index+1}</button>`).join('')}</nav><footer class="rules-navigation"><button id="rules-prev" type="button" aria-label="Предыдущая подсказка">← Назад</button><span>← → переключить · Esc выйти</span><button id="rules-next" type="button" aria-label="Следующая подсказка">Далее →</button></footer></main>`;
+  return `<main class="rules-screen" data-screen="rules"><header class="rules-heading"><button class="screen-back" id="rules-back" type="button">← Настройки</button><div><p class="eyebrow">BRICKS WAR · ИЛЛЮСТРИРОВАННЫЙ ГИД</p><h1>Правила игры</h1></div><output id="rules-progress" aria-label="Номер карточки"></output></header><article id="rules-card" class="rules-card" aria-live="polite" aria-atomic="true"></article><nav class="rules-topics" aria-label="Темы правил">${RULE_CARDS.map((card,index)=>`<button type="button" data-rule-topic="${index}" aria-label="${index+1}. ${card.topic}">${index+1}</button>`).join('')}</nav><footer class="rules-footer"><nav class="rules-navigation"><button id="rules-prev" type="button" aria-label="Previous tip">← Back</button><button id="rules-next" type="button" aria-label="Next tip">Next →</button></nav>${releaseMetadataMarkup()}</footer></main>`;
 }
 
 export function bindRulesScreen(screen: HTMLElement, back: () => void): () => void {

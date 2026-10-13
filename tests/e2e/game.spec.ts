@@ -27,7 +27,7 @@ test('launches four compact fields with complete unframed previews and stable pe
   await fillBattle(page);
   await page.getByLabel('Имя игрока 1').fill('Аня');
   await page.getByLabel('Имя игрока 2').fill('Аня');
-  await page.getByRole('button', { name: 'Начать' }).click();
+  await page.getByRole('button', { name: 'Start' }).click();
 
   const cards = page.locator('.hud-card');
   await expect(cards).toHaveCount(4);
@@ -54,7 +54,7 @@ test('keeps a one-player Survival surface tightly around the maximum-height boar
   await page.goto('/?muted=1');
   await page.getByRole('button', { name: /^Выживание/ }).click();
   await page.getByRole('button', { name: 'Удалить Игрок 2' }).click();
-  await page.getByRole('button', { name: 'Начать' }).click();
+  await page.getByRole('button', { name: 'Start' }).click();
 
   await expect(page.locator('#round-timer')).toHaveAttribute('aria-label', 'Прошедшее время матча');
   await expect(page.locator('#round-timer small')).toHaveCount(0);
@@ -78,7 +78,7 @@ test('keeps a one-player Survival surface tightly around the maximum-height boar
 test('does not mount a Survival anomaly-arrival notice', async ({ page }) => {
   await page.goto('/?muted=1&playtest-survival-level-up=1');
   await page.getByRole('button', { name: /^Выживание/ }).click();
-  await page.getByRole('button', { name: 'Начать' }).click();
+  await page.getByRole('button', { name: 'Start' }).click();
   await expect(page.locator('#countdown')).toBeHidden({ timeout: 6000 });
   await page.waitForTimeout(450);
   await expect(page.locator('[data-event-kind="level-up"]')).toHaveCount(0);
@@ -88,7 +88,7 @@ test('does not mount a Survival anomaly-arrival notice', async ({ page }) => {
 test('counts down the selected duration in competitive modes and freezes on pause', async ({ page }) => {
   await resetAndOpen(page, 'Битва');
   await chooseMenuOption(page, 'Длительность матча', '2 мин');
-  await page.getByRole('button', { name: 'Начать' }).click();
+  await page.getByRole('button', { name: 'Start' }).click();
 
   const timer = page.locator('#round-timer');
   const clock = page.locator('#match-clock');
@@ -110,7 +110,7 @@ test('keeps shared team surfaces but personal names and non-numeric team cues', 
   await fillBattle(page);
   await page.getByLabel('Имя игрока 1').fill('Аня');
   await page.getByLabel('Имя игрока 2').fill('Аня');
-  await page.getByRole('button', { name: 'Начать' }).click();
+  await page.getByRole('button', { name: 'Start' }).click();
 
   const cards = page.locator('.hud-card');
   await expect(cards.nth(0)).toHaveClass(/hud-palette-team-1/);
@@ -126,7 +126,7 @@ test('keeps shared team surfaces but personal names and non-numeric team cues', 
 test('uses a compact red current-sender caption and sword without resizing a field', async ({page}) => {
   await resetAndOpen(page,'Битва','?muted=1&playtest-conflict=3');
   await fillBattle(page);await page.getByLabel('Имя игрока 1').fill('Аня');
-  await page.getByRole('button',{name:'Начать'}).click();
+  await page.getByRole('button',{name:'Start'}).click();
   const target=page.locator('.hud-card.is-conflict-target').first(),before=await target.boundingBox();
   const notice=target.locator('.player-event-notice');
   await expect(notice).toContainText('Аня');await expect(notice).toContainText('3');
@@ -143,7 +143,7 @@ test('shows Final Push without anomaly copy in the timed global plaque without o
   await page.getByRole('option', { name: /5 мин$/ }).click();
   await expect(page.locator('#match-duration')).toHaveValue('5');
   await fillBattle(page, 2);
-  await page.getByRole('button', { name: 'Начать' }).click();
+  await page.getByRole('button', { name: 'Start' }).click();
 
   const plaque = page.locator('#arena-event-notice');
   await expect(plaque).toBeVisible({ timeout: 6_000 });
@@ -161,7 +161,7 @@ test.describe('reduced-motion match events', () => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await resetAndOpen(page, 'Битва', '?muted=1&playtest-conflict=3');
     await fillBattle(page, 2);
-    await page.getByRole('button', { name: 'Начать' }).click();
+    await page.getByRole('button', { name: 'Start' }).click();
     const notice = page.locator('.player-event-notice').first();
     await expect(notice).toBeVisible();
     await expect(notice).toContainText('3');
@@ -173,7 +173,7 @@ test.describe('reduced-motion match events', () => {
 
 test('keeps the arena paused while Settings opens and restores it with Back', async ({ page }) => {
   await resetAndOpen(page, 'Битва');
-  await page.getByRole('button', { name: 'Начать' }).click();
+  await page.getByRole('button', { name: 'Start' }).click();
   await expect(page.locator('.arena-screen')).toBeVisible();
   await expect(page.locator('.match-loading')).toHaveCount(0);
   await page.keyboard.press('Escape');
@@ -233,7 +233,7 @@ test('keeps the arena paused while Settings opens and restores it with Back', as
 test('restarts with the same roster and exits pause to the real main menu', async ({ page }) => {
   await resetAndOpen(page, 'Битва');
   await page.getByLabel('Имя игрока 1').fill('Мира');
-  await page.getByRole('button', { name: 'Начать' }).click();
+  await page.getByRole('button', { name: 'Start' }).click();
   await expect(page.locator('.arena-screen')).toBeVisible();
   await expect(page.locator('.match-loading')).toHaveCount(0);
   await page.keyboard.press('Escape');
@@ -252,7 +252,7 @@ test('offers only Repeat and Main Menu in results and Repeat preserves identitie
   await resetAndOpen(page, 'Битва', '?muted=1&playtest-fast=20');
   await page.getByLabel('Имя игрока 1').fill('Мира');
   await chooseMenuOption(page, 'Длительность матча', '2 мин');
-  await page.getByRole('button', { name: 'Начать' }).click();
+  await page.getByRole('button', { name: 'Start' }).click();
   const results = page.locator('.results-panel');
   await expect(results).toBeVisible({ timeout: 36_000 });
   expect(await results.evaluate((panel) => getComputedStyle(panel).backgroundImage))
@@ -295,7 +295,7 @@ test('uses the Menu gamepad button to pause and shared gamepad focus to continue
     Object.defineProperty(window, '__padButton', { configurable: true, value: (index: number, pressed: boolean) => { buttons[index] = { pressed, touched: pressed, value: pressed ? 1 : 0 }; } });
   });
   await resetAndOpen(page, 'Битва');
-  await page.getByRole('button', { name: 'Начать' }).click();
+  await page.getByRole('button', { name: 'Start' }).click();
   await page.evaluate(() => (window as typeof window & { __padButton: (index: number, pressed: boolean) => void }).__padButton(9, true));
   await expect(page.locator('#pause-overlay')).toBeVisible();
   await page.evaluate(() => (window as typeof window & { __padButton: (index: number, pressed: boolean) => void }).__padButton(9, false));
@@ -309,7 +309,7 @@ test('retains board geometry without overflow at wide and narrow supported viewp
     await page.setViewportSize(viewport);
     await resetAndOpen(page, 'Битва');
     await fillBattle(page);
-    await page.getByRole('button', { name: 'Начать' }).click();
+    await page.getByRole('button', { name: 'Start' }).click();
     await expect(page.locator('.hud-card')).toHaveCount(4);
     expect(await page.locator('.hud-card').evaluateAll((cards) => cards.every((card) => card.scrollWidth <= card.clientWidth))).toBe(true);
     const stage = await page.locator('.game-stage').boundingBox();
@@ -325,7 +325,7 @@ for (const viewport of [{width: 1440, height: 960}, {width: 390, height: 844}]) 
   test(`attack notice and frame end with the three-second warning at ${viewport.width}`, async ({page}) => {
     await page.setViewportSize(viewport);
     await resetAndOpen(page, 'Битва', '?muted=1&playtest-conflict=3&playtest-conflict-timed');
-    await page.getByRole('button', {name: /^Начать/}).click();
+    await page.getByRole('button', {name: /^Start/}).click();
     const target = page.locator('.hud-card.is-conflict-target').first();
     await expect(target).toBeVisible();
     await expect(target).toHaveAttribute('data-event-kind', 'incoming-attack');
@@ -352,7 +352,7 @@ test('Start Menu opens pause on every connected gamepad and resumes only after r
   });
   await page.goto('/?muted=1');
   await page.getByRole('button', { name: /^Выживание/ }).click();
-  await page.getByRole('button', { name: 'Начать' }).click();
+  await page.getByRole('button', { name: 'Start' }).click();
   await expect(page.locator('#countdown')).toBeHidden({timeout:6000});
   const press = async (index: number, down: boolean) => {
     await page.evaluate(({index,down}) => {

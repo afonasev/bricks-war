@@ -6,6 +6,14 @@ test.beforeEach(async ({ page }) => {
   await page.reload();
 });
 
+async function expectWorkshopArt(page: import('@playwright/test').Page, state: string) {
+  const art = page.locator('.menu-workshop-art');
+  await expect(art).toBeVisible();
+  await expect(art).toHaveAttribute('src', new RegExp(`${state}\\.webp`));
+  await expect.poll(() => art.evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true);
+  await expect(page.locator('.showcase-callouts')).toHaveCount(0);
+}
+
 test('updates the fixed main-menu showcase for pointer and keyboard selection', async ({ page }) => {
   expect(await page.locator('.main-menu-screen').evaluate((screen) => `${getComputedStyle(screen).backgroundImage} ${getComputedStyle(screen, '::before').backgroundImage}`))
     .not.toContain('radial-gradient');
@@ -20,12 +28,7 @@ test('updates the fixed main-menu showcase for pointer and keyboard selection', 
   await expect(showcase).toBeVisible();
   await expect(showcase).toHaveAttribute('data-preview', 'survival');
   await expect(showcase).toHaveAttribute('aria-label', /Выживание/);
-  await expect(page.locator('.survival-showcase .mini-board')).toHaveCount(1);
-  await expect(page.locator('.showcase-callouts')).toContainText('Каждый играет независимо');
-  await expect(page.locator('.showcase-callouts')).toContainText('щиты копятся сериями линий');
-  await expect(page.locator('.showcase-callouts')).toContainText('Аномалии очищают нижние ряды');
-  await expect(page.locator('.showcase-callouts')).not.toContainText(/атак/i);
-  await expect(page.locator('.showcase-callouts > div')).toHaveCount(3);
+  await expectWorkshopArt(page, 'survival');
   const before = await choices.nth(0).boundingBox();
   const showcaseBefore = await showcase.boundingBox();
   await choices.nth(1).hover();
@@ -35,26 +38,26 @@ test('updates the fixed main-menu showcase for pointer and keyboard selection', 
   await expect(choices.nth(1).locator('.mode-forward')).toHaveCSS('opacity', '1');
   await expect(showcase).toHaveAttribute('data-preview', 'battle');
   await expect(showcase).toHaveAttribute('aria-label', /Битва/);
-  await expect(page.locator('.mini-boards .mini-board')).toHaveCount(4);
-  await expect(page.locator('.showcase-callouts')).toContainText('Каждый сам за себя');
-  await expect(page.locator('.showcase-callouts')).toContainText('Атакуйте соперников');
-  await expect(page.locator('.showcase-callouts')).toContainText('щиты копятся сериями линий');
-  await expect(page.locator('.showcase-callouts')).toContainText('аномалии очищают нижние ряды');
-  await expect(page.locator('.showcase-callouts')).toContainText('Выживите и наберите как можно больше очков');
-  await expect(page.locator('.mini-boards [aria-label="Победитель"]')).toHaveCount(1);
+  await expectWorkshopArt(page, 'battle');
   await page.keyboard.press('ArrowDown');
   await expect(choices.nth(2)).toHaveClass(/is-ui-selected/);
   await expect(showcase).toHaveAttribute('data-preview', 'team-battle');
-  await expect(page.locator('.showcase-callouts')).toContainText('Две команды по два игрока');
-  await expect(page.locator('.showcase-callouts')).toContainText('Атакуйте команду соперников');
-  await expect(page.locator('.showcase-callouts')).toContainText('щиты копятся сериями линий');
-  await expect(page.locator('.showcase-callouts')).toContainText('аномалии очищают нижние ряды');
-  await expect(page.locator('.team-showcase [aria-label="Победившая команда"]')).toHaveCount(1);
-  await expect(page.locator('.team-showcase')).not.toContainText(/Команда Солнца|Команда Неба/);
+  await expectWorkshopArt(page, 'team-battle');
   const after = await choices.nth(0).boundingBox();
   const showcaseAfter = await showcase.boundingBox();
   expect(after).toEqual(before);
   expect(showcaseAfter).toEqual(showcaseBefore);
+  await choices.nth(3).hover();
+  await expect(showcase).toHaveAttribute('data-preview', 'network');
+  await expect(showcase).toHaveAttribute('aria-label', /Сетевая игра/);
+  await expectWorkshopArt(page, 'network');
+  expect(await showcase.boundingBox()).toEqual(showcaseBefore);
+  await choices.nth(4).hover();
+  await expect(showcase).toHaveAttribute('data-preview', 'settings');
+  await expect(showcase).toHaveAttribute('aria-label', /Как играть/);
+  await expectWorkshopArt(page, 'settings');
+  expect(await showcase.boundingBox()).toEqual(showcaseBefore);
+  await choices.nth(2).hover();
   await page.mouse.move(1200, 500);
   await page.keyboard.press('Enter');
   await expect(page.locator('[data-screen="team-battle"]')).toBeVisible();
@@ -158,13 +161,8 @@ test('keeps every redesigned main-menu destination routed and reflows the previe
   await page.setViewportSize({ width: 800, height: 900 });
   await page.getByRole('button', { name: /Настройки/ }).hover();
   await expect(page.locator('.menu-showcase')).toHaveAttribute('data-preview', 'settings');
-  await expect(page.locator('.settings-showcase')).toBeVisible();
-  await expect(page.locator('.settings-showcase')).toContainText('Управление');
-  await expect(page.locator('.settings-showcase kbd')).toHaveCount(0);
-  await expect(page.locator('.showcase-callouts')).toContainText('Автор Афонасьев Евгений');
-  await expect(page.locator('.showcase-callouts')).toContainText('при поддержке Codex');
-  await expect(page.locator('.showcase-callouts')).toContainText('2026 год');
-  await expect(page.locator('.menu-showcase[data-preview="settings"] .showcase-callouts > div').first().locator('span')).toHaveCSS('white-space', 'nowrap');
+  await expectWorkshopArt(page, 'settings');
+  await expect(page.locator('.menu-showcase')).toHaveAttribute('aria-label', /Как играть/);
   const primary = await page.locator('.main-menu-primary').boundingBox();
   const showcase = await page.locator('.menu-showcase').boundingBox();
   expect(primary).not.toBeNull();
@@ -172,7 +170,7 @@ test('keeps every redesigned main-menu destination routed and reflows the previe
   expect(showcase?.x ?? 0).toBeGreaterThanOrEqual((primary?.x ?? 0) + (primary?.width ?? 0));
   expect(Math.max(primary?.y ?? 0, showcase?.y ?? 0)).toBeLessThan(Math.min((primary?.y ?? 0) + (primary?.height ?? 0), (showcase?.y ?? 0) + (showcase?.height ?? 0)));
   await expect(page.locator('.main-menu-footer')).toBeVisible();
-  await expect(page.locator('.release-build-info')).toHaveText(/^Версия \d+\.\d+\.\d+(?:-dev)?(?: · Деплой .+)?$/);
+  await expect(page.locator('.release-build-info')).toHaveText(/^Version \d+\.\d+\.\d+(?:-dev)?(?: · .+)?$/);
 });
 
 test('keeps release footer lines, badges, and geometry synchronized across screens', async ({ page }) => {
@@ -336,7 +334,7 @@ test('keeps release settings aligned and the primary setup action compact', asyn
   expect(musicBox?.width).toBe(effectsBox?.width);
   await page.getByRole('button', { name: /Назад/ }).click();
   await page.getByRole('button', { name: /^Выживание/ }).click();
-  const startButton = page.getByRole('button', { name: 'Начать' });
+  const startButton = page.getByRole('button', { name: 'Start' });
   const start = await startButton.boundingBox();
   const viewport = page.viewportSize();
   expect(start?.width ?? Infinity).toBeLessThan((viewport?.width ?? 1280) / 2);
@@ -368,8 +366,8 @@ test('shows mode-specific setup and removes participants reversibly', async ({ p
   await expect(page.locator('.survival-records .record-duration')).toHaveText(['◷ 02:08', '◷ 01:04']);
   await expect(page.locator('.survival-records')).not.toContainText('Дата неизвестна');
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('bricks-war:solo-records:v1')!)[0].placedPieces)).toBe(42);
-  await expect(page.getByRole('button', { name: 'Начать' })).toBeEnabled();
-  await page.getByRole('button', { name: 'Начать' }).click();
+  await expect(page.getByRole('button', { name: 'Start' })).toBeEnabled();
+  await page.getByRole('button', { name: 'Start' }).click();
   await expect(page.locator('.hud-card')).toHaveCount(2);
   await page.goto('/?muted=1');
 
@@ -440,7 +438,7 @@ test('shows mode-specific setup and removes participants reversibly', async ({ p
   ]);
   expect(firstTeam?.y ?? Infinity).toBeLessThan(versus?.y ?? 0);
   expect(versus?.y ?? Infinity).toBeLessThan(secondTeam?.y ?? 0);
-  await expect(page.getByRole('button', { name: 'Начать' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Start' })).toBeDisabled();
 });
 
 test('starts a valid setup with the gamepad X button', async ({ page }) => {
@@ -452,7 +450,7 @@ test('starts a valid setup with the gamepad X button', async ({ page }) => {
   });
   await page.reload();
   await page.getByRole('button', { name: /^Выживание/ }).click();
-  await expect(page.getByRole('button', { name: 'Начать' })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Start' })).toBeEnabled();
   await page.evaluate(() => {
     const pad = (window as typeof window & { __startPad: { buttons: Array<{ pressed: boolean }> } }).__startPad;
     pad.buttons[2]!.pressed = true;
@@ -471,8 +469,8 @@ test('starts Survival with four distinct human controllers and no AI', async ({ 
   await page.getByRole('button', { name: 'Добавить игрока' }).first().click();
   await expect(page.locator('.survival-lobby .participant-card.occupied')).toHaveCount(4);
   await expect(page.locator('.survival-lobby [data-add-ai]')).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Начать' })).toBeEnabled();
-  await page.getByRole('button', { name: 'Начать' }).click();
+  await expect(page.getByRole('button', { name: 'Start' })).toBeEnabled();
+  await page.getByRole('button', { name: 'Start' }).click();
   await expect(page.locator('.hud-card')).toHaveCount(4);
 });
 

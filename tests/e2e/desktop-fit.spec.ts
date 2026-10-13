@@ -112,7 +112,7 @@ for (const [width,height] of [[1280,480],[800,620]] as const) {
         await page.getByRole('option',{name:'2 мин',exact:true}).click();
         await page.locator('[data-add-ai="3"]').click();
       }
-      await page.getByRole('button',{name:/^Начать/}).click();
+      await page.getByRole('button',{name:/^Start/}).click();
       await expect(page.locator('.hud-card').first()).toBeVisible(); await expectDesktopFit(page);
       const hudFit = await page.locator('.hud-card').evaluateAll(cards => cards.flatMap(card => {
         const outer = card.getBoundingClientRect();
@@ -123,11 +123,14 @@ for (const [width,height] of [[1280,480],[800,620]] as const) {
         return [...clipped,...overlap];
       }));
       expect(hudFit).toEqual([]);
-      await page.getByRole('button',{name:'Поставить матч на паузу',exact:true}).click();
+      await expect(page.locator('.match-loading')).toHaveCount(0);
+      await expect(page.locator('#countdown')).toBeHidden();
+      await page.keyboard.press('Escape');
+      await expect(page.locator('#continue-match')).toBeVisible();
       await expectDesktopFit(page);
       await page.getByRole('button',{name:'Настройки',exact:true}).click(); await expectDesktopFit(page);
       await page.getByRole('button',{name:'← Назад к паузе',exact:true}).click();
-      await page.getByRole('button',{name:'Продолжить Esc',exact:true}).click();
+      await page.locator('#continue-match').click();
       if (mode==='Выживание') { await page.keyboard.down('s'); await page.keyboard.down('ArrowDown'); }
       await expect(page.locator('.results-panel')).toBeVisible({timeout:36_000}); await expectDesktopFit(page);
       if (mode==='Выживание') {

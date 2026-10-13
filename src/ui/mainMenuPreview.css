@@ -1,0 +1,49 @@
+/* Keep the entire showcase a fixed image region; state changes cannot resize it. */
+.main-menu-screen .menu-showcase {
+  padding: 0;
+  background: #f3dfc0;
+  border-bottom-left-radius: 0;
+  box-shadow: none;
+}
+
+.main-menu-screen .showcase-content {
+  display: block;
+  height: 100%;
+  min-height: 0;
+}
+
+.menu-workshop-scene,
+.menu-workshop-art {
+  position: absolute;
+  inset: 0;
+}
+
+.menu-workshop-art {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+#app[data-layout="desktop"] .desktop-menu-stage .main-menu-screen .menu-showcase {
+  padding: 0;
+}
+
+#app[data-layout="desktop"] .desktop-menu-stage .main-menu-screen .showcase-content {
+  display: block;
+  height: 100%;
+}
+
+/* Tall desktop columns must keep the outer boards and devices in view. */
+@media (min-width: 761px) and (max-aspect-ratio: 1/1) {
+  .menu-workshop-scene::before {
+    content: "";
+    position: absolute;
+    inset: -24px;
+    background: var(--menu-art) center / cover;
+    filter: blur(24px);
+    opacity: .3;
+  }
+  .menu-workshop-art { object-fit: contain; }
+}

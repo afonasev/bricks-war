@@ -68,7 +68,7 @@ test('other tab update never reloads a local match and offers refresh on return 
   await loadControlled(page);
   const other = await context.newPage(); await loadControlled(other);
   await other.getByRole('button', { name: /^Выживание/ }).click();
-  await other.getByRole('button', { name: /^Начать/ }).click();
+  await other.getByRole('button', { name: /^Start/ }).click();
   await expect(other.locator('#game-stage')).toBeVisible();
   await discover(page); await page.getByRole('button', { name: 'Обновить', exact: true }).click();
   await expect(page.locator('meta[name="qa-release"]')).toHaveAttribute('content', 'B');
@@ -118,6 +118,6 @@ test('new header action preserves the existing keyboard selection', async ({ pag
   await discover(page);
   await expect(page.getByRole('button', { name: 'Обновить', exact: true })).toBeVisible();
   await page.keyboard.press('Enter');
-  await expect(page.getByRole('button', { name: /^Начать/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Start/ })).toBeVisible();
   await expect(page.locator('meta[name="qa-release"]')).toHaveAttribute('content', 'A');
 });

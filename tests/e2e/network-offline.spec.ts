@@ -5,6 +5,6 @@ test('cached phone shell still starts local Survival while offline after adding 
   await expect.poll(()=>page.evaluate(()=>!!navigator.serviceWorker.controller)).toBe(true);
   await context.setOffline(true);await page.reload();
   await expect(page.getByRole('button',{name:/^Сетевая игра/})).toBeVisible();
-  await page.getByRole('button',{name:/^Выживание/}).click();await page.getByRole('button',{name:'Начать',exact:true}).click();
+  await page.getByRole('button',{name:/^Выживание/}).click();await page.getByRole('button',{name:'Start',exact:true}).click();
   await expect(page.locator('#game-stage')).toBeVisible();await expect(page.getByRole('button',{name:'Поставить матч на паузу'})).toBeVisible();
 });

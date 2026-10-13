@@ -12,7 +12,6 @@ html:has(#app[data-layout="desktop"]), body:has(#app[data-layout="desktop"]), #a
 #app[data-layout="desktop"] .release-guidance-footer small { font-size: 12px; line-height: 1.1; }
 #app[data-layout="desktop"] .input-badge { width: 30px; height: 30px; flex-basis: 30px; }
 #app[data-layout="desktop"] .footer-start { min-height: 32px; padding: 3px 12px; font-size: 14px; }
-#app[data-layout="desktop"] .release-build-info { font-size: 12px; }
 #app[data-layout="desktop"] .menu-select-value { white-space: normal; text-overflow: clip; overflow: visible; overflow-wrap: anywhere; }
 #app[data-layout="desktop"] .setup-scroll { flex: 1 1 auto; min-height: 0; overflow: hidden; padding-bottom: 0; }
 #app[data-layout="desktop"] .main-menu-screen { display: grid; grid-template-rows: minmax(0,1fr) auto; padding: 0; }

@@ -19,6 +19,7 @@ export interface ArenaLayout {
   cellSize: number;
   gap?: number;
   participantCards?: ArenaCardLayout[];
+  headerHeight?: number;
 }
 
 export function chooseMobileSoloLayout(
@@ -101,6 +102,7 @@ function measureLayout(
   rows: number,
   mode: ArenaLayoutMode,
   gap: number,
+  headerHeight: number,
 ): ArenaLayout {
   const slotWidth = (
     width - (ARENA_EDGE_PADDING * 2) - (gap * (columns - 1))
@@ -110,18 +112,18 @@ function measureLayout(
   ) / rows;
   const cellSize = Math.max(0, Math.floor(Math.min(
     (slotWidth - ARENA_CARD_HORIZONTAL_PADDING) / 10,
-    (slotHeight - ARENA_CARD_HEADER_HEIGHT - ARENA_CARD_BOTTOM_PADDING) / 20,
+    (slotHeight - headerHeight - ARENA_CARD_BOTTOM_PADDING) / 20,
   )));
   const cardWidth = (cellSize * 10) + ARENA_CARD_HORIZONTAL_PADDING;
-  const cardHeight = ARENA_CARD_HEADER_HEIGHT + (cellSize * 20) + ARENA_CARD_BOTTOM_PADDING;
-  return { mode, columns, rows, slotWidth, slotHeight, cardWidth, cardHeight, cellSize, gap };
+  const cardHeight = headerHeight + (cellSize * 20) + ARENA_CARD_BOTTOM_PADDING;
+  return { mode, columns, rows, slotWidth, slotHeight, cardWidth, cardHeight, cellSize, gap, headerHeight };
 }
 
-export function chooseArenaLayout(width: number, height: number, participantCount: number, gap = ARENA_CARD_GAP): ArenaLayout {
+export function chooseArenaLayout(width: number, height: number, participantCount: number, gap = ARENA_CARD_GAP, headerHeight = ARENA_CARD_HEADER_HEIGHT): ArenaLayout {
   const count = Math.max(1, Math.min(4, participantCount));
-  const horizontal = measureLayout(width, height, count, 1, 'horizontal', gap);
+  const horizontal = measureLayout(width, height, count, 1, 'horizontal', gap, headerHeight);
   if (count <= 2) return horizontal;
-  const grid = measureLayout(width, height, 2, 2, 'grid-2x2', gap);
+  const grid = measureLayout(width, height, 2, 2, 'grid-2x2', gap, headerHeight);
   return grid.cellSize > horizontal.cellSize ? grid : horizontal;
 }
 

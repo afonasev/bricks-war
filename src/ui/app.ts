@@ -13,6 +13,8 @@ import * as Phaser from 'phaser/dist/phaser.esm.js';
 import conceptLogoUrl from '../assets/brand/concept-logo.webp';
 import './brandLogo.css';
 import controlsGamepadPanelUrl from '../assets/controls-gamepad-panel.webp';
+import { MAIN_MENU_PREVIEWS, mainMenuPreviewMarkup, type MainMenuDestination } from './mainMenuPreview';
+import './mainMenuPreview.css';
 import { GameAudio } from '../audio/GameAudio';
 import { MUSIC_DIRECTIONS, type AudioPreviewCategory, type MusicDirectionId } from '../audio/audioDirections';
 import { isSfxPresetId, SFX_PACK_OPTIONS } from '../audio/sfxPresets';
@@ -62,7 +64,7 @@ import { gamepadDestination, moveGamepad } from './gamepadRoster';
 import { loadSlotSelections, saveSlotSelections, type SlotSelection } from './slotPersistence';
 import { loadMatchOptionSelections } from './matchOptionsPersistence';
 import { loadBattleSetup, loadSetupTileStyles, saveMatchSetup } from './matchSetupPersistence';
-import { formatBuildInfo } from './buildInfo';
+import { releaseMetadataMarkup } from './releaseMetadata';
 import { loadGameTuning, resetGameTuning, saveGameTuning } from './gameTuningPersistence';
 import { PlayerEventRegionLatch } from './playerEventPlacement';
 import { participantLevelUpNoticeKey } from './hudInvalidation';
@@ -167,90 +169,23 @@ function escapeHtml(value: string): string {
   }[character] ?? character));
 }
 
-type MainMenuDestination = 'survival' | 'battle' | 'team-battle' | 'settings';
-
-const MAIN_MENU_PREVIEWS: Record<MainMenuDestination, {
-  label: string;
-  callouts: ReadonlyArray<{ icon: string; tone: string; text: string }>;
-}> = {
-  survival: {
-    label: 'Пример режима «Выживание»',
-    callouts: [
-      { icon: '◇', tone: 'blue', text: 'Каждый играет независимо · щиты копятся сериями линий' },
-      { icon: '✦', tone: 'lime', text: 'Аномалии очищают нижние ряды' },
-      { icon: '◷', tone: 'violet', text: 'Выживите и наберите как можно больше очков' },
-    ],
-  },
-  battle: {
-    label: 'Пример режима «Битва» для четырёх игроков',
-    callouts: [
-      { icon: '◉', tone: 'blue', text: 'Каждый сам за себя · щиты копятся сериями линий' },
-      { icon: '⇄', tone: 'coral', text: 'Атакуйте соперников · аномалии очищают нижние ряды' },
-      { icon: '♛', tone: 'violet', text: 'Выживите и наберите как можно больше очков' },
-    ],
-  },
-  'team-battle': {
-    label: 'Пример командного боя: две команды по два игрока',
-    callouts: [
-      { icon: '2×2', tone: 'lime', text: 'Две команды по два игрока · щиты копятся сериями линий' },
-      { icon: '⇄', tone: 'blue', text: 'Атакуйте команду соперников · аномалии очищают нижние ряды' },
-      { icon: '♛', tone: 'violet', text: 'Выживите и наберите как можно больше очков' },
-    ],
-  },
-  settings: {
-    label: 'Пример настроек звука, экрана, эффектов и управления',
-    callouts: [
-      { icon: '●', tone: 'coral', text: 'Автор Афонасьев Евгений' },
-      { icon: '✦', tone: 'blue', text: 'при поддержке Codex' },
-      { icon: '◷', tone: 'violet', text: '2026 год' },
-    ],
-  },
-};
-
-function showcaseMiniBoardMarkup(color: 'blue' | 'coral' | 'lime' | 'violet', board: number, crowned = false): string {
-  const blocks = [
-    [1, 11], [2, 11], [3, 11], [4, 11], [6, 11], [1, 10], [3, 10], [4, 10], [6, 10], [2, 9], [3, 9], [6, 9],
-    [board % 2 ? 5 : 3, 8], [board % 2 ? 5 : 4, 7], [board % 2 ? 4 : 5, 8], [board % 2 ? 6 : 5, 9],
-  ];
-  return `<div class="mini-board mini-board-${color}"><div class="mini-player">${crowned ? '<b aria-label="Победитель">♛</b>' : '<b aria-hidden="true">◆</b>'}<span>●●●●</span></div><div class="mini-grid">${blocks.map(([x, y], index) => `<i style="--x:${x};--y:${y};--tone:${index % 4}"></i>`).join('')}</div></div>`;
-}
-
-function mainMenuPreviewMarkup(destination: MainMenuDestination): string {
-  const visual = destination === 'survival'
-    ? `<div class="showcase-visual survival-showcase"><div class="survival-preview-board">${showcaseMiniBoardMarkup('blue', 0)}</div><div class="survival-record"><small>ЛУЧШИЙ РЕЗУЛЬТАТ</small><strong>04:28</strong><span>ТОП-10</span></div></div>`
-    : destination === 'battle'
-      ? `<div class="showcase-visual mini-boards">${(['blue', 'coral', 'lime', 'violet'] as const).map((color, board) => showcaseMiniBoardMarkup(color, board, board === 0)).join('')}</div>`
-      : destination === 'team-battle'
-        ? `<div class="showcase-visual team-showcase"><div class="team-preview team-preview-sun"><div>${showcaseMiniBoardMarkup('coral', 1)}${showcaseMiniBoardMarkup('lime', 2)}</div></div><div class="team-versus">VS</div><div class="team-preview team-preview-sky"><b class="team-preview-crown" aria-label="Победившая команда">♛</b><div>${showcaseMiniBoardMarkup('blue', 0)}${showcaseMiniBoardMarkup('violet', 3)}</div></div></div>`
-        : `<div class="showcase-visual settings-showcase"><div class="settings-preview-card"><header><span>⚙</span><strong>НАСТРОЙКИ</strong></header><div class="preview-setting"><b>♪</b><span>Музыка</span><i><em style="width:72%"></em></i></div><div class="preview-setting"><b>✦</b><span>Эффекты</span><i><em style="width:88%"></em></i></div><div class="preview-toggles"><span><b>▣</b> Полный экран <i>ВКЛ</i></span><span><b>◌</b> Спокойные эффекты <i>ВЫКЛ</i></span></div><div class="preview-controls preview-navigation"><b>🎮</b><span>Управление</span><strong>›</strong></div></div></div>`;
-  const callouts = MAIN_MENU_PREVIEWS[destination].callouts.map((callout) => `<div><b class="callout-${callout.tone}" aria-hidden="true">${callout.icon}</b><span>${callout.text}</span></div>`).join('');
-  return `${visual}<div class="showcase-callouts">${callouts}</div>`;
-}
-
 interface ReleaseFooterOptions {
   confirm?: string;
   back?: string;
   start?: string;
   roster?: string;
-  keyboard?: string;
-  buildInfo?: boolean;
 }
 
-function releaseFooterMarkup({ confirm, back, start, roster, keyboard, buildInfo = false }: ReleaseFooterOptions): string {
+function releaseFooterMarkup({ confirm, back, start, roster }: ReleaseFooterOptions): string {
   const showGamepadActions = !isMobilePlayViewport();
-  const credits = buildInfo
-    ? '<span class="release-footer-credits">© 2026 Evgeniy Afonasev · afonasev.tech · Made with Codex</span>'
-    : '';
   const confirmHint = confirm && showGamepadActions ? `<span class="release-footer-action"><b class="input-badge input-confirm">A</b>${confirm}</span>` : '';
   const backHint = back && showGamepadActions ? `<span class="release-footer-action"><b class="input-badge input-back">B</b>${back}</span>` : '';
   const rosterHint = roster && showGamepadActions ? `<span class="release-footer-action"><b class="input-badge input-roster">Y</b>${roster}</span>` : '';
   return `<footer class="release-footer main-menu-footer release-guidance-footer">
     <div class="release-footer-inner${start ? ' release-footer-start-layout' : ''}">
       ${start ? `${showGamepadActions ? `<div class="release-footer-side release-footer-before-start">${confirmHint}${backHint}</div>` : ''}<button class="primary-button footer-start" id="start-match" type="button">${showGamepadActions ? '<kbd aria-hidden="true">X</kbd>' : ''}<span>${start}</span></button>${showGamepadActions ? `<div class="release-footer-side release-footer-after-start">${rosterHint}</div>` : ''}` : `${showGamepadActions ? `<div class="release-footer-actions">${confirmHint}${backHint}${rosterHint}</div>` : ''}`}
-      ${keyboard ? `<small>${keyboard}</small>` : ''}
-      ${buildInfo ? `<span class="release-build-info">${formatBuildInfo()}</span>` : ''}
-      ${credits}
     </div>
+    ${releaseMetadataMarkup()}
   </footer>`;
 }
 
@@ -490,18 +425,17 @@ export class BricksWarApp {
 <button class="mode-choice mode-network" type="button" data-network-entry><span class="mode-icon" aria-hidden="true">◎</span><span class="mode-copy"><strong>Сетевая игра</strong><small>Выживание, Битва и Командный бой</small></span><span class="mode-forward" aria-hidden="true">›</span></button>
               <button class="mode-choice mode-settings" type="button" data-destination="settings">
                 <span class="mode-icon" aria-hidden="true">⚙</span>
-                <span class="mode-copy"><strong>Настройки</strong><small>Звук, экран, эффекты и управление</small></span>
+                <span class="mode-copy"><strong>Настройки</strong><small>Звук, экран, управление и как играть</small></span>
                 <span class="mode-forward" aria-hidden="true">›</span>
               </button>
               ${desktop ? '<button class="mode-choice mode-exit" id="desktop-exit" type="button"><span class="mode-icon" aria-hidden="true">⏻</span><span class="mode-copy"><strong>Выход из игры</strong><small>Закрыть приложение</small></span><span class="mode-forward" aria-hidden="true">›</span></button>' : ''}
             </nav>
           </div>
           <aside id="menu-showcase" class="menu-showcase showcase-survival" data-preview="survival" aria-label="${MAIN_MENU_PREVIEWS.survival.label}">
-            <div class="showcase-sky" aria-hidden="true"><i></i><i></i><i></i></div>
             <div id="showcase-content" class="showcase-content" aria-hidden="true">${mainMenuPreviewMarkup('survival')}</div>
           </aside>
         </section>
-        ${releaseFooterMarkup({ confirm: mobile ? 'Открыть' : 'Выбрать', back: 'Назад', buildInfo: true })}
+        ${releaseFooterMarkup({ confirm: mobile ? 'Open' : 'Select', back: 'Back' })}
       </main>
     `;
     this.root.querySelectorAll<HTMLButtonElement>('[data-destination]').forEach((button) => {
@@ -540,13 +474,13 @@ export class BricksWarApp {
 
   private updateMainMenuShowcase(selected: HTMLElement | null): void {
     if (this.router.current() !== 'main-menu') return;
-    const destination = selected?.dataset.destination as MainMenuDestination | undefined;
+    const destination = (selected?.hasAttribute('data-network-entry') ? 'network' : selected?.dataset.destination) as MainMenuDestination | undefined;
     if (!destination || !(destination in MAIN_MENU_PREVIEWS)) return;
     const showcase = this.root.querySelector<HTMLElement>('#menu-showcase');
     const content = this.root.querySelector<HTMLElement>('#showcase-content');
     if (!showcase || !content || showcase.dataset.preview === destination) return;
     showcase.dataset.preview = destination;
-    showcase.classList.remove('showcase-survival', 'showcase-battle', 'showcase-team-battle', 'showcase-settings');
+    showcase.classList.remove('showcase-survival', 'showcase-battle', 'showcase-team-battle', 'showcase-network', 'showcase-settings');
     showcase.classList.add(`showcase-${destination}`);
     showcase.setAttribute('aria-label', MAIN_MENU_PREVIEWS[destination].label);
     content.innerHTML = mainMenuPreviewMarkup(destination);
@@ -566,7 +500,7 @@ export class BricksWarApp {
           <section class="release-panel settings-section settings-audio-section"><header><span class="settings-icon" aria-hidden="true">♪</span><div><p class="eyebrow">ЗВУК</p><h2>Музыка и эффекты</h2></div></header>${this.setupAudioMarkup()}</section>
           ${isLocalPlaytestFlag('audio-prototypes') ? this.audioPrototypeGalleryMarkup() : ''}
           <section class="release-panel settings-section settings-display-section"><header><span class="settings-icon settings-icon-screen" aria-hidden="true">▣</span><div><p class="eyebrow">ЭКРАН</p><h2>Изображение</h2></div></header>
-            ${desktop ? `<label class="settings-action"><span><strong>Разрешение окна</strong><small>Размер игрового окна; полный экран использует весь монитор</small></span><select id="desktop-resolution">${(this.desktopDisplay.resolutions ?? [[960,540],[1280,720],[1440,900],[1600,900],[1920,1080]]).map(([w,h]) => `<option value="${w}x${h}" ${w === this.desktopDisplay.width && h === this.desktopDisplay.height ? 'selected' : ''}>${w} × ${h}</option>`).join('')}</select></label><label class="settings-action"><span><strong>Режим экрана</strong><small>Полный экран или отдельное окно</small></span><select id="desktop-window-mode"><option value="windowed" ${!this.desktopDisplay.fullscreen ? 'selected' : ''}>Оконный</option><option value="fullscreen" ${this.desktopDisplay.fullscreen ? 'selected' : ''}>Полный экран</option></select></label><output id="desktop-display-status" class="settings-status" role="status"></output>` : ''}
+            ${desktop ? `<label class="settings-action"><span><strong>Разрешение окна</strong><small>Размер в логических пикселях, с учётом масштаба ОС; полный экран — весь монитор</small></span><select id="desktop-resolution">${(this.desktopDisplay.resolutions ?? [[960,540],[1280,720],[1440,900],[1600,900],[1920,1080],[2560,1440],[3840,2160]]).map(([w,h]) => `<option value="${w}x${h}" ${w === this.desktopDisplay.width && h === this.desktopDisplay.height ? 'selected' : ''}>${w} × ${h}</option>`).join('')}</select></label><label class="settings-action"><span><strong>Режим экрана</strong><small>Полный экран или отдельное окно</small></span><select id="desktop-window-mode"><option value="windowed" ${!this.desktopDisplay.fullscreen ? 'selected' : ''}>Оконный</option><option value="fullscreen" ${this.desktopDisplay.fullscreen ? 'selected' : ''}>Полный экран</option></select></label><output id="desktop-display-status" class="settings-status" role="status"></output>` : ''}
             ${mobile || desktop ? '' : `<button class="settings-action" id="toggle-fullscreen" type="button"><span><strong>Полноэкранный режим</strong><small>Использовать весь экран для игровых полей</small></span><b>${document.fullscreenElement ? 'Вкл' : 'Выкл'}</b></button><output id="fullscreen-status" class="settings-status" role="status"></output>`}
             <label class="settings-action"><span><strong>Спокойные эффекты</strong><small>Меньше движения, частиц и ярких вспышек</small></span><input id="calm-effects" type="checkbox" ${this.releaseSettings.calmEffects ? 'checked' : ''} /></label>
           </section>
@@ -574,7 +508,7 @@ export class BricksWarApp {
           ${mobile ? '' : `<button class="release-panel settings-action settings-navigation" id="open-controls" type="button"><span class="settings-icon" aria-hidden="true">🎮</span><span><strong>Управление</strong><small>Клавиатура и геймпад</small></span><b>›</b></button>`}
           <button class="release-panel settings-action settings-navigation" id="open-settings-lab" type="button"><span class="settings-icon settings-icon-lab" aria-hidden="true">⌁</span><span><strong>Лаборатория дизайна</strong><small>Тонкая настройка игрового баланса</small></span><b>›</b></button>
         </section>
-        ${releaseFooterMarkup({ confirm: mobile ? undefined : 'Выбрать', back: 'Назад', keyboard: mobile ? 'Все настройки меняются касанием' : '↑↓ / WASD · выбор &nbsp;·&nbsp; Enter / A · открыть &nbsp;·&nbsp; Esc / B · назад' })}
+        ${releaseFooterMarkup({ confirm: mobile ? undefined : 'Select', back: 'Back' })}
       </main>
     `;
     this.root.querySelector('#settings-back')?.addEventListener('click', () => this.navigateBack());
@@ -637,7 +571,7 @@ export class BricksWarApp {
             <article class="release-panel"><h2>Клавиатура 2</h2><div class="keyboard-cluster arrows"><kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd></div><ul class="key-actions"><li class="action-rotate">↑ повернуть</li><li class="action-move">← → двигать</li><li class="action-drop">↓ ускорить</li></ul></article>
           </section>
         </div>
-        ${releaseFooterMarkup({ back: 'Назад', keyboard: 'Esc / B · назад' })}
+        ${releaseFooterMarkup({ back: 'Back' })}
       </main>
     `;
     this.root.querySelector('#controls-back')?.addEventListener('click', () => this.navigateBack());
@@ -677,7 +611,7 @@ export class BricksWarApp {
         ${mode === 'survival' || mobile ? '' : this.modeSettingsMarkup()}
         <p class="setup-error" id="setup-error" role="alert" aria-live="polite"></p>
         </div>
-        ${releaseFooterMarkup({ roster: mobile ? undefined : 'Войти', confirm: mobile ? undefined : 'Подтвердить', back: 'Назад', start: 'Начать', keyboard: mobile ? 'Настройте матч и нажмите «Начать»' : '↑↓ / WASD · выбор &nbsp;·&nbsp; Enter / A · подтвердить &nbsp;·&nbsp; X · начать &nbsp;·&nbsp; Esc / B · назад' })}
+        ${releaseFooterMarkup({ roster: mobile ? undefined : 'Join', confirm: mobile ? undefined : 'Confirm', back: 'Back', start: 'Start' })}
       </main>
     `;
 
@@ -1066,6 +1000,7 @@ export class BricksWarApp {
         <main class="release-screen premium-surface settings-screen" data-screen="laboratory">
           <header class="release-heading"><button class="screen-back" id="close-debug-lab" type="button">← Настройки</button><div><p class="eyebrow">ЛАБОРАТОРИЯ ДИЗАЙНА</p><h1>Только для локальной сборки</h1></div></header>
           <section class="release-panel laboratory-unavailable"><h2>Настройки релизного баланса защищены</h2><p>В публичной версии лаборатория показывает только это пояснение. Запустите проект на localhost, чтобы менять параметры следующего матча и сохранять их на этом устройстве.</p></section>
+          <footer class="menu-metadata-footer">${releaseMetadataMarkup()}</footer>
         </main>`;
       this.root.querySelector('#close-debug-lab')?.addEventListener('click', () => this.navigateBack());
       this.activateMenuFocus('laboratory');
@@ -1107,6 +1042,7 @@ export class BricksWarApp {
             <div class="debug-fields debug-message-fields">${MESSAGE_TEMPLATE_KEYS.map((key) => this.debugMessageFieldMarkup(key)).join('')}</div>
           </section>
         </div>
+        <footer class="menu-metadata-footer">${releaseMetadataMarkup()}</footer>
       </main>
     `;
     this.bindDebugTuning();
@@ -1722,6 +1658,8 @@ export class BricksWarApp {
     arena?.style.setProperty('--clock-board-rows', String(layout.rows));
     arena?.style.setProperty('--clock-grid-insets', `${8 + (layout.rows - 1) * (layout.gap ?? 4)}px`);
     hud.style.setProperty('--arena-card-gap', `${layout.gap ?? 4}px`);
+    hud.style.setProperty('--hud-scale', String((layout.headerHeight ?? 52) / 52));
+    hud.style.setProperty('--arena-header-height', `${layout.headerHeight ?? 52}px`);
     hud.dataset.layout = layout.mode;
     hud.dataset.cellSize = String(layout.cellSize);
     hud.style.setProperty('--arena-columns', String(layout.columns));
@@ -1803,7 +1741,8 @@ export class BricksWarApp {
         const statsMarkup = `<div class="hud-stats"><b>${participant.score.toLocaleString('ru-RU')} очков</b><span>${formatPieces(participant.placedPieces)}</span></div>`;
         const mobilePlayerMarkup = mobilePlayer
           ? `<div class="mobile-player-summary">${identityMarkup}${statsMarkup}</div>${shieldInventory}${nextPiecePreviewMarkup(participant.board.nextPiece)}`
-          : `${identityMarkup}${statsMarkup}${shieldInventory}${compactMobileAi ? '' : nextPiecePreviewMarkup(participant.board.nextPiece)}`;
+          : mobileSoloMatch ? `${identityMarkup}${statsMarkup}${shieldInventory}${compactMobileAi ? '' : nextPiecePreviewMarkup(participant.board.nextPiece)}`
+          : `<div class="desktop-field-heading">${identityMarkup}${statsMarkup}${shieldInventory}${nextPiecePreviewMarkup(participant.board.nextPiece)}</div>`;
         return `
         <article class="hud-card ${mobileSoloMatch && index === 0 ? 'mobile-player-card' : ''} ${compactMobileAi ? 'mobile-ai-card' : ''} hud-palette-${identity.palette} ${participant.board.alive ? '' : 'is-out'} ${participant.board.active?.definition.source === 'anomaly' ? 'has-active-anomaly' : ''} ${senderRows ? 'is-conflict-sender' : ''} ${incomingRows ? 'is-conflict-target' : ''} ${impactRows ? 'is-conflict-impact' : ''} ${defended || shieldBlocked ? 'is-conflict-defense' : ''} ${cleanupRows ? 'is-cleaning' : ''} ${participant.shieldReady ? 'has-shield' : ''} ${participantEvent ? 'has-player-event' : ''}" style="--player-name-color:${playerAccentForSlot(index)};--sender-color:${senderAccent};${mobileStyle}" data-team="${identity.teamLabel ? identity.palette : ''}" data-tile-style="${participant.resolvedTileStyle}" data-next-piece="${participant.board.nextPiece.id}" data-active-y="${participant.board.active?.y ?? ''}" data-attack-rows="${senderRows}" data-incoming-rows="${incomingRows || impactRows}" data-event-kind="${participantEvent?.kind ?? ''}" data-shield-remaining-ms="${state.shieldPresentations.find(e => e.participantId === participant.config.id)?.remainingMs ?? 0}" data-shield-debt="${state.shieldPresentations.filter(e => e.participantId === participant.config.id).reduce((n,e) => n + e.deferredImpacts.reduce((m,i) => m + i.rows, 0), 0)}" data-gray-rows="${participant.board.grid.filter(row => row.some(cell => cell === 'garbage')).length}">
           ${mobilePlayerMarkup}

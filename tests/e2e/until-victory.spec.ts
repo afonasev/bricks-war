@@ -19,7 +19,7 @@ for (const mode of ['Битва', 'Командный бой']) {
     await page.reload();
     await page.getByRole('button', { name: new RegExp(`^${mode}`) }).click();
     await expect(page.locator('#match-duration')).toHaveValue('until-victory');
-    await page.getByRole('button', { name: 'Начать' }).click();
+    await page.getByRole('button', { name: 'Start' }).click();
     await expect(page.locator('#round-timer')).toHaveAttribute('aria-label', 'Прошедшее время матча');
     await expect(page.locator('#match-clock')).toHaveText('00:02', { timeout: 10000 });
     await expect(page.locator('.arena-screen')).toBeVisible();
@@ -38,7 +38,7 @@ test('phone Battle selects until-victory and displays an increasing timer', asyn
   await page.goto('/?muted=1');
   await page.getByRole('button', { name: /^Битва/ }).click();
   await chooseVictory(page);
-  await page.getByRole('button', { name: 'Начать' }).click();
+  await page.getByRole('button', { name: 'Start' }).click();
   await expect(page.locator('#mobile-match-timer')).toHaveAttribute('aria-label', 'Прошедшее время матча');
   await expect(page.locator('#mobile-match-timer')).toHaveText('00:02', { timeout: 10000 });
   await expect(page.locator('.hud-card')).toHaveCount(2);
@@ -51,7 +51,7 @@ test('simultaneous final elimination explains the score exception and Repeat kee
   const removeAi = page.locator('[data-remove-slot="2"]');
   if (await removeAi.count()) await removeAi.click();
   await chooseVictory(page);
-  await page.getByRole('button', { name: 'Начать' }).click();
+  await page.getByRole('button', { name: 'Start' }).click();
   await expect(page.locator('#results-title')).toHaveText('Одновременное выбывание', { timeout: 36000 });
   await expect(page.locator('.results-panel')).toContainText('Последние соперники выбыли одновременно');
   await page.getByRole('button', { name: 'Повторить' }).click();

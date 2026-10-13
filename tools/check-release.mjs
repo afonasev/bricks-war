@@ -11,12 +11,12 @@ if (!metadata.version || !metadata.deployedAt) {
 
 const releaseDate = new Date(metadata.deployedAt);
 if (Number.isNaN(releaseDate.getTime())) throw new Error('Invalid release deployedAt');
-const expected = `Версия ${metadata.version} · Деплой ${new Intl.DateTimeFormat('ru-RU', { dateStyle: 'medium' }).format(releaseDate)}`;
+const expected = `Version ${metadata.version} · ${new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium' }).format(releaseDate)}`;
 
-const browser = await chromium.launch({ channel: 'chrome', headless: true });
+const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--mute-audio'] });
 try {
   const page = await browser.newPage();
-  const response = await page.goto(url, { waitUntil: 'networkidle' });
+  const response = await page.goto(`${url}?muted=1`, { waitUntil: 'networkidle' });
   if (!response?.ok()) throw new Error(`Release HTTP status: ${response?.status() ?? 'no response'}`);
   const actual = (await page.locator('.release-build-info').first().textContent())?.trim();
   if (actual !== expected) throw new Error(`Release identity mismatch: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);

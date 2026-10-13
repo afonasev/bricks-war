@@ -1,4 +1,5 @@
 import {drawBoardEventEffects} from './boardEventEffects';
+import { installCanvasViewport } from './canvasViewport';
 import { shieldPresentationForParticipant } from './shieldPresentation';
 import { airborneBurnCells } from './airborneBurn';
 import * as Phaser from 'phaser/dist/phaser.esm.js';
@@ -99,6 +100,7 @@ export class PlayScene extends Phaser.Scene {
   private presentationStarted = false;
   private staticGraphics!: Phaser.GameObjects.Graphics;
   private graphics!: Phaser.GameObjects.Graphics;
+  private viewport?: ReturnType<typeof installCanvasViewport>;
   private readonly shieldLayers = new Map<string, { graphics: Phaser.GameObjects.Graphics; effect: Phaser.GameObjects.Graphics; maskGraphics: Phaser.GameObjects.Graphics; mask: Phaser.Display.Masks.GeometryMask }>();
   private shieldCaptureStartedAt: number | null = null;
   private accumulator = 0;
@@ -126,10 +128,15 @@ export class PlayScene extends Phaser.Scene {
   create(): void {
     this.staticGraphics = this.add.graphics();
     this.graphics = this.add.graphics();
+    this.viewport = installCanvasViewport(this, !this.runtime.mobileSolo, () => {
+      this.activePieceInterpolation.reset(this.runtime.engine.state.participants);
+      this.renderState();
+    });
     const keyboard = this.input.keyboard;
     keyboard?.on('keydown', this.handleKeyDown, this);
     keyboard?.on('keyup', this.handleKeyUp, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.viewport?.destroy();
       keyboard?.off('keydown', this.handleKeyDown, this);
       keyboard?.off('keyup', this.handleKeyUp, this);
       document.removeEventListener('visibilitychange', this.handleVisibility);
@@ -160,6 +167,7 @@ export class PlayScene extends Phaser.Scene {
   }
 
   update(_time: number, delta: number): void {
+    this.viewport?.refreshDensity();
     if (this.runtime.engine.kind === 'network') {
       this.runtime.engine.step(delta);
       this.activePieceInterpolation.reset(this.runtime.engine.state.participants);
@@ -307,14 +315,13 @@ export class PlayScene extends Phaser.Scene {
   private renderState(): void {
     if (!this.graphics || !this.staticGraphics) return;
     const state = this.runtime.engine.state;
-    const width = this.scale.width;
-    const height = this.scale.height;
+    const { width, height } = this.viewport?.size() ?? this.scale;
     const count = state.participants.length;
     const controlsReservedHeight = width > height ? 28 : 42;
     const layout = this.runtime.engine.kind === 'network' ? chooseNetworkLayout(width,height,count,this.runtime.mobileSolo) : this.runtime.mobileSolo
       ? chooseMobileSoloLayout(width, height, count, controlsReservedHeight)
-      : chooseArenaLayout(width, height, count, LOCAL_ARENA_CARD_GAP);
-    const layoutKey = `${layout.mode}:${layout.columns}:${layout.rows}:${layout.gap ?? ARENA_CARD_GAP}:${layout.cellSize}:${layout.participantCards?.map((card) => `${card.x}:${card.y}:${card.cellSize}:${card.headerHeight ?? ARENA_CARD_HEADER_HEIGHT}`).join('|') ?? ''}`;
+      : chooseArenaLayout(width, height, count, LOCAL_ARENA_CARD_GAP, Math.round(ARENA_CARD_HEADER_HEIGHT * Math.max(1, Math.min(width / 1920, height / 1080))));
+    const layoutKey = `${layout.mode}:${layout.columns}:${layout.rows}:${layout.gap ?? ARENA_CARD_GAP}:${layout.cellSize}:${layout.headerHeight ?? ARENA_CARD_HEADER_HEIGHT}:${layout.participantCards?.map((card) => `${card.x}:${card.y}:${card.cellSize}:${card.headerHeight ?? ARENA_CARD_HEADER_HEIGHT}`).join('|') ?? ''}`;
     if (layoutKey !== this.lastLayoutKey) {
       this.lastLayoutKey = layoutKey;
       this.runtime.onLayout(layout);
@@ -347,7 +354,7 @@ export class PlayScene extends Phaser.Scene {
         const row = Math.floor(index / layout.columns);
         const x = ARENA_EDGE_PADDING + column * (layout.slotWidth + (layout.gap ?? ARENA_CARD_GAP)) + ((layout.slotWidth - layout.cardWidth) / 2);
         const y = ARENA_EDGE_PADDING + row * (layout.slotHeight + (layout.gap ?? ARENA_CARD_GAP)) + ((layout.slotHeight - layout.cardHeight) / 2);
-        this.drawStaticBoardCard(participant, this.runtime.engine.kind === 'network' ? Number(participant.config.controllerLabel ?? index) : index, state.options.matchVariant, card?.x ?? x, card?.y ?? y, card?.cardWidth ?? layout.cardWidth, card?.cardHeight ?? layout.cardHeight, card?.cellSize ?? layout.cellSize, card?.headerHeight ?? ARENA_CARD_HEADER_HEIGHT);
+        this.drawStaticBoardCard(participant, this.runtime.engine.kind === 'network' ? Number(participant.config.controllerLabel ?? index) : index, state.options.matchVariant, card?.x ?? x, card?.y ?? y, card?.cardWidth ?? layout.cardWidth, card?.cardHeight ?? layout.cardHeight, card?.cellSize ?? layout.cellSize, card?.headerHeight ?? layout.headerHeight ?? ARENA_CARD_HEADER_HEIGHT);
       });
     }
 
@@ -362,7 +369,7 @@ export class PlayScene extends Phaser.Scene {
       const row = Math.floor(index / layout.columns);
       const x = ARENA_EDGE_PADDING + column * (layout.slotWidth + (layout.gap ?? ARENA_CARD_GAP)) + ((layout.slotWidth - layout.cardWidth) / 2);
       const y = ARENA_EDGE_PADDING + row * (layout.slotHeight + (layout.gap ?? ARENA_CARD_GAP)) + ((layout.slotHeight - layout.cardHeight) / 2);
-        this.drawBoardCard(participant, card?.x ?? x, card?.y ?? y, card?.cardWidth ?? layout.cardWidth, card?.cardHeight ?? layout.cardHeight, card?.cellSize ?? layout.cellSize, card?.headerHeight ?? ARENA_CARD_HEADER_HEIGHT);
+        this.drawBoardCard(participant, card?.x ?? x, card?.y ?? y, card?.cardWidth ?? layout.cardWidth, card?.cardHeight ?? layout.cardHeight, card?.cellSize ?? layout.cellSize, card?.headerHeight ?? layout.headerHeight ?? ARENA_CARD_HEADER_HEIGHT);
     });
   }
 

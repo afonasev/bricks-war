@@ -1,3 +1,4 @@
+import { releaseMetadataMarkup } from '../ui/releaseMetadata';
 import { MatchLoading } from '../ui/matchLoading';
 import { shieldInventoryMarkup, shieldInventoryKey } from '../ui/shieldInventory';
 import * as Phaser from 'phaser/dist/phaser.esm.js';
@@ -64,7 +65,7 @@ export class NetworkApp {
   }
   private button(label:string,action:string,disabled=false):string {return `<button type="button" data-net-action="${action}" ${disabled?'disabled':''}>${label}</button>`;}
   private shell(title:string,body:string):void {
-    this.root.innerHTML=`<main class="network-screen release-screen premium-surface mode-setup-screen" data-network-view="${this.view}"><header class="network-heading release-heading"><button type="button" class="screen-back" data-net-action="menu" aria-label="Главное меню">← Главное меню</button><div><p class="eyebrow">BRICKS WAR · СЕТЬ</p><h1>${title}</h1></div></header><output class="network-status" role="status" id="network-status"></output><div class="network-content">${body}</div></main>`;
+    this.root.innerHTML=`<main class="network-screen release-screen premium-surface mode-setup-screen" data-network-view="${this.view}"><header class="network-heading release-heading"><button type="button" class="screen-back" data-net-action="menu" aria-label="Главное меню">← Главное меню</button><div><p class="eyebrow">BRICKS WAR · СЕТЬ</p><h1>${title}</h1></div></header><output class="network-status" role="status" id="network-status"></output><div class="network-content">${body}</div><footer class="menu-metadata-footer">${releaseMetadataMarkup()}</footer></main>`;
     this.bind();
   }
   private bind():void {

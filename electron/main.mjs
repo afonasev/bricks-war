@@ -79,12 +79,28 @@ app.whenReady().then(async () => {
   });
   const size = fitWindow(preferences, screen.getPrimaryDisplay().workAreaSize);
   win = new BrowserWindow({ ...size, useContentSize: true, minWidth: 800, minHeight: 480,
-    fullscreen: preferences.fullscreen, title: 'Bricks War', show: false,
+    fullscreen: preferences.fullscreen, fullscreenable: true, title: 'Bricks War', show: false,
     icon: join(here, '..', 'build', 'desktop-content', 'pwa-512.png'),
     webPreferences: { session: ses, preload: join(here, 'preload.cjs'), contextIsolation: true, sandbox: true, nodeIntegration: false } });
   win.webContents.setZoomMode('disabled');
   win.webContents.on('did-finish-load', () => win.webContents.setZoomMode('disabled'));
   if (process.env.BRICKS_DESKTOP_QA_PROFILE) win.webContents.setAudioMuted(true);
+  const fitCurrentDisplay = (restorePreference = false) => {
+    // Native fullscreen enters asynchronously and emits intermediate move events.
+    if (win.isDestroyed() || win.isFullScreen() || preferences.fullscreen) return;
+    const bounds = win.getBounds(), content = win.getContentBounds();
+    const area = screen.getDisplayMatching(bounds).workArea;
+    const frame = { width: bounds.width - content.width, height: bounds.height - content.height };
+    const fit = fitWindow(restorePreference ? preferences : content, area, frame);
+    win.setMinimumSize(Math.min(800, area.width), Math.min(480, area.height));
+    const width = fit.width + frame.width, height = fit.height + frame.height;
+    const x = Math.max(area.x, Math.min(bounds.x, area.x + area.width - width));
+    const y = Math.max(area.y, Math.min(bounds.y, area.y + area.height - height));
+    if (width !== bounds.width || height !== bounds.height || x !== bounds.x || y !== bounds.y) win.setBounds({ x, y, width, height });
+  };
+  win.on('leave-full-screen', () => fitCurrentDisplay(true));
+  win.on('move', () => fitCurrentDisplay());
+  screen.on('display-metrics-changed', () => fitCurrentDisplay());
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   win.webContents.on('will-navigate', (event, url) => { if (url !== `${ORIGIN}/`) event.preventDefault(); });
   win.webContents.on('did-start-navigation', (_event, _url, _inPlace, isMainFrame) => { if (isMainFrame) safeMenu = false; });
@@ -117,8 +133,8 @@ app.whenReady().then(async () => {
     await writeFile(displayFile, JSON.stringify(preferences));
     win.setFullScreen(preferences.fullscreen);
     if (!preferences.fullscreen) {
-      const fit = fitWindow(preferences, screen.getDisplayMatching(win.getBounds()).workAreaSize);
-      win.setContentSize(fit.width, fit.height); win.center();
+      fitCurrentDisplay(true);
+      win.center();
     }
     return { ...preferences, resolutions: RESOLUTIONS };
   });
