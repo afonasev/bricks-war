@@ -1492,8 +1492,8 @@ export class BricksWarApp {
     this.bindAudioToggle();
     this.bindVolumeControl();
     if (mobileMatch) this.bindMobileMatchInput(input);
-    if (isLocalPlaytestFlag('playtest-board-events')) {
-      Object.assign(window, {__boardEffectsQA: {engine, prepareClearPlaytest, audio: this.audio}});
+    if (isLocalPlaytestFlag('playtest-board-events') || isLocalPlaytestFlag('playtest-performance')) {
+      Object.assign(window, {__boardEffectsQA: {engine, scene, prepareClearPlaytest, audio: this.audio}});
     }
     this.updateHud(engine.state);
     if ((playtestConflictRows && [1, 3, 4].includes(playtestConflictRows)) || playtestCleanup || playtestShield || playtestShieldImpact !== null || playtestLevelUp || playtestSurvivalLevelUp || playtestFinalPush || playtestGlobalCombined || playtestImpact || playtestDefense || playtestShieldBlock || playtestShieldHalf || playtestShieldFull || playtestMessageLower || playtestAnomalyBurn || playtestScore !== null) {

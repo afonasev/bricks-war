@@ -1,3 +1,4 @@
+import { cacheGraphicsGeometry } from './graphicsGeometryCache';
 import {drawBoardEventEffects} from './boardEventEffects';
 import { installCanvasViewport } from './canvasViewport';
 import { shieldPresentationForParticipant } from './shieldPresentation';
@@ -98,6 +99,7 @@ function playtestSimulationScale(): number {
 
 export class PlayScene extends Phaser.Scene {
   private presentationStarted = false;
+  private readonly staticCards = new Map<string, { graphics: Phaser.GameObjects.Graphics; cache: ReturnType<typeof cacheGraphicsGeometry>; key: string }>();
   private staticGraphics!: Phaser.GameObjects.Graphics;
   private graphics!: Phaser.GameObjects.Graphics;
   private viewport?: ReturnType<typeof installCanvasViewport>;
@@ -112,6 +114,8 @@ export class PlayScene extends Phaser.Scene {
   private readonly activePieceInterpolation = new ActivePieceInterpolation();
   private readonly heldPauseButtons = new Map<number, boolean>();
   private readonly fireBands = new Map<string, FireBandLayer>();
+  // At most 4 row heights × (25 animated frames + one calm frame), scene-owned.
+  private readonly fireFrames = new Map<string, Phaser.Textures.CanvasTexture>();
   private runtime: PlayRuntime;
   private readonly simulationScale = playtestSimulationScale();
   private readonly reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
@@ -127,6 +131,7 @@ export class PlayScene extends Phaser.Scene {
 
   create(): void {
     this.staticGraphics = this.add.graphics();
+    this.staticGraphics.setDepth(-2);
     this.graphics = this.add.graphics();
     this.viewport = installCanvasViewport(this, !this.runtime.mobileSolo, () => {
       this.activePieceInterpolation.reset(this.runtime.engine.state.participants);
@@ -136,6 +141,8 @@ export class PlayScene extends Phaser.Scene {
     keyboard?.on('keydown', this.handleKeyDown, this);
     keyboard?.on('keyup', this.handleKeyUp, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      for (const card of this.staticCards.values()) { card.cache.destroy(); card.graphics.destroy(); }
+      this.staticCards.clear();
       this.viewport?.destroy();
       keyboard?.off('keydown', this.handleKeyDown, this);
       keyboard?.off('keyup', this.handleKeyUp, this);
@@ -146,9 +153,10 @@ export class PlayScene extends Phaser.Scene {
       this.shieldLayers.clear();
       for (const band of this.fireBands.values()) {
         band.image.destroy();
-        this.textures.remove(band.key);
       }
       this.fireBands.clear();
+      for (const texture of this.fireFrames.values()) this.textures.remove(texture.key);
+      this.fireFrames.clear();
     });
     document.addEventListener('visibilitychange', this.handleVisibility);
     this.scale.on(Phaser.Scale.Events.RESIZE, () => {
@@ -327,7 +335,11 @@ export class PlayScene extends Phaser.Scene {
       this.runtime.onLayout(layout);
     }
 
-    const staticKey = staticPlayfieldRenderKey(state, layoutKey, width, height);
+    const participantIds = new Set(state.participants.map(p => p.config.id));
+    for (const [id, card] of this.staticCards) if (!participantIds.has(id)) {
+      card.cache.destroy(); card.graphics.destroy(); this.staticCards.delete(id);
+    }
+    const staticKey = `${staticPlayfieldRenderKey(state, layoutKey, width, height)}#${[...participantIds].join(',')}`;
     if (staticKey !== this.lastStaticRenderKey) {
       this.lastStaticRenderKey = staticKey;
       this.staticGraphics.clear();
@@ -354,13 +366,34 @@ export class PlayScene extends Phaser.Scene {
         const row = Math.floor(index / layout.columns);
         const x = ARENA_EDGE_PADDING + column * (layout.slotWidth + (layout.gap ?? ARENA_CARD_GAP)) + ((layout.slotWidth - layout.cardWidth) / 2);
         const y = ARENA_EDGE_PADDING + row * (layout.slotHeight + (layout.gap ?? ARENA_CARD_GAP)) + ((layout.slotHeight - layout.cardHeight) / 2);
-        this.drawStaticBoardCard(participant, this.runtime.engine.kind === 'network' ? Number(participant.config.controllerLabel ?? index) : index, state.options.matchVariant, card?.x ?? x, card?.y ?? y, card?.cardWidth ?? layout.cardWidth, card?.cardHeight ?? layout.cardHeight, card?.cellSize ?? layout.cellSize, card?.headerHeight ?? layout.headerHeight ?? ARENA_CARD_HEADER_HEIGHT);
+        const id = participant.config.id;
+        const cardKey = `${index}:${participant.config.teamId}:${staticPlayfieldRenderKey({ ...state, participants: [participant] }, layoutKey, width, height)}`;
+        let cached = this.staticCards.get(id);
+        if (!cached) {
+          const graphics = this.add.graphics().setDepth(-1);
+          cached = { graphics, cache: cacheGraphicsGeometry(graphics), key: '' };
+          this.staticCards.set(id, cached);
+        }
+        if (cached.key !== cardKey) {
+          cached.key = cardKey;
+          const background = this.staticGraphics;
+          this.staticGraphics = cached.graphics;
+          this.staticGraphics.clear();
+          try {
+            this.drawStaticBoardCard(participant, this.runtime.engine.kind === 'network' ? Number(participant.config.controllerLabel ?? index) : index, state.options.matchVariant, card?.x ?? x, card?.y ?? y, card?.cardWidth ?? layout.cardWidth, card?.cardHeight ?? layout.cardHeight, card?.cellSize ?? layout.cellSize, card?.headerHeight ?? layout.headerHeight ?? ARENA_CARD_HEADER_HEIGHT);
+          } finally { this.staticGraphics = background; }
+        }
       });
     }
 
-    const renderKey = playfieldRenderKey(state, layoutKey, width, height, this.time.now, this.calmEffects);
-    if (renderKey === this.lastRenderKey && this.calmEffects) return;
-    this.lastRenderKey = renderKey;
+    if (this.calmEffects) {
+      const renderKey = playfieldRenderKey(state, layoutKey, width, height, this.time.now, true);
+      if (renderKey === this.lastRenderKey) return;
+      this.lastRenderKey = renderKey;
+    } else {
+      // Normal rendering interpolates active pieces every frame; this key cannot skip it.
+      this.lastRenderKey = '';
+    }
     this.graphics.clear();
     for (const layer of this.shieldLayers.values()) { layer.graphics.clear(); layer.graphics.setVisible(false); layer.effect.clear(); layer.effect.setVisible(false); }
       state.participants.forEach((participant, index) => {
@@ -640,6 +673,29 @@ export class PlayScene extends Phaser.Scene {
     const calm = this.calmEffects;
     const frame = calm ? 24 : Math.min(24, Math.round(progress * 24));
     if (frame === band.lastFrame && rows === band.lastRows && calm === band.lastCalm) return;
+    const cacheKey = `${rows}:${frame}:${calm}`;
+    const cached = this.fireFrames.get(cacheKey);
+    if (cached) {
+      // Drop the unused placeholder when another participant generated the first frame.
+      if (band.lastFrame === -1) this.textures.remove(band.key);
+      band.key = cached.key;
+      band.texture = cached;
+      band.image.setTexture(cached.key);
+      band.lastFrame = frame;
+      band.lastRows = rows;
+      band.lastCalm = calm;
+      return;
+    }
+    // A cached texture is immutable: allocate only when this scene sees a new frame.
+    if (band.lastFrame !== -1) {
+      const key = `fire-band-${nextFireBandId++}`;
+      const texture = this.textures.createCanvas(key,
+        FIRE_REFERENCE_WIDTH + FIRE_GLOW_PADDING * 2, FIRE_REFERENCE_HEIGHT + FIRE_GLOW_PADDING * 2);
+      if (!texture) return;
+      band.key = key;
+      band.texture = texture;
+    }
+    band.image.setTexture(band.key);
     band.lastFrame = frame;
     band.lastRows = rows;
     band.lastCalm = calm;
@@ -686,6 +742,7 @@ export class PlayScene extends Phaser.Scene {
     }
     context.restore();
     band.texture.refresh();
+    this.fireFrames.set(cacheKey, band.texture);
   }
 
   private drawClearPresentation(participant: ParticipantState, boardX: number, boardY: number, cellSize: number): void {

@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+import baseline from './fixtures/fire-heat-baseline.json';
 import { describe, expect, it } from 'vitest';
 import { FIRE_REFERENCE_HEIGHT, FIRE_REFERENCE_WIDTH, writeFireHeatPixels } from '../src/rendering/fireHeat';
 
@@ -23,4 +25,14 @@ describe('approved fire heat field', () => {
     expect(pixel(data, 30, 26)).toEqual([0, 0, 0, 0]);
     expect(pixel(data, 0, 0)).toEqual([0, 0, 0, 0]);
   });
+});
+
+// Full RGBA hashes captured from 0a5c63e, not derived from the optimized implementation.
+it('preserves every byte of all animated and calm fire frames', () => {
+  const data = new Uint8ClampedArray(FIRE_REFERENCE_WIDTH * FIRE_REFERENCE_HEIGHT * 4);
+  for (const [key, expected] of Object.entries(baseline)) {
+    const [rows, frame, calm] = key.split(':');
+    writeFireHeatPixels(data, Number(rows), Number(frame) / 24, calm === 'true' ? 0.5 : Number(frame) / 24);
+    expect(createHash('sha256').update(data).digest('hex'), key).toBe(expected);
+  }
 });

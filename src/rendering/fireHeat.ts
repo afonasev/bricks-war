@@ -36,6 +36,7 @@ export function writeFireHeatPixels(
   const rippleCosX = new Float64Array(width);
   const grainSinX = new Float64Array(width);
   const grainCosX = new Float64Array(width);
+  const leadX = new Float64Array(width);
   for (let x = 0; x < width; x += 1) {
     const swirlX = x * 0.105 - time * 15;
     const rippleX = Math.sin(x * 0.08 - time * 8);
@@ -46,6 +47,8 @@ export function writeFireHeatPixels(
     rippleCosX[x] = Math.cos(rippleX);
     grainSinX[x] = Math.sin(grainX);
     grainCosX[x] = Math.cos(grainX);
+    const distance = width - 1 - x;
+    leadX[x] = Math.exp(-((distance / 16) ** 2));
   }
   for (let y = 0; y < height; y += 1) {
     const swirlY = Math.sin(y * 0.18 + time * 10) * 1.4;
@@ -63,8 +66,7 @@ export function writeFireHeatPixels(
       const ripple = rippleSinY * rippleCosX[x]! + rippleCosY * rippleSinX[x]!;
       const grain = grainSinX[x]! * grainCosY + grainCosX[x]! * grainSinY;
       const heat = Math.max(0, Math.min(1, 0.48 + 0.23 * swirl + 0.19 * ripple + 0.08 * grain));
-      const distance = width - 1 - x;
-      const lead = Math.exp(-((distance / 16) ** 2));
+      const lead = leadX[x]!;
       const index = (y * FIRE_REFERENCE_WIDTH + x) * 4;
       pixels[index] = byte(205 + 48 * heat + 15 * lead);
       pixels[index + 1] = byte(54 + 124 * heat + 73 * lead);
