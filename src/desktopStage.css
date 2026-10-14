@@ -15,7 +15,7 @@
 #app[data-layout="desktop"] .desktop-menu-stage .mode-setup-screen[data-screen="survival"] .survival-lobby .editable-player-name,
 #app[data-layout="desktop"] .desktop-menu-stage .battle-setup-layout .editable-player-name { font-size: 16px; }
 #app[data-layout="desktop"] .desktop-menu-stage .survival-rules li { font-size: 18px; }
-#app[data-layout="desktop"] .desktop-menu-stage .menu-select-options { width: 650px; }
+#app[data-layout="desktop"] .desktop-menu-stage .menu-select:not(.is-dropdown) .menu-select-options { width: 650px; }
 #app[data-layout="desktop"] .desktop-menu-stage .profile-choice { width: 650px; }
 #app[data-layout="desktop"] .desktop-menu-stage .profile-choice p,
 #app[data-layout="desktop"] .desktop-menu-stage .profile-choice button,
@@ -25,7 +25,7 @@
 #app[data-layout="desktop"] .results-panel { transform: scale(var(--desktop-scale)); flex-shrink: 0; max-height: 608px; }
 #app[data-layout="desktop"] .results-panel { width: 1000px; }
 #app[data-layout="desktop"] .pause-panel { width: 650px; }
-#app[data-layout="desktop"] .pause-panel .menu-select-options { width: 600px; }
+#app[data-layout="desktop"] .pause-panel .menu-select:not(.is-dropdown) .menu-select-options { width: 600px; }
 html:has(#app[data-layout="desktop"]) { font-size: 18px; }
 
 #app[data-layout="desktop"] .desktop-menu-stage .mode-setup-screen[data-screen="survival"] .survival-rules li { font-size: 16px; }

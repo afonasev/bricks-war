@@ -52,6 +52,8 @@ export function enhanceMenuSelects(root: HTMLElement): void {
     const label = selectLabel(select);
     const wrapper = document.createElement('span');
     wrapper.className = 'menu-select';
+    const dropdown = select.dataset.menuSelectLayout === 'dropdown';
+    wrapper.classList.toggle('is-dropdown', dropdown);
     const trigger = document.createElement('button');
     trigger.type = 'button';
     trigger.disabled = select.disabled;
@@ -108,7 +110,7 @@ export function enhanceMenuSelects(root: HTMLElement): void {
 
     let highlighted = select.selectedIndex;
     let suppressKeyboardClick = false;
-    const desktop = (): boolean => root.dataset.layout === 'desktop';
+    const desktop = (): boolean => root.dataset.layout === 'desktop' && !dropdown;
     const pageSize = (): number => 6;
     const pager = document.createElement('span');
     pager.className = 'menu-select-pages';
@@ -164,8 +166,8 @@ export function enhanceMenuSelects(root: HTMLElement): void {
       const rootBounds = root.getBoundingClientRect();
       const triggerBounds = trigger.getBoundingClientRect();
       const gap = 8;
-      const spaceAbove = Math.max(0, triggerBounds.top - rootBounds.top - gap);
-      const spaceBelow = Math.max(0, rootBounds.bottom - triggerBounds.bottom - gap);
+      const spaceAbove = Math.max(0, triggerBounds.top - Math.max(0, rootBounds.top) - gap);
+      const spaceBelow = Math.max(0, Math.min(window.innerHeight, rootBounds.bottom) - triggerBounds.bottom - gap);
       const opensUpward = spaceAbove > spaceBelow;
       wrapper.classList.toggle('opens-upward', opensUpward);
       listbox.style.setProperty('--menu-select-available-height', `${Math.floor(opensUpward ? spaceAbove : spaceBelow)}px`);
