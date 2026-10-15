@@ -1,16 +1,22 @@
-export interface DisplayPreferences { width: number; height: number; fullscreen: boolean; resolutions?: number[][]; }
+export interface DisplayPreferences { width: number; height: number; fullscreen: boolean; auto?: boolean; resolutions?: number[][]; }
 export interface DesktopUpdate {
   available: boolean; applying: boolean; error: boolean;
-  phase?: 'idle' | 'checking' | 'downloading' | 'ready' | 'error';
+  phase?: 'idle' | 'checking' | 'available' | 'downloading' | 'verifying' | 'paused' | 'ready' | 'error' | 'check-error' | 'download-error' | 'install-error';
+  progress?: number; version?: string; currentVersion?: string; shellVersion?: string; component?: string;
 }
 export interface DesktopBridge {
   updateState(): Promise<DesktopUpdate>;
   check(): Promise<DesktopUpdate>;
+  download(): Promise<DesktopUpdate>;
+  cancel(): Promise<DesktopUpdate>;
+  setActivity(inMenu: boolean): Promise<DesktopUpdate>;
+  history(): Promise<{version:string; date:string|null; text:string; fallback:boolean; installed:boolean}[]>;
   apply(): Promise<boolean>;
   setSafeMenu(safe: boolean): void;
   healthy(): Promise<void>;
   display(): Promise<DisplayPreferences>;
   setDisplay(preferences: DisplayPreferences): Promise<DisplayPreferences>;
+  confirmDisplay(confirm: boolean): Promise<DisplayPreferences>;
   exit(): Promise<void>;
 }
 declare global { interface Window { bricksDesktop?: DesktopBridge; } }

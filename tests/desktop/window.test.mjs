@@ -6,7 +6,7 @@ test('large presets round-trip through persisted JSON while old choices remain v
   assert.ok(RESOLUTIONS.some(([w,h]) => w === 3840 && h === 2160));
   assert.ok(RESOLUTIONS.some(([w,h]) => w === 2560 && h === 1440));
   for (const [width,height] of RESOLUTIONS) {
-    const saved = { width, height, fullscreen: true };
+    const saved = { width, height, fullscreen: true, auto: false };
     assert.deepEqual(windowPreferences(JSON.parse(JSON.stringify(saved))), saved);
   }
 });

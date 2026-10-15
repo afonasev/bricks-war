@@ -1,14 +1,23 @@
+import { readFileSync, unlinkSync } from 'node:fs';
 import { app, BrowserWindow, ipcMain, session, screen, Menu } from 'electron';
 import { readFile, writeFile, mkdir, realpath } from 'node:fs/promises';
 import { join, dirname, extname, relative, isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import updater from 'electron-updater';
 import { ContentStore } from './content.mjs';
 import { githubContentDownload } from './update-source.mjs';
 import { windowPreferences, fitWindow, RESOLUTIONS } from './window.mjs';
+import { TransferGate, UpdateCoordinator, ShellActivation } from './update-coordinator.mjs';
+import { ShellUpdate } from './shell-update.mjs';
+import { GithubUpdates } from './github-updates.mjs';
+import { gameUrl, startupMuted as isStartupMuted } from './startup.mjs';
 
 const ORIGIN = 'https://bricks.afonasev.tech';
-const SHELL_ABI = 1;
+let restoredArgs = [];
+try { const file = join(process.env.BRICKS_DESKTOP_QA_PROFILE || app.getPath('userData'),'shell-update','launch-args.json'); const saved = JSON.parse(readFileSync(file,'utf8')); if (saved.version === app.getVersion() && Array.isArray(saved.args) && saved.args.every(arg=>typeof arg === 'string')) { restoredArgs = saved.args; unlinkSync(file); } } catch { /* ordinary launch */ }
+const launchArgs = [...process.argv,...restoredArgs];
+const startupMuted = isStartupMuted(launchArgs, process.env.BRICKS_DESKTOP_QA_PROFILE);
+const initialGameUrl = gameUrl(ORIGIN, startupMuted);
+const SHELL_ABI = 2;
 const here = dirname(fileURLToPath(import.meta.url));
 if (process.platform === 'win32') app.setAppUserModelId('tech.afonasev.brickswar');
 if (process.env.BRICKS_DESKTOP_QA_PROFILE) app.setPath('userData', process.env.BRICKS_DESKTOP_QA_PROFILE);
@@ -18,14 +27,12 @@ const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.
   '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/manifest+json',
   '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg', '.wav': 'audio/wav', '.woff2': 'font/woff2' };
 if (!app.requestSingleInstanceLock()) app.quit();
-let win, store, safeMenu = false, shellReady = false, updateError = false, applying = false;
-let contentPhase = 'idle';
+let coordinator;
+let win, store, safeMenu = false, applying = false;
 let preferences = windowPreferences();
-const autoUpdater = updater.autoUpdater;
-const state = () => ({ available: Boolean(store?.ready || shellReady), applying, error: updateError,
-  phase: contentPhase !== 'idle' ? contentPhase : store?.ready || shellReady ? 'ready' : updateError ? 'error' : 'idle' });
+const state = () => coordinator?.snapshot() ?? { available:false, applying:false, error:false, phase:'idle' };
 const allowedSender = event => win && event.sender === win.webContents && event.senderFrame === win.webContents.mainFrame
-  && event.senderFrame.url === `${ORIGIN}/`;
+  && event.senderFrame.url === initialGameUrl;
 const handle = (channel, fn) => ipcMain.handle(`desktop:${channel}`, (event, ...args) => {
   if (!allowedSender(event)) throw Error('Untrusted desktop request');
   return fn(...args);
@@ -43,7 +50,9 @@ app.whenReady().then(async () => {
   if (process.env.BRICKS_DESKTOP_QA_OFFLINE === '1') await ses.setProxy({ proxyRules: '127.0.0.1:9' });
   // Electron session.fetch cancels manual redirects. Node fetch exposes each response
   // and stays outside the local HTTPS protocol handler and renderer permissions.
-  const githubDownload = githubContentDownload(globalThis.fetch);
+  const gate = new TransferGate();
+  const rawDownload = githubContentDownload(globalThis.fetch);
+  const githubDownload = (path,limit,file) => gate.run(signal => rawDownload(path,limit,{...file, signal:file?.signal ? AbortSignal.any([signal,file.signal]) : signal}),file?.signal);
   async function download(path, limit, file) {
     if (!app.isPackaged && process.env.BRICKS_DESKTOP_QA_PROFILE && process.env.BRICKS_DESKTOP_QA_FEED) {
       const bytes = await readFile(join(process.env.BRICKS_DESKTOP_QA_FEED, path));
@@ -55,7 +64,19 @@ app.whenReady().then(async () => {
   }
   store = await new ContentStore({ root: join(profile, 'content'), bundled: join(here, '..', 'build', 'desktop-content'),
     publicKey: await readFile(join(here, 'content-public-key.pem'), 'utf8'), shellVersion: SHELL_ABI, download,
-    onProgress: phase => { contentPhase = phase; } }).open();
+    onProgress: () => {} }).open();
+  const publicKey = await readFile(join(here,'content-public-key.pem'),'utf8');
+  const shell = await new ShellUpdate({root:join(profile,'shell-update'),gate,fetcher:globalThis.fetch,publicKey,version:app.getVersion(),args:launchArgs.slice(1),helper:join(here,'shell-helper.mjs')}).open();
+  const github = new GithubUpdates({gate,store,publicKey,shell,cachePath:join(profile,'github-updates-cache.json')});
+  coordinator = new UpdateCoordinator({store,gate,discover:() => github.discover(),history:() => github.history(),readyShell:() => shell.ready});
+  coordinator.shellVersion = app.getVersion();
+  if (shell.ready) { coordinator.phase = 'ready'; coordinator.available = true; }
+  const activation=new ShellActivation(shell,()=>{coordinator.phase='install-error';coordinator.startupError=true;shell.ready=null;});
+  app.on('before-quit',event=>{if(activation.pending){event.preventDefault();void activation.start().then(()=>app.quit(),()=>app.quit());}});
+  // Ordinary quit leaves the game closed. Apply pending shell on the next normal launch,
+  // before showing any renderer; both this path and explicit Restart can probe health.
+  if(shell.ready){try{await activation.start();app.quit();return;}catch(error){console.warn('Prepared shell rejected:',error.message);}}
+  if(store.ready){await store.activate();coordinator.phase='idle';coordinator.available=false;}
   let serving = store.active;
   let inventory = new Set(store.manifest.files.map(f => f.path));
   ses.protocol.handle('https', async request => {
@@ -84,14 +105,14 @@ app.whenReady().then(async () => {
     webPreferences: { session: ses, preload: join(here, 'preload.cjs'), contextIsolation: true, sandbox: true, nodeIntegration: false } });
   win.webContents.setZoomMode('disabled');
   win.webContents.on('did-finish-load', () => win.webContents.setZoomMode('disabled'));
-  if (process.env.BRICKS_DESKTOP_QA_PROFILE) win.webContents.setAudioMuted(true);
+  if (startupMuted) win.webContents.setAudioMuted(true);
   const fitCurrentDisplay = (restorePreference = false) => {
     // Native fullscreen enters asynchronously and emits intermediate move events.
     if (win.isDestroyed() || win.isFullScreen() || preferences.fullscreen) return;
     const bounds = win.getBounds(), content = win.getContentBounds();
     const area = screen.getDisplayMatching(bounds).workArea;
     const frame = { width: bounds.width - content.width, height: bounds.height - content.height };
-    const fit = fitWindow(restorePreference ? preferences : content, area, frame);
+    const fit = fitWindow(restorePreference || preferences.auto ? preferences : content, area, frame);
     win.setMinimumSize(Math.min(800, area.width), Math.min(480, area.height));
     const width = fit.width + frame.width, height = fit.height + frame.height;
     const x = Math.max(area.x, Math.min(bounds.x, area.x + area.width - width));
@@ -102,35 +123,39 @@ app.whenReady().then(async () => {
   win.on('move', () => fitCurrentDisplay());
   screen.on('display-metrics-changed', () => fitCurrentDisplay());
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
-  win.webContents.on('will-navigate', (event, url) => { if (url !== `${ORIGIN}/`) event.preventDefault(); });
+  win.webContents.on('will-navigate', (event, url) => { if (url !== initialGameUrl) event.preventDefault(); });
   win.webContents.on('did-start-navigation', (_event, _url, _inPlace, isMainFrame) => { if (isMainFrame) safeMenu = false; });
   win.webContents.on('render-process-gone', () => { safeMenu = false; });
   win.on('close', () => { safeMenu = false; });
   win.once('ready-to-show', () => win.show());
   handle('update-state', state);
-  handle('check', async () => {
-    try { await store.check(); updateError = false; }
-    catch { updateError = true; console.warn('Game update check failed; current and ready releases retained.'); }
-    finally { contentPhase = 'idle'; }
-    return state();
-  });
+  handle('check', () => coordinator.check());
+  handle('download', () => { if (!safeMenu) return state(); void coordinator.download(); return state(); });
+  handle('cancel', () => coordinator.cancel());
+  handle('activity', async inMenu => { safeMenu = inMenu; return coordinator.setActivity(inMenu); });
+  handle('history', () => coordinator.getHistory());
   ipcMain.on('desktop:safe-menu', (event, safe) => { if (allowedSender(event)) safeMenu = safe === true; });
   handle('apply', async () => {
-    if (!safeMenu || applying || !state().available) return false;
-    applying = true; updateError = false;
-    try {
-      if (shellReady) { autoUpdater.quitAndInstall(false, true); return true; }
-      if (!await store.activate()) return false;
-      serving = store.active; inventory = new Set(store.manifest.files.map(f => f.path));
-      safeMenu = false; await win.loadURL(`${ORIGIN}/`); return true;
-    } catch { updateError = true; return false; } finally { applying = false; }
+    if (!safeMenu || applying || coordinator.phase !== 'ready') return false;
+    applying = true;
+    if (shell.ready) { try { await activation.start(); app.quit(); } catch { applying=false; return false; } } else { app.relaunch({ args: launchArgs.slice(1) }); app.quit(); } return true;
   });
-  handle('healthy', () => store.healthy());
+  handle('healthy', async () => { await store.healthy(); await shell.healthy(); });
   handle('display', () => ({ ...preferences, fullscreen: win.isFullScreen(), resolutions: RESOLUTIONS }));
+  let displayPreview, displayTimer;
+  const applyDisplay = () => { win.setFullScreen(preferences.fullscreen); if (!preferences.fullscreen) { fitCurrentDisplay(true); win.center(); } };
+  const finishDisplay = async confirm => {
+    clearTimeout(displayTimer);
+    if (displayPreview) { if (!confirm) preferences = displayPreview; else await writeFile(displayFile, JSON.stringify(preferences)); displayPreview = null; applyDisplay(); }
+    return { ...preferences, resolutions: RESOLUTIONS };
+  };
+  handle('confirm-display', finishDisplay);
   handle('set-display', async value => {
     if (!value || typeof value !== 'object') throw Error('Invalid display preferences');
+    if (!displayPreview) displayPreview = { ...preferences };
     preferences = windowPreferences(value);
-    await writeFile(displayFile, JSON.stringify(preferences));
+    clearTimeout(displayTimer);
+    displayTimer = setTimeout(() => { void finishDisplay(false); }, 15000);
     win.setFullScreen(preferences.fullscreen);
     if (!preferences.fullscreen) {
       fitCurrentDisplay(true);
@@ -139,15 +164,7 @@ app.whenReady().then(async () => {
     return { ...preferences, resolutions: RESOLUTIONS };
   });
   handle('exit', () => app.quit());
-  autoUpdater.autoInstallOnAppQuit = false;
-  autoUpdater.autoDownload = true;
-  autoUpdater.on('update-downloaded', () => { shellReady = true; });
-  autoUpdater.on('error', () => {});
-  if (app.isPackaged && !process.env.BRICKS_DESKTOP_QA_PROFILE) {
-    void autoUpdater.checkForUpdates().catch(() => {});
-    setInterval(() => { void autoUpdater.checkForUpdates().catch(() => {}); }, 60 * 60 * 1000).unref();
-  }
-  await win.loadURL(`${ORIGIN}/`);
+  await win.loadURL(initialGameUrl);
   await win.webContents.setVisualZoomLevelLimits(1, 1);
 }).catch(error => { console.error('Desktop startup failed:', error.message); app.exit(1); });
 app.on('window-all-closed', () => app.quit());

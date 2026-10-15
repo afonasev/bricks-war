@@ -1,0 +1,2 @@
+import {defineConfig} from '@playwright/test';
+export default defineConfig({testDir:'./tests/e2e',testMatch:['template-alignment.spec.ts','desktop-update.spec.ts','startup-muted.spec.ts','gamepad-roster.spec.ts'],workers:1,use:{baseURL:'http://127.0.0.1:4197',viewport:{width:1440,height:960},channel:'chrome',launchOptions:{args:['--mute-audio']}},webServer:{command:'npm run dev -- --host 127.0.0.1 --port 4197 --strictPort',port:4197,reuseExistingServer:true},reporter:[['list'],['json',{outputFile:'evidence/align-game-template/browser-report.json'}]]});

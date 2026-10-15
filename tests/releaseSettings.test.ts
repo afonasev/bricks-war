@@ -27,21 +27,21 @@ describe('release settings', () => {
 
   it('migrates a legacy master level to both independent levels', () => {
     expect(normalizeReleaseSettings({ volume: 0.62, muted: true })).toEqual({
-      music: 0.62, effects: 0.62, muted: true, calmEffects: false, musicDirection: 'neon-workshop', sfxDirection: 'soft-toy', sfxPreset: 'soft-toy',
+      ...DEFAULT_RELEASE_SETTINGS, master: 0, music: 0.62, effects: 0.62, muted: false, calmEffects: false, musicDirection: 'neon-workshop', sfxDirection: 'soft-toy', sfxPreset: 'soft-toy',
     });
   });
 
   it('clamps, saves, and restores independent values', () => {
     const storage = memoryStorage();
-    expect(saveReleaseSettings({ music: 1.4, effects: -1, muted: false, calmEffects: true, musicDirection: 'brickbeat', sfxDirection: 'arcade', sfxPreset: 'original' }, storage)).toBe(true);
-    expect(loadReleaseSettings(storage)).toEqual({ music: 1, effects: 0, muted: false, calmEffects: true, musicDirection: 'brickbeat', sfxDirection: 'arcade', sfxPreset: 'soft-toy' });
+    expect(saveReleaseSettings({ ...DEFAULT_RELEASE_SETTINGS, music: 1.4, effects: -1, muted: false, calmEffects: true, musicDirection: 'brickbeat', sfxDirection: 'arcade', sfxPreset: 'original' }, storage)).toBe(true);
+    expect(loadReleaseSettings(storage)).toEqual({ ...DEFAULT_RELEASE_SETTINGS, music: 1, effects: 0, muted: false, calmEffects: true, musicDirection: 'brickbeat', sfxDirection: 'arcade', sfxPreset: 'soft-toy' });
   });
 
   it('migrates Quiet Mechanism while preserving independent levels and legacy SFX direction', () => {
     const storage = memoryStorage();
     const settings: ReleaseSettings = { ...DEFAULT_RELEASE_SETTINGS, music: 0.73, effects: 0.28, muted: true, sfxDirection: 'construction', sfxPreset: 'quiet-mechanism' };
     expect(saveReleaseSettings(settings, storage)).toBe(true);
-    expect(loadReleaseSettings(storage)).toEqual({ ...settings, sfxPreset: 'soft-toy' });
+    expect(loadReleaseSettings(storage)).toEqual({ ...settings, muted: false, sfxPreset: 'soft-toy' });
   });
 
   it('migrates realistic and defaults invalid or missing SFX packs to Soft Toy', () => {

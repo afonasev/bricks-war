@@ -4,28 +4,29 @@ for (const viewport of [{ width: 1440, height: 960 }, { width: 1280, height: 480
     await page.setViewportSize(viewport);
     await page.addInitScript(() => {
       const qa = (window as any).__desktopQA = {
-        state: { available: false, applying: false, error: true, phase: 'error' },
+        state: { available: false, applying: false, error: true, phase: 'check-error' },
         checks: 0, applies: 0,
       };
       (window as any).bricksDesktop = {
         updateState: async () => ({ ...qa.state }),
         check: async () => {
           qa.checks++;
-          if (qa.checks > 1) qa.state = { available: true, applying: false, error: false, phase: 'ready' };
+          if (qa.checks > 1) throw Error('Discovery repeated');
           return { ...qa.state };
         },
+        download:async()=>{qa.state.phase='downloading';return {...qa.state};},cancel:async()=>{qa.state.phase='available';return {...qa.state};},setActivity:async()=>({...qa.state}),history:async()=>[],
         apply: async () => { qa.applies++; return true; }, setSafeMenu: () => {}, healthy: async () => {},
         display: async () => ({ width: 1280, height: 720, fullscreen: false }), exit: async () => {},
       };
     });
     await page.goto('/?muted=1');
     const button = page.locator('.client-update-button');
-    await expect(button).toHaveText('Повторить'); await expect(button).toBeEnabled();
-    await expect(page.locator('.client-update-status')).toHaveText('Не удалось обновить. Попробуйте ещё раз.');
-    for (const phase of ['checking', 'downloading', 'error']) {
+    await expect(button).toHaveText('Проверка недоступна'); await expect(button).toBeDisabled();
+    await expect(page.locator('.client-update-status')).toHaveText('Не удалось проверить обновления. Следующая проверка — при запуске игры.');
+    for (const phase of ['checking', 'downloading', 'check-error']) {
       await page.evaluate(phase => { (window as any).__desktopQA.state.phase = phase; }, phase);
-      await expect(button).toHaveText(phase === 'checking' ? 'Проверка…' : phase === 'downloading' ? 'Загрузка…' : 'Повторить');
-      if (phase !== 'error') await expect(button).toBeDisabled();
+      await expect(button).toHaveText(phase === 'checking' ? 'Проверка…' : phase === 'downloading' ? 'Загрузка 0%' : 'Проверка недоступна');
+      await expect(button).toBeDisabled();
       const issues = await page.evaluate(() => {
         const nodes = [...document.querySelectorAll<HTMLElement>('.client-update-button, .client-update-status, .client-update-announcement')]
           .filter(e => !e.hidden && e.getClientRects().length);
@@ -47,11 +48,11 @@ for (const viewport of [{ width: 1440, height: 960 }, { width: 1280, height: 480
       });
       expect(issues).toEqual([]);
     }
-    await page.screenshot({ path: `evidence/github-game-updates/error-${viewport.width}x${viewport.height}.png` });
-    await button.click();
-    await expect(button).toHaveText('Обновить'); await expect(button).toBeEnabled();
+    await page.screenshot({ path: `evidence/align-game-template/error-${viewport.width}x${viewport.height}.png` });
+    await page.evaluate(()=>{(window as any).__desktopQA.state={available:true,applying:false,error:false,phase:'ready'};});
+    await expect(button).toHaveText('Перезапустить'); await expect(button).toBeEnabled();
     expect(await page.evaluate(() => (window as any).__desktopQA.applies)).toBe(0);
-    await page.screenshot({ path: `evidence/github-game-updates/ready-${viewport.width}x${viewport.height}.png` });
+    await page.screenshot({ path: `evidence/align-game-template/ready-${viewport.width}x${viewport.height}.png` });
     await button.click();
     await expect.poll(() => page.evaluate(() => (window as any).__desktopQA.applies)).toBe(1);
   });

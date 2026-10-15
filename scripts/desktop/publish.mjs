@@ -11,7 +11,7 @@ const quote = value => `'${value.replaceAll("'", "'\\''")}'`;
 const ssh = command => execFileSync('ssh', ['-o', 'BatchMode=yes', host, command], { encoding: 'utf8' }).trim();
 const stage = 'build/desktop-publish';
 const current = JSON.parse(await readFile(`${stage}/game/latest.json`, 'utf8'));
-const sequence = validateManifest(current, await readFile('electron/content-public-key.pem', 'utf8'), 1).sequence;
+const sequence = validateManifest(current, await readFile('electron/content-public-key.pem', 'utf8'), 2).sequence;
 // Discard previous local preparation payloads; publish exactly one current game release.
 for (const entry of await readdir(`${stage}/game`)) if (entry !== String(sequence) && entry !== 'latest.json') await rm(`${stage}/game/${entry}`, { recursive: true, force: true });
 if (installers) {

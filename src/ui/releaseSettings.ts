@@ -1,5 +1,10 @@
 export const RELEASE_SETTINGS_KEY = 'bricks-war:release-settings:v1';
 export const DEFAULT_RELEASE_SETTINGS = Object.freeze({
+  antialias: true,
+  fpsLimit: 0,
+  master: 1,
+  stickSensitivity: 1,
+  stickDeadzone: 0,
   music: 0.85,
   effects: 0.85,
   muted: false,
@@ -10,6 +15,11 @@ export const DEFAULT_RELEASE_SETTINGS = Object.freeze({
 });
 
 export interface ReleaseSettings {
+  antialias: boolean;
+  fpsLimit: number;
+  master: number;
+  stickSensitivity: number;
+  stickDeadzone: number;
   music: number;
   effects: number;
   muted: boolean;
@@ -39,9 +49,14 @@ export function normalizeReleaseSettings(value: unknown): ReleaseSettings {
   const stored = value as Partial<ReleaseSettings> & { volume?: unknown; masterVolume?: unknown };
   const legacy = level(stored.volume ?? stored.masterVolume, DEFAULT_RELEASE_SETTINGS.music);
   return {
+    antialias: typeof stored.antialias === 'boolean' ? stored.antialias : true,
+    fpsLimit: [0,30,60,120].includes(stored.fpsLimit ?? -1) ? stored.fpsLimit! : 0,
+    master: level(stored.master, stored.muted === true ? 0 : 1),
+    stickSensitivity: typeof stored.stickSensitivity === 'number' && Number.isFinite(stored.stickSensitivity) ? Math.max(0.5, Math.min(2, stored.stickSensitivity)) : 1,
+    stickDeadzone: Math.min(0.5, level(stored.stickDeadzone, 0)),
     music: level(stored.music, legacy),
     effects: level(stored.effects, legacy),
-    muted: typeof stored.muted === 'boolean' ? stored.muted : false,
+    muted: false,
     calmEffects: typeof stored.calmEffects === 'boolean' ? stored.calmEffects : false,
     musicDirection: ['neon-workshop', 'toybox-tactics', 'arcade-skyline', 'glass-gravity', 'brickbeat'].includes(stored.musicDirection ?? '') ? stored.musicDirection as MusicDirectionId : DEFAULT_RELEASE_SETTINGS.musicDirection,
     sfxDirection: ['soft-toy', 'construction', 'arcade', 'glassy-future'].includes(stored.sfxDirection ?? '') ? stored.sfxDirection as SfxDirectionId : DEFAULT_RELEASE_SETTINGS.sfxDirection,

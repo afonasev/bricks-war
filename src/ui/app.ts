@@ -12,7 +12,7 @@ import { LocalMatchSession } from '../sessions/matchSession';
 import * as Phaser from 'phaser/dist/phaser.esm.js';
 import conceptLogoUrl from '../assets/brand/concept-logo.webp';
 import './brandLogo.css';
-import controlsGamepadPanelUrl from '../assets/controls-gamepad-panel.webp';
+import controlsGamepadPanelUrl from '../assets/controls-gamepad-gameplay.png';
 import { MAIN_MENU_PREVIEWS, mainMenuPreviewMarkup, type MainMenuDestination } from './mainMenuPreview';
 import './mainMenuPreview.css';
 import { GameAudio } from '../audio/GameAudio';
@@ -73,7 +73,7 @@ import { recordDateMarkup } from './recordDate';
 import { MenuFocusController } from './menuNavigation';
 import { enhanceMenuSelects } from './menuSelect';
 import { ScreenRouter, type AppScreen } from './screenRouter';
-import { loadReleaseSettings, saveReleaseSettings } from './releaseSettings';
+import { DEFAULT_RELEASE_SETTINGS, loadReleaseSettings, saveReleaseSettings } from './releaseSettings';
 import { isMobilePlayViewport, loadMobileSettings, saveMobileSettings, type MobileSettings } from './mobileSettings';
 import { clientUpdate } from '../pwa/clientUpdate';
 import { updatePresentation } from '../pwa/updatePresentation';
@@ -219,11 +219,13 @@ export class BricksWarApp {
   private playerNameObservedWidths = new WeakMap<HTMLInputElement | HTMLTextAreaElement, number>();
   private readonly releaseSettings = loadReleaseSettings();
   private readonly mobileSettings: MobileSettings = loadMobileSettings();
-  private readonly audio = new GameAudio(startsMutedForPlaytest() || this.releaseSettings.muted, {
+  private readonly startupMuted = startsMutedForPlaytest();
+  private readonly audio = new GameAudio(this.startupMuted, {
+    master: this.releaseSettings.master,
     music: this.releaseSettings.music,
     effects: this.releaseSettings.effects,
     sfxPreset: this.releaseSettings.sfxPreset,
-  });
+  }, this.startupMuted);
   private readonly router = new ScreenRouter();
   private readonly menuFocus: MenuFocusController;
   private readonly gamepadProfiles = new GamepadProfiles();
@@ -253,7 +255,7 @@ export class BricksWarApp {
     this.audio.setDirections(this.releaseSettings.musicDirection, this.releaseSettings.sfxDirection);
     this.menuFocus = new MenuFocusController(root, {
       onBack: () => this.navigateBack(),
-      onInputMode: (mode) => { this.root.dataset.inputMode = mode; },
+      onInputMode: (mode) => { this.root.dataset.inputMode = mode; this.refreshPadHints(); },
       onSelectionChange: (selected) => this.updateMainMenuShowcase(selected),
       onGamepadSelection: (gamepadIndex, selected) => this.openPlayerNameChoice(gamepadIndex, selected),
       onGamepadConfirm: (gamepadIndex, selected) => this.handleGamepadConfirm(gamepadIndex, selected),
@@ -296,6 +298,8 @@ export class BricksWarApp {
     const announcement = this.root.querySelector<HTMLElement>('.client-update-announcement');
     if (!button || !status) return;
     const state = clientUpdate.snapshot();
+    if (desktop && state.shellVersion) { const info = this.root.querySelector('.release-build-info'); if (info) info.textContent = `Игра ${state.currentVersion ?? ''} · Оболочка ${state.shellVersion}`; }
+    const cancel = this.root.querySelector<HTMLButtonElement>('.desktop-cancel-download'); if (cancel) cancel.hidden = !['downloading','verifying','paused'].includes(state.phase ?? '');
     const presentation = updatePresentation(state);
     button.hidden = !presentation.visible;
     const download = this.root.querySelector<HTMLButtonElement>('.desktop-download');
@@ -324,7 +328,16 @@ export class BricksWarApp {
     else if (screen === 'rules') this.renderRules();
   }
 
+  private readonly menuScroll = new Map<string, number[]>();
+  private refreshPadHints(): void {
+    const pad = Array.from(navigator.getGamepads?.() ?? []).find(p => p?.connected && p.index === this.menuFocus.activeGamepadIndex());
+    const family = /dualsense|dualshock|playstation|sony|054c/i.test(pad?.id ?? '') ? ['✕','○','□','△'] : /nintendo|switch|057e/i.test(pad?.id ?? '') ? ['B','A','Y','X'] : /xbox|xinput|045e/i.test(pad?.id ?? '') ? ['A','B','X','Y'] : ['Низ','Право','Лево','Верх'];
+    this.root.querySelectorAll<HTMLElement>('.screen-back,#pause-settings-back,[data-history-back]').forEach(button=>{let hint=button.querySelector<HTMLElement>('.context-pad-hint');if(!hint){hint=document.createElement('b');hint.className='context-pad-hint input-badge';hint.setAttribute('aria-hidden','true');button.append(hint);}hint.textContent=family[1]!;});
+    for (const [selector,index] of [['.input-confirm',0],['.input-back',1],['.footer-start kbd',2],['.input-roster',3]] as const) this.root.querySelectorAll(selector).forEach(item => { item.textContent = family[index]!; });
+  }
+
   private rememberFocus(): void {
+    this.menuScroll.set(this.router.current(), Array.from(this.root.querySelectorAll<HTMLElement>('.settings-list, .release-panel, .profile-choice-actions, .controls-reference')).map(el => el.scrollTop));
     this.router.rememberSelection(this.router.current(), this.menuFocus.selectedIndex());
   }
 
@@ -334,6 +347,8 @@ export class BricksWarApp {
     this.root.querySelectorAll<HTMLElement>('button:not(.menu-select-option), input, textarea, select:not([hidden])').forEach((element) => {
       if (!element.closest('.menu-select-pages') && !element.hasAttribute('data-ui-focus')) element.setAttribute('data-ui-focus', '');
     });
+    this.root.querySelectorAll<HTMLElement>('.settings-list, .release-panel, .profile-choice-actions, .controls-reference').forEach((el,index) => { el.scrollTop = this.menuScroll.get(screen)?.[index] ?? 0; });
+    this.refreshPadHints();
     this.menuFocus.activate(screen, this.profileChoices.length ? 0 : this.router.selectionFor(screen, this.root.querySelectorAll('[data-ui-focus]:not([disabled])').length));
   }
 
@@ -354,6 +369,9 @@ export class BricksWarApp {
   }
 
   private navigateBack(): void {
+    const historyClose = this.root.querySelector<HTMLButtonElement>('[data-history-back]'); if (historyClose) { historyClose.click(); return; }
+    const displayCancel = this.root.querySelector<HTMLButtonElement>('[data-display-no]');
+    if (displayCancel) { displayCancel.click(); return; }
     if (this.matchLoading) {
       this.destroyGame();
       this.router.back();
@@ -390,6 +408,7 @@ export class BricksWarApp {
 
   private renderMainMenu(): void {
     this.network?.destroy(); this.network = null;
+    void clientUpdate.setActivity(true);
     this.disconnectPlayerNameResizeObserver();
     this.destroyGame();
     this.countdownReady = false;
@@ -403,7 +422,7 @@ export class BricksWarApp {
         <section class="main-menu-layout">
           <div class="main-menu-primary">
             <header class="release-brand main-menu-brand">
-              <div class="main-menu-brand-row"><h1 class="concept-brand-heading"><img class="concept-brand-logo" src="${conceptLogoUrl}" alt="BRICKS WAR" /></h1><div class="client-update-slot"><p class="client-update-announcement" hidden><strong>Вышла новая версия игры,</strong> готовы обновиться?</p><button class="client-update-button" type="button" hidden>Обновить</button><p class="client-update-status" role="status" hidden></p><button type="button" class="desktop-download" data-ui-focus hidden aria-label="Скачать игру для установки" title="Скачать игру"><span aria-hidden="true">⇩</span><span>Скачать игру</span></button></div></div>
+              <div class="main-menu-brand-row"><h1 class="concept-brand-heading"><img class="concept-brand-logo" src="${conceptLogoUrl}" alt="BRICKS WAR" /></h1><div class="client-update-slot"><p class="client-update-announcement" hidden><strong>Вышла новая версия игры,</strong> готовы обновиться?</p><button class="client-update-button" type="button" hidden>Обновить</button><p class="client-update-status" role="status" hidden></p>${desktop ? '<button class="desktop-cancel-download" type="button" hidden>Отменить загрузку</button><button class="desktop-release-history" type="button">Что нового</button>' : ''}<button type="button" class="desktop-download" data-ui-focus hidden aria-label="Скачать игру для установки" title="Скачать игру"><span aria-hidden="true">⇩</span><span>Скачать игру</span></button></div></div>
             </header>
             ${shouldShowIosInstallHint() || isLocalPlaytestFlag('pwa-install-hint') ? '<aside class="pwa-install-hint" role="status"><span aria-hidden="true">⇧</span><p>Хотите играть как в приложении? Нажмите <b>Поделиться</b> в Safari, затем <b>На экран «Домой»</b>.</p><button type="button" data-dismiss-pwa-hint aria-label="Закрыть подсказку установки">×</button></aside>' : ''}
             <nav class="mode-menu" aria-label="Главное меню">
@@ -451,12 +470,14 @@ export class BricksWarApp {
     this.root.querySelector('[data-network-entry]')?.addEventListener('click', () => {
       this.menuFocus.suspend(); this.router.open('network'); this.destroyGame();
       desktop?.setSafeMenu(false);
-      this.network = new NetworkApp(this.root, () => {this.router.open('main-menu'); this.renderMainMenu();}, this.audio);
+      this.network = new NetworkApp(this.root, () => {this.router.open('main-menu'); this.renderMainMenu();}, this.audio, onClose => this.openNetworkPreferences(onClose));
     });
     this.root.querySelector('.client-update-button')?.addEventListener('click', () => {
       if (clientUpdate.snapshot().available) clientUpdate.apply();
-      else void clientUpdate.check(true);
+      else if (!desktop) void clientUpdate.check(true);
     });
+    this.root.querySelector('.desktop-release-history')?.addEventListener('click', () => { void this.showReleaseHistory(); });
+    this.root.querySelector('.desktop-cancel-download')?.addEventListener('click', () => clientUpdate.cancelDownload());
     this.root.querySelector('#desktop-exit')?.addEventListener('click', () => { clientUpdate.refresh(); void desktop?.exit(); });
     this.root.querySelector('.desktop-download')?.addEventListener('click', () => {
       if (!this.downloadUrl) return;
@@ -474,13 +495,13 @@ export class BricksWarApp {
 
   private updateMainMenuShowcase(selected: HTMLElement | null): void {
     if (this.router.current() !== 'main-menu') return;
-    const destination = (selected?.hasAttribute('data-network-entry') ? 'network' : selected?.dataset.destination) as MainMenuDestination | undefined;
+    const destination = (selected?.id === 'desktop-exit' ? 'exit' : selected?.hasAttribute('data-network-entry') ? 'network' : selected?.dataset.destination) as MainMenuDestination | undefined;
     if (!destination || !(destination in MAIN_MENU_PREVIEWS)) return;
     const showcase = this.root.querySelector<HTMLElement>('#menu-showcase');
     const content = this.root.querySelector<HTMLElement>('#showcase-content');
     if (!showcase || !content || showcase.dataset.preview === destination) return;
     showcase.dataset.preview = destination;
-    showcase.classList.remove('showcase-survival', 'showcase-battle', 'showcase-team-battle', 'showcase-network', 'showcase-settings');
+    showcase.classList.remove('showcase-survival', 'showcase-battle', 'showcase-team-battle', 'showcase-network', 'showcase-settings', 'showcase-exit');
     showcase.classList.add(`showcase-${destination}`);
     showcase.setAttribute('aria-label', MAIN_MENU_PREVIEWS[destination].label);
     content.innerHTML = mainMenuPreviewMarkup(destination);
@@ -500,10 +521,11 @@ export class BricksWarApp {
           <section class="release-panel settings-section settings-audio-section"><header><span class="settings-icon" aria-hidden="true">♪</span><div><p class="eyebrow">ЗВУК</p><h2>Музыка и эффекты</h2></div></header>${this.setupAudioMarkup()}</section>
           ${isLocalPlaytestFlag('audio-prototypes') ? this.audioPrototypeGalleryMarkup() : ''}
           <section class="release-panel settings-section settings-display-section"><header><span class="settings-icon settings-icon-screen" aria-hidden="true">▣</span><div><p class="eyebrow">ЭКРАН</p><h2>Изображение</h2></div></header>
-            ${desktop ? `<label class="settings-action"><span><strong>Разрешение окна</strong><small>Размер в логических пикселях, с учётом масштаба ОС; полный экран — весь монитор</small></span><select id="desktop-resolution" data-menu-select-layout="dropdown">${(this.desktopDisplay.resolutions ?? [[960,540],[1280,720],[1440,900],[1600,900],[1920,1080],[2560,1440],[3840,2160]]).map(([w,h]) => `<option value="${w}x${h}" ${w === this.desktopDisplay.width && h === this.desktopDisplay.height ? 'selected' : ''}>${w} × ${h}</option>`).join('')}</select></label><label class="settings-action"><span><strong>Режим экрана</strong><small>Полный экран или отдельное окно</small></span><select id="desktop-window-mode"><option value="windowed" ${!this.desktopDisplay.fullscreen ? 'selected' : ''}>Оконный</option><option value="fullscreen" ${this.desktopDisplay.fullscreen ? 'selected' : ''}>Полный экран</option></select></label><output id="desktop-display-status" class="settings-status" role="status"></output>` : ''}
+            ${desktop ? `<label class="settings-action"><span><strong>Разрешение окна</strong><small>Размер в логических пикселях, с учётом масштаба ОС; полный экран — весь монитор</small></span><select id="desktop-resolution" data-menu-select-layout="dropdown"><option value="auto" ${this.desktopDisplay.auto ? 'selected' : ''}>Auto — по экрану</option>${(this.desktopDisplay.resolutions ?? [[960,540],[1280,720],[1440,900],[1600,900],[1920,1080],[2560,1440],[3840,2160]]).map(([w,h]) => `<option value="${w}x${h}" ${!this.desktopDisplay.auto && w === this.desktopDisplay.width && h === this.desktopDisplay.height ? 'selected' : ''}>${w} × ${h}</option>`).join('')}</select></label><label class="settings-action"><span><strong>Режим экрана</strong><small>Полный экран или отдельное окно</small></span><select id="desktop-window-mode"><option value="windowed" ${!this.desktopDisplay.fullscreen ? 'selected' : ''}>Оконный</option><option value="fullscreen" ${this.desktopDisplay.fullscreen ? 'selected' : ''}>Полный экран</option></select></label><output id="desktop-display-status" class="settings-status" role="status"></output>` : ''}
             ${mobile || desktop ? '' : `<button class="settings-action" id="toggle-fullscreen" type="button"><span><strong>Полноэкранный режим</strong><small>Использовать весь экран для игровых полей</small></span><b>${document.fullscreenElement ? 'Вкл' : 'Выкл'}</b></button><output id="fullscreen-status" class="settings-status" role="status"></output>`}
             <label class="settings-action"><span><strong>Спокойные эффекты</strong><small>Меньше движения, частиц и ярких вспышек</small></span><input id="calm-effects" type="checkbox" ${this.releaseSettings.calmEffects ? 'checked' : ''} /></label>
           </section>
+          ${this.preferenceExtrasMarkup()}
           <button class="release-panel settings-action settings-navigation" id="open-rules" type="button"><span class="settings-icon" aria-hidden="true">✦</span><span><strong>Правила</strong><small>Фигуры, атаки и защита — на примерах</small></span><b>›</b></button>
           ${mobile ? '' : `<button class="release-panel settings-action settings-navigation" id="open-controls" type="button"><span class="settings-icon settings-icon-gamepad" aria-hidden="true">🎮</span><span><strong>Управление</strong><small>Клавиатура и геймпад</small></span><b>›</b></button>`}
           <button class="release-panel settings-action settings-navigation" id="open-settings-lab" type="button"><span class="settings-icon settings-icon-lab" aria-hidden="true">⌁</span><span><strong>Лаборатория дизайна</strong><small>Тонкая настройка игрового баланса</small></span><b>›</b></button>
@@ -521,7 +543,7 @@ export class BricksWarApp {
       const resolution = this.root.querySelector<HTMLSelectElement>('#desktop-resolution')?.value ?? '1280x720';
       const [width = 1280, height = 720] = resolution.split('x').map(Number);
       const fullscreen = this.root.querySelector<HTMLSelectElement>('#desktop-window-mode')?.value === 'fullscreen';
-      void desktop.setDisplay({ width, height, fullscreen }).then(value => { this.desktopDisplay = value; })
+      void this.previewDisplay({ width, height, fullscreen, auto: resolution === 'auto' })
         .catch(() => { const status = this.root.querySelector('#desktop-display-status'); if (status) status.textContent = 'Не удалось изменить параметры экрана'; });
     };
     this.root.querySelector('#desktop-resolution')?.addEventListener('change', applyDesktopDisplay);
@@ -536,11 +558,12 @@ export class BricksWarApp {
     this.root.querySelector<HTMLInputElement>('#calm-effects')?.addEventListener('change', (event) => {
       this.releaseSettings.calmEffects = (event.currentTarget as HTMLInputElement).checked;
       document.body.classList.toggle('calm-effects', this.releaseSettings.calmEffects);
-      saveReleaseSettings(this.releaseSettings);
+      this.persistPreferences();
     });
     this.bindMenuAudioUnlock();
     this.bindAudioToggle();
     this.bindVolumeControl();
+    this.bindPreferenceExtras();
     this.activateMenuFocus('settings');
   }
 
@@ -564,7 +587,8 @@ export class BricksWarApp {
         <header class="release-heading"><button class="screen-back" id="controls-back" type="button">← Настройки</button><div><p class="eyebrow">ФИКСИРОВАННАЯ СХЕМА</p><h1>Управление</h1></div></header>
         <div class="controls-reference">
           <section class="gamepad-reference" aria-label="Схема геймпада">
-            <img class="approved-gamepad-artwork" src="${controlsGamepadPanelUrl}" width="1000" height="720" alt="Геймпад: левый стик или D-pad — движение; вниз — ускорить падение; A — повернуть; B — назад в меню; Menu — пауза. В меню D-pad или стик выбирает пункт, основная кнопка открывает, правая кнопка возвращает назад." />
+            <img class="approved-gamepad-artwork" src="${controlsGamepadPanelUrl}" width="1000" height="720" alt="Геймпад: левый стик или D-pad — движение; вниз — ускорить падение; A — повернуть; Menu — пауза. Нижняя лицевая кнопка (A / крест) — поворот." />
+            <p class="controls-family-note">На рисунке Xbox. Поворот — нижняя лицевая кнопка: A на Xbox, ✕ на PlayStation, B на Nintendo. Влево/вправо — движение; вниз — ускорение. Пауза — Menu / Options / +.</p>
           </section>
           <section class="keyboard-reference">
             <article class="release-panel"><h2>Клавиатура 1</h2><div class="keyboard-cluster wasd"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></div><ul class="key-actions"><li class="action-rotate">W повернуть</li><li class="action-move">A D двигать</li><li class="action-drop">S ускорить</li></ul></article>
@@ -1333,6 +1357,7 @@ export class BricksWarApp {
   }
 
   private async prepareMatch(loading: MatchLoading): Promise<void> {
+    await clientUpdate.setActivity(false);
     if (!await loading.painted() || this.matchLoading !== loading) return;
     this.disconnectPlayerNameResizeObserver();
     this.countdownReady = false;
@@ -1450,7 +1475,8 @@ export class BricksWarApp {
       parent: 'game-canvas',
       backgroundColor: '#071b4a',
       transparent: !mobileMatch,
-      antialias: true,
+      antialias: this.releaseSettings.antialias,
+      fps: {limit:this.releaseSettings.fpsLimit},
       render: { pixelArt: false, roundPixels: true },
       scale: {
         mode: Phaser.Scale.RESIZE,
@@ -1485,7 +1511,7 @@ export class BricksWarApp {
     this.root.querySelector<HTMLInputElement>('#pause-calm-effects')?.addEventListener('change', (event) => {
       this.releaseSettings.calmEffects = (event.currentTarget as HTMLInputElement).checked;
       document.body.classList.toggle('calm-effects', this.releaseSettings.calmEffects);
-      saveReleaseSettings(this.releaseSettings);
+      this.persistPreferences();
     });
     const returnToMenu = (): void => { this.destroyGame(); this.router.open('main-menu'); this.renderMainMenu(); };
     this.root.querySelector('#return-to-menu')?.addEventListener('click', returnToMenu);
@@ -1925,17 +1951,118 @@ export class BricksWarApp {
     this.activateMenuFocus('results');
   }
 
-  private audioButtonMarkup(): string {
-    const enabled = !this.audio.isMuted();
-    return `<button class="audio-toggle" type="button" aria-label="${enabled ? 'Отключить звук' : 'Включить звук'}" aria-pressed="${enabled}">♪ ЗВУК ${enabled ? 'ВКЛ' : 'ВЫКЛ'}</button>`;
+  private async showReleaseHistory(): Promise<void> {
+    if (!desktop || this.root.querySelector('[data-release-history]')) return;
+    const backdrop = document.createElement('div'); backdrop.className = 'profile-choice-backdrop';
+    backdrop.innerHTML = `<section class="release-panel release-history" data-release-history role="dialog" aria-modal="true"><h2>Что нового</h2><p role="status">Загружаем историю…</p><div class="release-history-list"></div><button type="button" data-history-back data-ui-focus>Закрыть</button></section>`;
+    const close = () => { backdrop.remove(); this.activateMenuFocus('main-menu'); };
+    backdrop.querySelector('[data-history-back]')?.addEventListener('click', close);
+    this.root.append(backdrop); this.activateMenuFocus('main-menu');
+    try {
+      const rows = await desktop.history(); const list = backdrop.querySelector('.release-history-list')!;
+      backdrop.querySelector('[role="status"]')!.textContent = '';
+      for (const row of rows) {
+        const article = document.createElement('article'); const heading = document.createElement('h3');
+        heading.textContent = `${row.version}${row.installed ? ' · установлена' : ''}${row.date ? ' · ' + new Date(row.date).toLocaleDateString('ru-RU') : ''}`;
+        const notes = document.createElement('pre'); notes.textContent = row.text; article.append(heading,notes);
+        if (row.fallback) { const fallback = document.createElement('p'); fallback.textContent = 'Для старого выпуска русский перевод может отсутствовать.'; article.append(fallback); }
+        list.append(article);
+      }
+    } catch { backdrop.querySelector('[role="status"]')!.textContent = 'История сейчас недоступна. Можно продолжить играть.'; }
+  }
+
+  private async previewDisplay(value: import('../platform/desktop').DisplayPreferences): Promise<void> {
+    if (!desktop || this.root.querySelector('[data-display-confirm]')) return;
+    this.desktopDisplay = await desktop.setDisplay(value);
+    const backdrop = document.createElement('div'); backdrop.className = 'profile-choice-backdrop';
+    backdrop.innerHTML = `<section class="release-panel profile-choice" data-display-confirm role="dialog" aria-modal="true"><h2>Сохранить режим экрана?</h2><p>Без подтверждения прежний режим вернётся через 15 секунд.</p><button data-display-yes type="button" data-ui-focus>Сохранить</button><button data-display-no type="button" data-ui-focus>Вернуть прежний</button></section>`;
+    this.root.append(backdrop);
+    let finished = false;
+    const finish = async (confirm: boolean) => {
+      if (finished) return; finished = true; window.clearTimeout(timer);
+      this.desktopDisplay = await desktop!.confirmDisplay(confirm); backdrop.remove();
+      this.refreshPreferenceScreen();
+    };
+    const timer = window.setTimeout(() => { void finish(false); }, 15000);
+    backdrop.querySelector('[data-display-yes]')?.addEventListener('click', () => { void finish(true); });
+    backdrop.querySelector('[data-display-no]')?.addEventListener('click', () => { void finish(false); });
+    if(this.network)this.network.activateNavigation();else this.activateMenuFocus('settings');
+  }
+
+  private networkPreferencesClose?: () => void;
+  private openNetworkPreferences(onClose: () => void): void {
+    this.networkPreferencesClose=onClose;
+    const backdrop=document.createElement('div');backdrop.className='profile-choice-backdrop';
+    const panel=document.createElement('section');panel.className='release-panel pause-panel pause-settings-panel';panel.dataset.networkPreferences='';backdrop.append(panel);this.root.append(backdrop);
+    this.renderPausePreferences(panel,()=>{backdrop.remove();onClose();});
+  }
+
+  private refreshPreferenceScreen(): void {
+    const panel=this.root.querySelector<HTMLElement>('[data-network-preferences]');
+    if(panel) this.renderPausePreferences(panel,()=>{panel.parentElement?.remove();this.networkPreferencesClose?.();});
+    else if(this.game) this.renderPausePreferences(); else this.renderSettings();
+  }
+
+  private renderPausePreferences(panel = this.root.querySelector<HTMLElement>('#pause-settings-panel'), onBack = () => this.navigateBack()): void {
+    if (!panel) return;
+    panel.innerHTML = `<h2>Настройки</h2><div class="pause-preferences-scroll">${this.setupAudioMarkup()}
+      ${desktop ? `<label class="settings-action"><span>Разрешение окна</span><select data-pause-resolution><option value="auto" ${this.desktopDisplay.auto ? 'selected' : ''}>Auto — по экрану</option>${(this.desktopDisplay.resolutions ?? [[1280,720]]).map(([w,h]) => `<option value="${w}x${h}" ${!this.desktopDisplay.auto && w === this.desktopDisplay.width && h === this.desktopDisplay.height ? 'selected' : ''}>${w} × ${h}</option>`).join('')}</select></label><label class="settings-action"><span>Режим экрана</span><select data-pause-window><option value="windowed" ${!this.desktopDisplay.fullscreen ? 'selected' : ''}>Оконный</option><option value="fullscreen" ${this.desktopDisplay.fullscreen ? 'selected' : ''}>Полный экран</option></select></label>` : `<button type="button" data-pause-fullscreen>Полноэкранный режим</button>`}
+      <label class="settings-action"><span>Спокойные эффекты</span><input data-pause-calm type="checkbox" ${this.releaseSettings.calmEffects ? 'checked' : ''} /></label>${this.preferenceExtrasMarkup()}</div><button id="pause-settings-back" ${panel.hasAttribute('data-network-preferences') ? 'data-network-prefs-back' : ''} type="button">← Назад к паузе</button>`;
+    panel.querySelector('#pause-settings-back')?.addEventListener('click', onBack);
+    panel.querySelector('[data-pause-calm]')?.addEventListener('change', event => { this.releaseSettings.calmEffects = (event.target as HTMLInputElement).checked; document.body.classList.toggle('calm-effects', this.releaseSettings.calmEffects); this.persistPreferences(); });
+    panel.querySelector('[data-pause-fullscreen]')?.addEventListener('click', () => { void (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch(() => { const status = panel.querySelector('[data-preferences-status]'); if (status) status.textContent = 'Не удалось изменить режим экрана'; }); });
+    const change = () => { const resolution = panel.querySelector<HTMLSelectElement>('[data-pause-resolution]')?.value ?? 'auto'; const [width = 1280,height = 720] = resolution.split('x').map(Number); void this.previewDisplay({ width,height, auto: resolution === 'auto', fullscreen: panel.querySelector<HTMLSelectElement>('[data-pause-window]')?.value === 'fullscreen' }); };
+    panel.querySelector('[data-pause-resolution]')?.addEventListener('change', change); panel.querySelector('[data-pause-window]')?.addEventListener('change', change);
+    this.bindVolumeControl(); this.bindPreferenceExtras(); enhanceMenuSelects(panel); if (!panel.hasAttribute('data-network-preferences')) this.activateMenuFocus('settings'); else panel.querySelectorAll<HTMLElement>('button,input,select').forEach(el=>{if(!el.hidden)el.dataset.uiFocus='';});
+  }
+
+  private persistPreferences(): boolean {
+    const saved = saveReleaseSettings(this.releaseSettings);
+    const status = this.root.querySelector<HTMLOutputElement>('[data-preferences-status]');
+    if (status) status.textContent = saved ? '' : 'Не удалось сохранить настройки на устройстве. Изменения действуют до закрытия игры; повторите изменение.';
+    return saved;
+  }
+
+  private preferenceExtrasMarkup(): string {
+    return `<section class="preference-inputs"><label class="settings-action"><span><strong>Сглаживание</strong><small>Применится в следующем матче</small></span><input data-preference-aa type="checkbox" ${this.releaseSettings.antialias ? 'checked' : ''} /></label><label class="settings-action"><span><strong>Ограничение кадров</strong><small>Применится в следующем матче. Частота экрана может ограничивать результат.</small></span><select data-preference-fps>${[0,30,60,120].map(value => `<option value="${value}" ${this.releaseSettings.fpsLimit === value ? 'selected' : ''}>${value ? value + ' кадр/с' : 'Без ограничения'}</option>`).join('')}</select></label><h2>Управление стиком</h2><p>Общие настройки этого устройства. D-pad не меняется.</p>
+      <label class="volume-control"><span>Чувствительность</span><input data-stick="stickSensitivity" type="range" min="50" max="200" step="5" value="${Math.round(this.releaseSettings.stickSensitivity * 100)}" /><output>${Math.round(this.releaseSettings.stickSensitivity * 100)}%</output></label>
+      <label class="volume-control"><span>Мёртвая зона</span><input data-stick="stickDeadzone" type="range" min="0" max="50" step="1" value="${Math.round(this.releaseSettings.stickDeadzone * 100)}" /><output>${Math.round(this.releaseSettings.stickDeadzone * 100)}%</output></label></section>
+      <div class="preferences-reset-actions"><button type="button" data-reset-preferences="audio">Сбросить звук</button><button type="button" data-reset-preferences="input">Сбросить управление</button><button type="button" data-reset-preferences="display">Сбросить экран и эффекты</button><button type="button" data-reset-preferences="all">Сбросить все настройки</button></div><output data-preferences-status role="status"></output>`;
+  }
+
+  private bindPreferenceExtras(): void {
+    this.root.querySelector<HTMLInputElement>('[data-preference-aa]')?.addEventListener('change',event=>{this.releaseSettings.antialias=(event.target as HTMLInputElement).checked;this.persistPreferences();});
+    this.root.querySelector<HTMLSelectElement>('[data-preference-fps]')?.addEventListener('change',event=>{this.releaseSettings.fpsLimit=Number((event.target as HTMLSelectElement).value);this.persistPreferences();});
+    this.root.querySelectorAll<HTMLInputElement>('[data-stick]').forEach(input => input.addEventListener('input', () => {
+      const key = input.dataset.stick as 'stickSensitivity' | 'stickDeadzone';
+      this.releaseSettings[key] = Number(input.value) / 100;
+      const output = input.parentElement?.querySelector('output'); if (output) output.textContent = `${input.value}%`;
+      this.persistPreferences();
+    }));
+    this.root.querySelectorAll<HTMLButtonElement>('[data-reset-preferences]').forEach(button => button.addEventListener('click', () => {
+      const group = button.dataset.resetPreferences;
+      if (group === 'all' || group === 'audio') {
+        for (const key of ['master', 'music', 'effects'] as const) this.releaseSettings[key] = DEFAULT_RELEASE_SETTINGS[key];
+        this.releaseSettings.musicDirection = DEFAULT_RELEASE_SETTINGS.musicDirection; this.releaseSettings.sfxDirection = DEFAULT_RELEASE_SETTINGS.sfxDirection; this.audio.setDirections(this.releaseSettings.musicDirection,this.releaseSettings.sfxDirection);
+        this.audio.setMasterVolume(this.releaseSettings.master); this.audio.setMusicVolume(this.releaseSettings.music); this.audio.setEffectsVolume(this.releaseSettings.effects);
+      }
+      if (group === 'all' || group === 'input') { this.releaseSettings.stickSensitivity = 1; this.releaseSettings.stickDeadzone = 0; }
+      if (group === 'all' || group === 'display') {
+        this.releaseSettings.antialias = true; this.releaseSettings.fpsLimit = 0; this.releaseSettings.calmEffects = false; document.body.classList.remove('calm-effects');
+        if (desktop) void this.previewDisplay({ width: 1280, height: 720, fullscreen: false, auto: true });
+      }
+      this.refreshPreferenceScreen();
+      this.persistPreferences();
+    }));
   }
 
   private setupAudioMarkup(): string {
+    const master = Math.round(this.audio.getMasterVolume() * 100);
     const music = Math.round(this.audio.getMusicVolume() * 100);
     const effects = Math.round(this.audio.getEffectsVolume() * 100);
     return `
       <div class="setup-audio-controls">
-        ${this.audioButtonMarkup()}
+        <label class="volume-control" for="master-volume"><span>Общая</span><input id="master-volume" type="range" min="0" max="100" step="1" value="${master}" aria-label="Общая громкость" /><output id="master-volume-value">${master}%</output></label>
         <label class="volume-control" for="music-volume">
           <span>Музыка</span>
           <input id="music-volume" type="range" min="0" max="100" step="1" value="${music}" aria-label="Громкость музыки" />
@@ -1982,7 +2109,7 @@ export class BricksWarApp {
         }
         this.audio.setDirections(this.releaseSettings.musicDirection, this.releaseSettings.sfxDirection);
         this.audio.playPrototype(category, category === 'gameplay-music' || category === 'menu-music' ? direction as MusicDirectionId : undefined);
-        saveReleaseSettings(this.releaseSettings);
+        this.persistPreferences();
       });
     });
   }
@@ -2002,32 +2129,37 @@ export class BricksWarApp {
   private bindAudioToggle(): void {
     this.root.querySelectorAll<HTMLButtonElement>('.audio-toggle').forEach((button) => {
       button.addEventListener('click', () => {
+        if (this.startupMuted) {
+          this.refreshAudioButtons();
+          return;
+        }
         this.audio.unlock();
         this.audio.toggleMuted();
         this.releaseSettings.muted = this.audio.isMuted();
-        saveReleaseSettings(this.releaseSettings);
+        this.persistPreferences();
         this.refreshAudioButtons();
       });
     });
   }
 
   private bindVolumeControl(): void {
-    const bind = (kind: 'music' | 'effects'): void => {
+    const bind = (kind: 'master' | 'music' | 'effects'): void => {
       const slider = this.root.querySelector<HTMLInputElement>(`#${kind}-volume`);
       const output = this.root.querySelector<HTMLOutputElement>(`#${kind}-volume-value`);
       if (!slider || !output) return;
       slider.addEventListener('input', () => {
         this.audio.unlock();
         const value = Number(slider.value) / 100;
-        const normalized = kind === 'music' ? this.audio.setMusicVolume(value) : this.audio.setEffectsVolume(value);
+        const normalized = kind === 'master' ? this.audio.setMasterVolume(value) : kind === 'music' ? this.audio.setMusicVolume(value) : this.audio.setEffectsVolume(value);
         const percentage = Math.round(normalized * 100);
         this.releaseSettings[kind] = normalized;
-        saveReleaseSettings(this.releaseSettings);
+        this.persistPreferences();
         slider.value = String(percentage);
         output.value = `${percentage}%`;
         output.textContent = `${percentage}%`;
       });
     };
+    bind('master');
     bind('music');
     bind('effects');
   }
@@ -2079,7 +2211,7 @@ export class BricksWarApp {
     if (!menu || !settings) return;
     menu.hidden = open;
     settings.hidden = !open;
-    if (open) this.router.open('settings', 'pause');
+    if (open) { this.router.open('settings', 'pause'); this.renderPausePreferences(); }
     else this.router.open('pause', 'arena');
     this.activateMenuFocus(open ? 'settings' : 'pause');
   }

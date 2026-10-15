@@ -1,3 +1,4 @@
+import { loadReleaseSettings } from '../ui/releaseSettings';
 import type { GamepadController } from '../domain/types';
 
 export interface ConnectedGamepad {
@@ -25,9 +26,16 @@ export function connectedGamepads(source: Navigator = navigator): ConnectedGamep
   }] : []);
 }
 
-export function gamepadControls(gamepad: Gamepad): GamepadControls {
-  const horizontal = gamepad.axes[0] ?? 0;
-  const vertical = gamepad.axes[1] ?? 0;
+export function stickAxis(value: number, sensitivity = 1, deadzone = 0): number {
+  if (!Number.isFinite(value)) return 0;
+  const magnitude = Math.abs(value);
+  if (magnitude <= deadzone) return 0;
+  return Math.sign(value) * Math.min(1, (magnitude - deadzone) / (1 - deadzone) * sensitivity);
+}
+
+export function gamepadControls(gamepad: Gamepad, preferences = loadReleaseSettings()): GamepadControls {
+  const horizontal = stickAxis(gamepad.axes[0] ?? 0, preferences.stickSensitivity, preferences.stickDeadzone);
+  const vertical = stickAxis(gamepad.axes[1] ?? 0, preferences.stickSensitivity, preferences.stickDeadzone);
   return {
     left: buttonPressed(gamepad, 14) || horizontal <= -STICK_THRESHOLD,
     right: buttonPressed(gamepad, 15) || horizontal >= STICK_THRESHOLD,

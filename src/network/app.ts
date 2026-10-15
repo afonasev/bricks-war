@@ -1,3 +1,6 @@
+import {MenuFocusController} from '../ui/menuNavigation';
+import {loadReleaseSettings} from '../ui/releaseSettings';
+import { clientUpdate } from '../pwa/clientUpdate';
 import { releaseMetadataMarkup } from '../ui/releaseMetadata';
 import { MatchLoading } from '../ui/matchLoading';
 import { shieldInventoryMarkup, shieldInventoryKey } from '../ui/shieldInventory';
@@ -32,6 +35,7 @@ const styleOptions=(selected:TileStyleSelection)=>[...TILE_STYLES.map(t=>({id:t.
 const phaseLabel={waiting:'Ожидание',countdown:'Старт',playing:'Идёт матч',paused:'Пауза',results:'Результаты'};
 type Controls = NetworkControls;
 export class NetworkApp {
+  private menuFocus:MenuFocusController;
   private session:NetworkMatchSession|null=null;
   private audioGeneration:string|null=null;
   private credential=loadCredential();
@@ -56,8 +60,9 @@ export class NetworkApp {
   private listBusy=false;
   private listOffset=0;
   private storageAvailable=true;
-  constructor(private root:HTMLElement,private onMenu:()=>void,private audio?:Pick<GameAudio,'syncNetworkAnomalies'|'syncMusic'|'enterMenu'>) {
+  constructor(private root:HTMLElement,private onMenu:()=>void,private audio?:Pick<GameAudio,'syncNetworkAnomalies'|'syncMusic'|'enterMenu'>,private preferences?:(onClose:()=>void)=>void) {
     this.root.classList.add('network-root');
+    this.menuFocus=new MenuFocusController(root,{onBack:()=>{const close=this.root.querySelector<HTMLButtonElement>('[data-network-prefs-back]');if(close)close.click();else void this.action(this.view==='list'?'menu':'list');},onInputMode:mode=>{this.root.dataset.inputMode=mode;}});
     window.addEventListener('keydown',this.keyDown);window.addEventListener('keyup',this.keyUp);
     window.addEventListener('deviceorientation',this.sensor);
     this.timer=setInterval(()=>{if(this.view==='list')void this.refreshList();},2000);
@@ -70,6 +75,11 @@ export class NetworkApp {
   }
   private bind():void {
     this.root.querySelectorAll<HTMLButtonElement>('[data-net-action]').forEach(button=>button.onclick=()=>void this.action(button.dataset.netAction!));
+    this.activateNavigation();
+  }
+  activateNavigation():void {
+    this.root.querySelectorAll<HTMLElement>('button,input,select,textarea,summary').forEach(el=>el.dataset.uiFocus='');
+    if(this.view!=='arena'||this.root.querySelector('#network-pause:not([hidden]),[data-network-preferences],[data-display-confirm]'))this.menuFocus.activate('network');else this.menuFocus.suspend();
   }
   private status(message:string):void {
     const text=message+(this.storageAvailable?'':' · браузер не сохраняет место; возврат после перезагрузки не гарантирован');
@@ -77,6 +87,7 @@ export class NetworkApp {
   }
   private async action(action:string):Promise<void> {
     try {
+      if(action==='preferences'){this.sources.clear();this.sendControls();this.preferences?.(()=>this.activateNavigation());this.activateNavigation();return;}
       if(action==='menu') {this.destroy();this.onMenu();return;}
       if(action==='list'){await this.showList();return;}
       if(action.startsWith('page:')){this.listOffset=Number(action.slice(5));await this.refreshList();return;}
@@ -104,13 +115,14 @@ export class NetworkApp {
     return JSON.stringify([snapshot.serviceId,snapshot.room.id,snapshot.ownId,snapshot.matchId]);
   }
   private async showList():Promise<void> {
+    await clientUpdate.setActivity(true);
     this.matchLoading?.cancel();this.matchLoading=null;
     if(this.game&&this.view==='arena') {
       this.game.loop.sleep();this.arenaElement?.remove();
       for(const source of this.sources.keys())this.blocked.add(source);this.sources.clear();
     }
     this.session?.dispose();this.session=null;this.view='list';this.renderKey='';
-    this.shell('Сетевая игра',`<p>Выживание, Битва и Командный бой · минимум 2 человека · до 8 участников с ИИ · одно место на устройстве</p><section id="network-current"></section><div class="network-actions">${this.button('Создать лобби','create')}${this.button('Обновить','retry')}</div><section id="network-lobbies" aria-label="Лобби"></section>`);
+    this.shell('Сетевая игра',`<p>Выживание, Битва и Командный бой · минимум 2 человека · до 8 участников с ИИ · одно место на устройстве</p><section id="network-current"></section><div class="network-actions">${this.button('Создать лобби','create')}${this.button('Настройки','preferences')}${this.button('Обновить','retry')}</div><section id="network-lobbies" aria-label="Лобби"></section>`);
     await this.refreshList();
   }
   private async refreshList():Promise<void> {
@@ -173,6 +185,7 @@ export class NetworkApp {
     this.root.querySelector<HTMLFormElement>('form')!.onsubmit=event=>{event.preventDefault();void this.submit('join');};
   }
   private async submit(path:string,rules?:ResolvedRoomRules):Promise<void> {
+    await clientUpdate.setActivity(false);
     const form=this.root.querySelector<HTMLFormElement>('form');if(!form)return;
     const button=form.querySelector<HTMLButtonElement>('button[type="submit"]')!;button.disabled=true;
     try {
@@ -283,7 +296,7 @@ export class NetworkApp {
     if(this.game&&this.arenaIdentity===identity){this.buildArena();return;}
     this.destroyArena();this.view='preparing';
     const loading=new MatchLoading(this.root,()=>this.destroyArena());this.matchLoading=loading;
-    void loading.painted().then(painted=>{
+    void clientUpdate.setActivity(false).then(() => loading.painted()).then(painted=>{
       if(!painted||this.matchLoading!==loading||this.session!==session||!session.snapshot)return;
       if(this.matchIdentity(session.snapshot)!==identity){this.destroyArena();this.view='lobby';this.renderSession();return;}
       this.buildArena();this.updateArena();
@@ -299,10 +312,10 @@ export class NetworkApp {
     const identity=this.matchIdentity(this.session.snapshot);
     if(this.game&&this.arenaElement&&this.arenaRuntime&&this.arenaIdentity===identity) {
       this.root.replaceChildren(this.arenaElement);this.arenaRuntime.engine=this.session;
-      this.view='arena';this.renderKey='';this.updateArena();
+      this.view='arena';this.menuFocus.suspend();this.renderKey='';this.updateArena();
       this.game.scale.getParentBounds();this.game.scale.refresh();this.game.loop.wake();return;
     }
-    this.view='arena';this.renderKey='';
+    this.view='arena';this.menuFocus.suspend();this.renderKey='';
     this.root.innerHTML=`<main class="network-arena arena-screen premium-surface">
       <header class="network-arena-heading arena-topline">
         <div class="arena-brand"><strong>BRICKS WAR</strong><output id="network-status" class="match-status network-status"></output></div>
@@ -339,7 +352,7 @@ export class NetworkApp {
       },onState:()=>this.updateArena(),
       onLayout:layout=>{this.layout=layout;this.updateArena();},onFinished:()=>{}};
     const scene=new PlayScene(this.arenaRuntime);
-    this.game=new Phaser.Game({type:Phaser.AUTO,parent:'network-canvas',backgroundColor:'#fff8e9',scale:{mode:Phaser.Scale.RESIZE,width:'100%',height:'100%'},scene:[scene],audio:{noAudio:true}});
+    const preferences=loadReleaseSettings();this.game=new Phaser.Game({type:Phaser.AUTO,antialias:preferences.antialias,fps:{limit:preferences.fpsLimit},parent:'network-canvas',backgroundColor:'#fff8e9',scale:{mode:Phaser.Scale.RESIZE,width:'100%',height:'100%'},scene:[scene],audio:{noAudio:true}});
   }
   private updateArena():void {
     const session=this.session;const snapshot=session?.snapshot;if(!session||!snapshot?.state||this.view!=='arena'||!this.arenaElement)return;
@@ -384,12 +397,12 @@ export class NetworkApp {
       const eligible=!!snapshot.manualPausedBy&&(snapshot.manualPausedBy===snapshot.ownId||snapshot.creatorId===snapshot.ownId);
       const renderKey=JSON.stringify([snapshot.manualPausedBy,snapshot.creatorId,snapshot.ownId,
         absent.map(s=>[s.id,s.name,Math.ceil(s.absence!.remainingMs/1000),s.absence!.blocksGameplay]),pauser?.name]);
-      const html=`<section class="network-pause-panel"><h2>Матч на паузе</h2>${pauser?`<p>Пауза: ${escape(pauser.name)}</p>`:''}<div class="network-absences">${absent.map(s=>`<article><span>${escape(s.name)} · ${Math.ceil(s.absence!.remainingMs/1000)} с${s.absence!.blocksGameplay?'':' · наблюдатель'}</span>${snapshot.creatorId===snapshot.ownId&&s.id!==snapshot.creatorId?this.button('Исключить и продолжить',`exclude:${s.id}`):''}</article>`).join('')}</div><div class="network-actions">${this.controls==='tilt'?this.button('Настроить наклон','tilt'):''}${eligible?this.button('Продолжить','resume'):snapshot.manualPausedBy?'<p>Продолжить могут поставивший паузу и создатель.</p>':''}${this.button('К списку','list')}</div></section>`;
+      const html=`<section class="network-pause-panel"><h2>Матч на паузе</h2>${pauser?`<p>Пауза: ${escape(pauser.name)}</p>`:''}<div class="network-absences">${absent.map(s=>`<article><span>${escape(s.name)} · ${Math.ceil(s.absence!.remainingMs/1000)} с${s.absence!.blocksGameplay?'':' · наблюдатель'}</span>${snapshot.creatorId===snapshot.ownId&&s.id!==snapshot.creatorId?this.button('Исключить и продолжить',`exclude:${s.id}`):''}</article>`).join('')}</div><div class="network-actions">${this.controls==='tilt'?this.button('Настроить наклон','tilt'):''}${eligible?this.button('Продолжить','resume'):snapshot.manualPausedBy?'<p>Продолжить могут поставивший паузу и создатель.</p>':''}${this.button('Настройки','preferences')}${this.button('К списку','list')}</div></section>`;
       if(overlay.dataset.renderKey!==renderKey){overlay.innerHTML=html;overlay.dataset.renderKey=renderKey;this.bind();}
     } else delete overlay.dataset.renderKey;
   }
   private press(source:string,action:string):void {
-    if(this.matchLoading?.visible||this.blocked.has(source)||this.sources.has(source))return;
+    if(this.root.querySelector('[data-network-preferences],[data-display-confirm],[data-virtual-keyboard]')||this.matchLoading?.visible||this.blocked.has(source)||this.sources.has(source))return;
     if(!this.session?.acceptsGameplayInput()){this.blocked.add(source);return;}
     this.sources.set(source,action);this.sendControls(action==='rotate');
   }
@@ -429,6 +442,7 @@ export class NetworkApp {
   };
   destroy():void {
     this.destroyed=true;clearInterval(this.timer);cancelAnimationFrame(this.frame);this.destroyArena();this.session?.dispose();
+    this.menuFocus.destroy();
     window.removeEventListener('keydown',this.keyDown);window.removeEventListener('keyup',this.keyUp);window.removeEventListener('deviceorientation',this.sensor);this.root.classList.remove('network-root');
   }
 }

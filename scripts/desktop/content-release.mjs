@@ -5,7 +5,8 @@ import { digest, validateManifest } from '../../electron/content.mjs';
 export async function contentReleasePlan(directory, publicKey) {
   const bytes = await readFile(join(directory, 'manifest.json'));
   const envelope = JSON.parse(bytes);
-  const manifest = validateManifest(envelope, publicKey, 1);
+  const manifest = validateManifest(envelope, publicKey, 2);
+  if(manifest.game!=='bricks-war'||manifest.component!=='content'||manifest.channel!=='stable')throw Error('Content release identity required');
   const assets = new Map();
   for (const file of manifest.files) {
     const path = join(directory, file.path);
@@ -20,9 +21,11 @@ export async function contentReleasePlan(directory, publicKey) {
 
 /** Immutable assets are verified before the only mutable discovery pointer is switched. */
 export async function publishContentRelease(plan, remote) {
+  if(!/^content-\d+$/.test(plan.tag))throw Error('Wrong content tag');
   let release = await remote.find(plan.tag);
   if (!release) release = await remote.create(plan.tag);
-  if (!release?.prerelease) throw Error('Content release must be a prerelease');
+  if (release?.tag_name && release.tag_name !== plan.tag) throw Error('Wrong release identity');
+  if (!release || release.prerelease) throw Error('Content release must be stable');
   for (const asset of plan.assets) {
     const existing = release.assets.find(entry => entry.name === asset.name);
     if (existing) {

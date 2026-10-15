@@ -7,10 +7,14 @@ export interface ClientUpdateState {
   blocked: boolean;
   error: boolean;
   phase?: DesktopUpdate['phase'];
+  progress?: number; version?: string; currentVersion?: string; shellVersion?: string; component?: string;
 }
 
 /** Update consent belongs to this document, never to other tabs. */
 export class ClientUpdate {
+  private desktopStarted = false;
+  private nativeCheck?: Promise<void>;
+  private pollTimer?: ReturnType<typeof setInterval>;
   private registration?: ServiceWorkerRegistration;
   private obsolete = false;
   private nativeState: DesktopUpdate = { available: false, applying: false, error: false };
@@ -96,6 +100,7 @@ export class ClientUpdate {
       return false;
     }
     if (desktop) {
+      if (this.nativeState.phase !== 'ready') { void desktop.download().then(state => { this.nativeState = state; this.refresh(); }); return true; }
       desktop.setSafeMenu(this.guard() && !this.networkActive());
       this.nativeState.applying = true;
       this.refresh();
@@ -126,12 +131,12 @@ export class ClientUpdate {
 
   check(force = false): Promise<void> {
     if (desktop) {
-      if (this.checking) return this.checking;
+      if (this.nativeCheck) return this.nativeCheck;
       this.nativeState = { ...this.nativeState, phase: 'checking' }; this.refresh();
-      this.checking = desktop.check().then(state => { this.nativeState = state; })
-        .catch(() => { this.nativeState = { ...this.nativeState, error: true, phase: 'error' }; })
-        .finally(() => { this.checking = undefined; this.refresh(); });
-      return this.checking;
+      this.nativeCheck = desktop.check().then(state => { this.nativeState = state; })
+        .catch(() => { this.nativeState = { ...this.nativeState, error: true, phase: 'check-error' }; })
+        .finally(() => { this.refresh(); });
+      return this.nativeCheck;
     }
     if (!this.registration?.update) return Promise.resolve();
     if (this.checking) return this.checking;
@@ -142,15 +147,19 @@ export class ClientUpdate {
     return this.checking;
   }
 
-  dispose(): void { clearTimeout(this.timeout); this.listeners.clear(); }
+  async setActivity(inMenu: boolean): Promise<void> {
+    if (desktop) { this.nativeState = await desktop.setActivity(inMenu); this.refresh(); }
+  }
+  cancelDownload(): void { if (desktop) void desktop.cancel().then(state => { this.nativeState = state; this.refresh(); }); }
+
+  dispose(): void { clearInterval(this.pollTimer); clearTimeout(this.timeout); this.listeners.clear(); }
 
   startDesktop(): void {
-    if (!desktop) return;
+    if (!desktop || this.desktopStarted) return;
+    this.desktopStarted = true;
     const poll = () => { void desktop!.updateState().then(state => { this.nativeState = state; this.refresh(); }); };
     poll(); void this.check();
-    setInterval(poll, 2_000);
-    setInterval(() => { void this.check(); }, 60_000);
-    window.addEventListener('online', () => { void this.check(); });
+    this.pollTimer = setInterval(poll, 500);
   }
 }
 

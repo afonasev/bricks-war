@@ -254,7 +254,7 @@ for (const size of [{ width: 1440, height: 720 }, { width: 1024, height: 600 }, 
       return { overlap: content.bottom > footer.top + 1, settingsCovered: settings.bottom > footer.top + 1, footerOffscreen: footer.bottom > innerHeight + 1, actionOverlap: actions.some((a, i) => actions.slice(i + 1).some(b => Math.min(a.right,b.right) > Math.max(a.left,b.left) + 1 && Math.min(a.bottom,b.bottom) > Math.max(a.top,b.top) + 1)) };
     });
     expect(layout).toEqual({ overlap: false, settingsCovered: false, footerOffscreen: false, actionOverlap: false });
-    if (size.width > 700) await expect(page.locator('.input-roster')).toHaveText('Y');
+    if (size.width > 700) await expect(page.locator('.input-roster')).toHaveText('Верх');
   });
 }
 

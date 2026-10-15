@@ -23,7 +23,7 @@ export function githubContentDownload(fetcher) {
     const original = path === 'latest.json' ? CONTENT_FEED
       : path === 'manifest.json' ? assetUrl.slice(0, assetUrl.lastIndexOf('/') + 1) + 'manifest.json' : assetUrl;
     let url = original;
-    const signal = AbortSignal.timeout(30_000);
+    const signal = file?.signal ? AbortSignal.any([AbortSignal.timeout(30_000), file.signal]) : AbortSignal.timeout(30_000);
     for (let hops = 0; hops <= 5; hops++) {
       const response = await fetcher(url, { bypassCustomProtocolHandlers: true, redirect: 'manual', cache: 'no-store', signal });
       if ([301, 302, 303, 307, 308].includes(response.status)) {

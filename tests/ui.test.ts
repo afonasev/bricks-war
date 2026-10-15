@@ -105,11 +105,15 @@ describe('results formatting', () => {
     expect(startsMutedForPlaytest({ hostname: '127.0.0.1', search: '?debug=1&muted=1' })).toBe(true);
     expect(startsMutedForPlaytest({ hostname: 'localhost', search: '?muted=false' })).toBe(false);
     expect(startsMutedForPlaytest({ hostname: 'localhost', search: '?muted=0' })).toBe(false);
-    expect(startsMutedForPlaytest({ hostname: 'example.com', search: '?muted=1' })).toBe(false);
+    expect(startsMutedForPlaytest({ hostname: 'example.com', search: '?muted=1' })).toBe(true);
 
-    const audio = new GameAudio(true);
+    const audio = new GameAudio(false, {}, true);
     expect(audio.isMuted()).toBe(true);
     expect(audio.getVolume()).toBe(DEFAULT_MASTER_VOLUME);
+    expect(audio.toggleMuted()).toBe(true);
+    expect(audio.isMuted()).toBe(true);
+    audio.unlock();
+    expect((audio as unknown as { context: AudioContext | null }).context).toBeNull();
   });
 
   it('applies twice the output gain for the same slider volume', () => {

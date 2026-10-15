@@ -1636,3 +1636,69 @@ html { touch-action: pan-x pan-y; overscroll-behavior: none; }
   #app .mode-setup-screen .release-guidance-footer { padding-top: 8px; gap: 9px; }
   #app :is(.main-menu-screen, .mode-setup-screen, .settings-screen, .controls-screen) { --release-footer-reserve: 112px; }
 }
+
+/* Shared preference and modal surfaces. */
+#app:not([data-input-mode="gamepad"]) .release-footer-action,
+#app:not([data-input-mode="gamepad"]) .footer-start kbd { display: none; }
+#app[data-input-mode="gamepad"], #app[data-input-mode="gamepad"] * { cursor: none !important; }
+.preference-inputs { padding: 12px 16px; min-width: 0; }
+.preference-inputs h2 { font-size: 1rem; margin: 0 0 8px; }
+.preference-inputs p { font-size: .8rem; }
+.preference-inputs .volume-control { grid-template-columns: minmax(110px,1fr) minmax(80px,160px) 44px; margin: 10px 0; }
+.preferences-reset-actions { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px; }
+.preferences-reset-actions button { min-height: 40px; padding: 8px 12px; border: 2px solid #a8bdd4; border-radius: 10px; background: #fff; color: #31577f; }
+[data-preferences-status] { display: block; padding: 0 12px; color: #765064; }
+.pause-settings-panel { max-height: 90dvh; width: min(680px,94vw); }
+.pause-preferences-scroll { overflow-y: auto; max-height: 64dvh; width: 100%; }
+.virtual-keyboard { max-width: 800px; max-height: 90dvh; overflow: auto; }
+.virtual-keyboard-keys { display: grid; grid-template-columns: repeat(10,minmax(0,1fr)); gap: 4px; }
+.virtual-keyboard-keys button { min-height: 38px; min-width: 0; border: 1px solid #8ba8c4; border-radius: 6px; }
+.virtual-keyboard-keys button:nth-last-child(-n+4) { grid-column: span 2; }
+@media(max-width:600px) { .preference-inputs .volume-control { grid-template-columns: minmax(95px,1fr) minmax(65px,100px) 40px; font-size: .55rem; } .virtual-keyboard-keys { grid-template-columns: repeat(8,minmax(0,1fr)); } }
+
+.release-history { width: min(800px,94vw); max-height: 90dvh; display: flex; flex-direction: column; padding: 20px; }
+.release-history-list { overflow-y: auto; min-height: 0; }
+.release-history pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; font-size: .85rem; }
+.release-history button, .desktop-release-history, .desktop-cancel-download { min-height: 38px; padding: 8px 12px; border: 2px solid #9bb9d2; border-radius: 10px; color: #31577f; background: #fff; }
+.release-history [data-history-back] { flex-shrink: 0; }
+
+html:has(.settings-screen), body:has(.settings-screen) { height:100dvh; overflow:hidden; }
+#app .settings-screen { height:100dvh; min-height:0; display:flex; flex-direction:column; }
+#app .settings-screen .settings-list { min-height:0; flex:1 1 auto; overflow-y:auto; align-content:start; padding-bottom:12px; }
+#app .settings-screen .release-heading, #app .settings-screen .release-footer { flex:0 0 auto; }
+#app .settings-screen .release-footer { position:relative; inset:auto; }
+#app .settings-screen .preference-inputs, #app .settings-screen .preferences-reset-actions, #app .settings-screen [data-preferences-status] { grid-column:1 / -1; }
+#app .settings-list .preference-inputs .volume-control { grid-template-columns: minmax(170px,220px) minmax(0,1fr) 50px; }
+#app .settings-list .preference-inputs .volume-control > span { white-space:normal; overflow-wrap:anywhere; }
+@media(max-width:600px) { #app .settings-list .preference-inputs .volume-control { grid-template-columns: minmax(110px,1.3fr) minmax(60px,1fr) 40px; } }
+
+.controls-family-note { margin:4px 8px; font-size:12px; line-height:1.3; color:#31577f; }
+#app .settings-screen .volume-control, #app .pause-settings-panel .volume-control { font:700 13px/1.3 system-ui,sans-serif; letter-spacing:0; }
+#app .settings-screen .setup-audio-controls .volume-control { grid-template-columns:90px minmax(70px,1fr) 44px; }
+
+@media(max-width:600px) { .main-menu-screen:has(.desktop-release-history) .concept-brand-logo { width:180px; } .main-menu-screen:has(.desktop-release-history) .main-menu-primary { gap:12px; } .main-menu-screen:has(.desktop-release-history) .mode-menu { gap:8px; } }
+
+#app.network-root { overflow:hidden; }
+#app.network-root .network-screen { height:100dvh; min-height:0; display:flex; flex-direction:column; overflow:hidden; }
+#app.network-root .network-screen .network-heading, #app.network-root .network-screen .menu-metadata-footer { flex:0 0 auto; }
+#app.network-root .network-screen .network-content { flex:1 1 auto; min-height:0; overflow-y:auto; }
+#app[data-layout="desktop"] .main-menu-screen:has(.desktop-release-history) .main-menu-brand-row { display:grid; grid-template-columns:minmax(140px,.8fr) minmax(220px,1.2fr); gap:12px; }
+#app[data-layout="desktop"] .main-menu-screen:has(.desktop-release-history) .client-update-slot { grid-template-columns:minmax(0,1fr) auto; gap:6px; padding:8px; }
+#app[data-layout="desktop"] .main-menu-screen:has(.desktop-release-history) .client-update-announcement { grid-column:1 / -1; }
+#app[data-layout="desktop"] .main-menu-screen:has(.desktop-release-history) .desktop-release-history { grid-column:1; grid-row:2; padding:6px; font-size:12px; }
+#app[data-layout="desktop"] .main-menu-screen:has(.desktop-release-history) .client-update-button { grid-column:2; grid-row:2; padding:6px; font-size:12px; min-height:38px; }
+#app[data-layout="desktop"] .main-menu-screen:has(.desktop-release-history) .client-update-status { grid-column:1 / -1; grid-row:3; }
+#app .settings-screen .menu-select-value, #app .pause-settings-panel .menu-select-value { white-space:normal; overflow:visible; text-overflow:clip; }
+@media(max-width:600px) {
+  #app .settings-screen .preference-inputs .settings-action { flex-wrap:wrap; }
+  #app .settings-screen .preference-inputs .settings-action > .menu-select { width:100%; flex:1 1 100%; }
+  #app .settings-list .preference-inputs .volume-control { grid-template-columns:minmax(0,1fr) 44px; gap:8px; }
+  #app .settings-list .preference-inputs .volume-control > input { grid-column:1 / -1; grid-row:2; }
+  #app .settings-list .preference-inputs .volume-control > output { grid-column:2; grid-row:1; }
+}
+
+#app[data-input-mode="gamepad"] .input-badge { min-width:30px; width:auto; flex-basis:auto; padding:0 4px; }
+
+#app .context-pad-hint { display:none; margin-left:8px; }
+#app[data-input-mode="gamepad"] .context-pad-hint { display:inline-flex; }
+#app:has(.screen-back) .release-footer-action:has(.input-back) { display:none; }

@@ -20,10 +20,10 @@ async function inventory(dir, prefix = '') {
 }
 await inventory('dist'); files.sort((a,b) => a.path.localeCompare(b.path));
 const pkg = JSON.parse(await readFile('package.json', 'utf8'));
-const payload = JSON.stringify({ schema: 1, sequence, gameVersion: pkg.version, minShellVersion: 1,
+const payload = JSON.stringify({ schema: 1, game: 'bricks-war', component: 'content', channel: 'stable', sequence, gameVersion: pkg.version, minShellVersion: 2,
   commit: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), files });
 const envelope = { payload, signature: sign(null, Buffer.from(payload), privateKey).toString('base64') };
-validateManifest(envelope, publicKey, 1);
+validateManifest(envelope, publicKey, 2);
 await mkdir('build', { recursive: true });
 await rm('build/desktop-content', { recursive: true, force: true });
 await cp('dist', 'build/desktop-content', { recursive: true });

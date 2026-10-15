@@ -88,6 +88,8 @@ export class GameAudio {
   private quietMechanismLoad: Promise<boolean> | null = null;
   private available = true;
   private muted: boolean;
+  private readonly startupMuted: boolean;
+  private masterVolume = 1;
   private musicVolume = DEFAULT_MASTER_VOLUME;
   private effectsVolume = DEFAULT_MASTER_VOLUME;
   private sfxPreset: SfxPresetId = 'original';
@@ -116,8 +118,10 @@ export class GameAudio {
   private readonly productionMusicEnabled = true;
   private latestMusicSync: { state: MatchState; identity: string; seed: number } | null = null;
 
-  constructor(initialMuted = false, levels: { music?: number; effects?: number; sfxPreset?: SfxPresetId } = {}) {
-    this.muted = initialMuted;
+  constructor(initialMuted = false, levels: { master?: number; music?: number; effects?: number; sfxPreset?: SfxPresetId } = {}, startupMuted = false) {
+    this.startupMuted = startupMuted;
+    this.muted = initialMuted || startupMuted;
+    this.masterVolume = this.clampVolume(levels.master ?? 1);
     this.musicVolume = this.clampVolume(levels.music ?? DEFAULT_MASTER_VOLUME);
     this.effectsVolume = this.clampVolume(levels.effects ?? DEFAULT_MASTER_VOLUME);
     this.requestedSfxPreset = levels.sfxPreset ?? 'soft-toy';
@@ -125,7 +129,7 @@ export class GameAudio {
   }
 
   unlock(): void {
-    if (!this.available) return;
+    if (!this.available || this.startupMuted) return;
     if (this.context) {
       void this.context.resume().catch(() => undefined);
       return;
@@ -150,7 +154,7 @@ export class GameAudio {
       const sfxBus = context.createGain();
       const musicUserGain = context.createGain();
       const effectsUserGain = context.createGain();
-      master.gain.value = masterGainForVolume(1, this.muted);
+      master.gain.value = masterGainForVolume(this.masterVolume, this.muted);
       musicBus.gain.value = 0.22;
       sfxBus.gain.value = 0.72;
       musicUserGain.gain.value = this.musicVolume;
@@ -355,6 +359,7 @@ export class GameAudio {
   }
 
   toggleMuted(): boolean {
+    if (this.startupMuted) return true;
     this.muted = !this.muted;
     this.applyMasterGain();
     if (this.muted) this.stopRecordedMusic();
@@ -377,6 +382,14 @@ export class GameAudio {
   getVolume(): number {
     return this.musicVolume;
   }
+
+  setMasterVolume(value: number): number {
+    this.masterVolume = this.clampVolume(value);
+    this.applyMasterGain();
+    return this.masterVolume;
+  }
+
+  getMasterVolume(): number { return this.masterVolume; }
 
   setMusicVolume(value: number): number {
     this.musicVolume = this.clampVolume(value);
@@ -1117,7 +1130,7 @@ export class GameAudio {
     const now = context.currentTime;
     master.gain.cancelScheduledValues(now);
     master.gain.setValueAtTime(master.gain.value, now);
-    master.gain.linearRampToValueAtTime(masterGainForVolume(1, this.muted), now + 0.08);
+    master.gain.linearRampToValueAtTime(masterGainForVolume(this.masterVolume, this.muted), now + 0.08);
   }
 
   private applyUserGains(): void {

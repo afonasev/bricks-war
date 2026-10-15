@@ -8,11 +8,12 @@ describe('update menu presentation', () => {
   });
   it('shows checking and downloading without offering premature activation', () => {
     expect(updatePresentation({ ...base, phase: 'checking' })).toMatchObject({ visible: true, label: 'Проверка…', disabled: true });
-    expect(updatePresentation({ ...base, phase: 'downloading' })).toMatchObject({ label: 'Загрузка…', disabled: true, status: 'Загружаем новую версию игры' });
+    expect(updatePresentation({ ...base, phase: 'verifying' })).toMatchObject({visible:true,label:'Проверка пакета…',disabled:true});
+    expect(updatePresentation({ ...base, phase: 'downloading' })).toMatchObject({ label: 'Загрузка 0%', disabled: true, status: 'Можно продолжить играть: загрузка приостановится на время матча.' });
   });
   it('offers retry on discovery failure and retains apply for an already staged update', () => {
-    expect(updatePresentation({ ...base, phase: 'error', error: true })).toMatchObject({ visible: true, label: 'Повторить', disabled: false });
-    expect(updatePresentation({ ...base, available: true, phase: 'ready', error: true })).toMatchObject({ visible: true, label: 'Обновить', disabled: false });
+    expect(updatePresentation({ ...base, phase: 'check-error', error: true })).toMatchObject({ visible: true, label: 'Проверка недоступна', disabled: true });
+    expect(updatePresentation({ ...base, available: true, phase: 'ready', error: true })).toMatchObject({ visible: true, label: 'Перезапустить', disabled: false });
   });
   it('preserves match blocking and apply progress', () => {
     expect(updatePresentation({ ...base, available: true, blocked: true })).toMatchObject({ disabled: true, status: 'Сначала завершите сетевую игру' });

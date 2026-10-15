@@ -1,3 +1,4 @@
+import { generateReleaseNotes } from './release-notes.mjs';
 import { execFileSync } from 'node:child_process';
 import { mkdtemp, mkdir, readFile, writeFile, rm, copyFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -34,10 +35,11 @@ if (!process.argv.includes('--publish')) {
     try { previous = JSON.parse(await readFile(pointer, 'utf8')); }
     catch (error) { if (error.code !== 'ENOENT') throw error; }
     if (previous) {
-      const old = validateManifest(previous, key, 1);
+      const old = validateManifest(previous, key, 2);
       if (old.sequence > plan.manifest.sequence || old.sequence === plan.manifest.sequence
         && JSON.stringify(previous) !== JSON.stringify(plan.envelope)) throw Error('Refusing discovery rollback or sequence reuse');
     }
+    const notes = await generateReleaseNotes(previous ? validateManifest(previous,key,2).commit : undefined,plan.manifest.commit);
     const find = async (tag, id) => {
       if (id) return JSON.parse(gh('api', `repos/${CONTENT_REPOSITORY}/releases/${id}`));
       // Listing a known endpoint distinguishes a missing release from authentication/network failure.
@@ -50,9 +52,9 @@ if (!process.argv.includes('--publish')) {
       create: async tag => {
         const request = join(scratch, 'create-release.json');
         await writeFile(request, JSON.stringify({ tag_name: tag, target_commitish: 'main', draft: true,
-          prerelease: true, make_latest: 'false',
+          prerelease: false, make_latest: 'false',
           name: `Game content ${plan.manifest.gameVersion} (${plan.manifest.sequence})`,
-          body: `Signed game content; source ${plan.manifest.commit}. Not a native installer release.` }));
+          body: notes }));
         // The release list can lag creation; use the authoritative POST response.
         return JSON.parse(gh('api', '--method', 'POST', `repos/${CONTENT_REPOSITORY}/releases`, '--input', request));
       },
@@ -60,7 +62,7 @@ if (!process.argv.includes('--publish')) {
         const path = join(scratch, asset.name); await copyFile(asset.path, path);
         gh('release', 'upload', tag, path, '--repo', CONTENT_REPOSITORY);
       },
-      publish: async tag => { gh('release', 'edit', tag, '--repo', CONTENT_REPOSITORY, '--draft=false', '--prerelease', '--latest=false'); },
+      publish: async tag => { gh('release', 'edit', tag, '--repo', CONTENT_REPOSITORY, '--draft=false', '--prerelease=false', '--latest=false'); },
       download: async (tag, asset) => {
         return download(asset.name, asset.size, { sequence: plan.manifest.sequence, sha256: asset.sha256 });
       },
@@ -81,7 +83,7 @@ if (!process.argv.includes('--publish')) {
     for (let attempt = 0; attempt < 18; attempt++) {
       try {
         const bytes = await download('latest.json', 512_000);
-        const actual = validateManifest(JSON.parse(bytes), key, 1);
+        const actual = validateManifest(JSON.parse(bytes), key, 2);
         if (actual.sequence === plan.manifest.sequence && JSON.parse(bytes).signature === plan.envelope.signature) { confirmed = true; break; }
       } catch { /* Pages may still be deploying. */ }
       await new Promise(resolve => setTimeout(resolve, 10_000));

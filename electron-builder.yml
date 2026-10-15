@@ -8,7 +8,7 @@ files:
   - package.json
 extraMetadata:
   main: electron/main.mjs
-  version: 1.6.0
+  version: 1.7.0
 asar: true
 artifactName: Bricks-War-${version}-${os}-${arch}.${ext}
 publish:
@@ -17,6 +17,7 @@ publish:
   repo: bricks-war
   releaseType: release
 mac:
+  minimumSystemVersion: '13.0.0'
   category: public.app-category.games
   target:
     - target: dmg

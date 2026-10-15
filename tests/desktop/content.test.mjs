@@ -56,7 +56,7 @@ test('corrupt or interrupted downloads preserve active release and permit retry'
   assert.equal(store.ready.sequence, 2);
 });
 test('window settings accept listed resolutions and fit smaller monitors', () => {
-  assert.deepEqual(windowPreferences({width:NaN,height:-1,fullscreen:'true'}), {width:1280,height:720,fullscreen:false});
+  assert.deepEqual(windowPreferences({width:NaN,height:-1,fullscreen:'true'}), {width:1280,height:720,fullscreen:false,auto:false});
   assert.deepEqual(fitWindow(windowPreferences({width:1920,height:1080,fullscreen:false}), {width:1280,height:800}), {width:1280,height:760});
 });
 test('one-time shell replacement uses a newer bundle while retaining a newer cached release', async t => {
@@ -87,6 +87,13 @@ test('stage progress and download identity come only from verified inventory', a
   f.options.onProgress = phase => progress.push(phase);
   f.options.download = (path, size, file) => { if (file) files.push(file); return original(path, size); };
   const store = await new ContentStore(f.options).open(); await store.check();
-  assert.deepEqual(progress, ['checking', 'downloading']);
+  assert.deepEqual(progress, ['checking', 'downloading', 'verifying']);
   assert.deepEqual(files, [{ sequence: 2, sha256: digest(f.b) }]);
+});
+
+test('explicit cancel revokes pending activation but a fresh consent may retry the same signed package',async t=>{
+ const f=await fixture(t);const store=await new ContentStore(f.options).open();const selected=envelope(2,f.b);await store.prepare(selected);await store.discardPrepared(2);assert.equal(store.ready,null);assert.equal(store.state.pending,null);assert.equal(store.state.highWater,2);assert.equal(await store.check(),false);await store.prepare(selected);assert.equal(store.ready.sequence,2);assert.equal(await readFile(join(store.active,'index.html'),'utf8'),'game A');
+});
+test('cancel before content preflight cannot transfer a package',async t=>{
+ const f=await fixture(t);let calls=0;f.options.download=async()=>{calls++;throw Error('unexpected');};const store=await new ContentStore(f.options).open();const preparing=store.prepare(envelope(2,f.b));store.cancel();await assert.rejects(preparing);assert.equal(calls,0);assert.equal(store.ready,null);
 });

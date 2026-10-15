@@ -12,3 +12,6 @@ build/
 .flow.lock
 .flow-leases.json
 .flow-tmp-*
+
+# Retired planning repository: independent Git history, local archive only.
+/planning/legacy-store/

@@ -14,7 +14,7 @@ test('plan validates local signatures/hashes and deduplicates identical file byt
   await mkdir(join(directory, 'assets'));
   await writeFile(join(directory, 'index.html'), bytes);
   await writeFile(join(directory, 'assets/copy'), bytes);
-  const payload = JSON.stringify({ schema: 1, sequence: 42, minShellVersion: 1, gameVersion: '1.4.1',
+  const payload = JSON.stringify({ schema: 1, game:'bricks-war',component:'content',channel:'stable',sequence: 42, minShellVersion: 1, gameVersion: '1.4.1',
     files: ['index.html', 'assets/copy'].map(path => ({ path, sha256: digest(bytes), size: bytes.length })) });
   await writeFile(join(directory, 'manifest.json'), JSON.stringify({ payload,
     signature: sign(null, Buffer.from(payload), keys.privateKey).toString('base64') }));
@@ -31,7 +31,7 @@ function fixture(fail = '') {
   const events = []; let release = null;
   const remote = {
     find: async () => release,
-    create: async () => { events.push('create'); return release = { id: 77, draft: true, prerelease: true, assets: [] }; },
+    create: async () => { events.push('create'); return release = { id: 77, draft: true, prerelease: false, assets: [] }; },
     upload: async (_tag, asset) => {
       events.push('upload'); if (fail === 'upload') throw Error('upload failed');
       release.assets.push({ name: asset.name, size: asset.size, digest: fail === 'digest' ? 'bad' : `sha256:${sha256}` });
@@ -67,9 +67,9 @@ test('published incomplete or conflicting assets cannot be overwritten', async (
   await assert.rejects(publishContentRelease(f.plan, f.remote), /differs/);
   assert.ok(!f.events.includes('upload')); assert.ok(!f.events.includes('pointer'));
 });
-test('stable shell release cannot be used as a content publication', async () => {
-  const f = fixture(); await f.remote.create(); f.release.prerelease = false;
-  await assert.rejects(publishContentRelease(f.plan, f.remote), /prerelease/);
+test('prerelease content cannot enter the stable channel', async () => {
+  const f = fixture(); await f.remote.create(); f.release.prerelease = true;
+  await assert.rejects(publishContentRelease(f.plan, f.remote), /stable/);
 });
 test('post-upload verification addresses the created release by ID instead of a stale release list', async () => {
   const f = fixture(), ids = [];
