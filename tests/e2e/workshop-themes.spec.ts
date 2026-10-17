@@ -1,0 +1,41 @@
+import {test,expect} from '@playwright/test';
+import {mkdir,writeFile} from 'node:fs/promises';
+import {TILE_STYLES} from '../../src/domain/tileStyles';
+const stage=process.env.BRICKS_THEME_STAGE ?? 'after';
+const root=process.env.BRICKS_THEME_CAPTURE_DIR ?? 'evidence/toy-workshop-arena/material-study-f6';
+const out=`${root}/${stage}`;
+for(const style of TILE_STYLES) test(`theme comparison ${style.id}`,async({page})=>{
+  const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
+  await page.goto('/?muted=1&playtest-board-events=1');
+  await page.getByRole('button',{name:/^Выживание/}).click();
+  const remove=page.getByRole('button',{name:'Удалить Игрок 2'});if(await remove.count())await remove.click();
+  await page.getByRole('combobox',{name:'Стиль участника 1',exact:true}).click();
+  const option=page.getByRole('option',{name:style.label,exact:true});
+  if(!await option.count())await page.getByRole('button',{name:'Следующие →',exact:true}).click();
+  await option.click();
+  await page.locator('#start-match').click();
+  await expect(page.locator('.match-loading')).toHaveCount(0);
+  await expect(page.locator('#countdown')).toBeHidden({timeout:6000});
+  await expect(page.locator('#arena-event-notice')).toBeHidden({timeout:6000});
+  const state=await page.evaluate(style=>{
+    const qa=(window as any).__boardEffectsQA;qa.scene.scene.pause();
+    const p=qa.engine.state.participants[0];p.resolvedTileStyle=style;p.board.active=null;
+    const kinds=['Z','L','O','S','I','J','T'];
+    p.board.grid.forEach((r:any[])=>r.fill(null));
+    const heights=[8,8,7,5,4,4,3,5,6,7],h=p.board.grid.length;
+    for(let x=0;x<10;x++)for(let y=h-heights[x]!;y<h;y++)p.board.grid[y][x]=kinds[(x+y*3+Math.floor(y/2))%7];
+    // Single examples separated from the pile, all seven gameplay colors.
+    for(let x=0;x<7;x++)p.board.grid[7][x+1]=kinds[x];
+    p.board.staticRenderRevision++;
+    qa.scene.runtime.onState(qa.engine.state);qa.scene.renderState();
+    const sprites=()=>qa.scene.children.list.filter((o:any)=>o.texture?.key?.startsWith('workshop-tiles-'));
+    const before=sprites().length;for(let i=0;i<10;i++)qa.scene.renderState();
+    return {style:p.resolvedTileStyle,before,after:sprites().length,visible:sprites().filter((o:any)=>o.visible).length};
+  },style.id);
+  expect(state.style).toBe(style.id);expect(state.after).toBe(state.before);
+  if(stage==='after'||style.id==='classic')expect(state.visible).toBeGreaterThan(50);
+  expect(errors).toEqual([]);
+  await mkdir(out,{recursive:true});
+  await page.screenshot({path:`${out}/${style.id}.png`});
+  await writeFile(`${out}/${style.id}.json`,JSON.stringify({state,errors,viewport:{width:1440,height:960}},null,2));
+});

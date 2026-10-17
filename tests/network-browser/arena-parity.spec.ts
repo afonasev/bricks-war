@@ -1,3 +1,4 @@
+import { mkdir } from 'node:fs/promises';
 import { test, expect } from '@playwright/test';
 
 test('ordinary arena surfaces retain complete network names and disjoint HUD across viewports', async ({ browser, baseURL }) => {
@@ -8,7 +9,7 @@ test('ordinary arena surfaces retain complete network names and disjoint HUD acr
   try {
     for (const page of pages) {
       await page.goto('/?muted=1');
-      await page.getByRole('button', { name: 'Сетевая игра Выживание' }).click();
+      await page.locator('[data-network-entry]').click();
     }
     await host.getByRole('button', { name: 'Создать лобби', exact: true }).click();
     await host.getByLabel('Название лобби').fill(room);
@@ -22,6 +23,7 @@ test('ordinary arena surfaces retain complete network names and disjoint HUD acr
     }
     for (const page of pages) await page.getByRole('button', { name: 'Готов', exact: true }).click();
     await host.getByRole('button', { name: 'Начать', exact: true }).click();
+    for (const page of pages) await expect(page.locator('.match-loading')).toHaveCount(0);
     await expect(host.locator('.network-arena')).toHaveAttribute('data-phase', 'playing');
     for (const [width, height] of [[1600,900],[800,900],[1280,480],[360,800],[390,844],[844,390]]) {
       await host.setViewportSize({ width: width!, height: height! });
@@ -49,8 +51,14 @@ test('ordinary arena surfaces retain complete network names and disjoint HUD acr
         return true;
       })).toBe(true);
       await expect(host.locator('.network-own-card .hud-next-piece')).toBeVisible();
+      if(process.env.BRICKS_PANEL_CAPTURE_DIR) {
+        await expect(host.locator('.wood-panel-shell')).toHaveCount(4);
+        await mkdir(process.env.BRICKS_PANEL_CAPTURE_DIR,{recursive:true});
+        await host.screenshot({path:`${process.env.BRICKS_PANEL_CAPTURE_DIR}/network-${width}x${height}.png`});
+      }
       await expect(host.locator('.network-own-card .hud-identity')).toHaveText('Константин Александрович Ерофеев');
     }
+    if (process.env.BRICKS_ARENA_REVIEW) await host.screenshot({path:process.env.BRICKS_ARENA_REVIEW});
     await host.getByRole('button', { name: 'Пауза', exact: true }).click();
     await expect(host.getByRole('heading', { name: 'Матч на паузе' })).toBeVisible();
     await host.getByRole('button', { name: 'Продолжить', exact: true }).click();

@@ -16,7 +16,7 @@ for (const viewport of [{width:1440,height:960},{width:1280,height:480},{width:8
         const back = footer.querySelector('.input-back')?.parentElement?.getBoundingClientRect();
         const roster = footer.querySelector('.input-roster')?.parentElement?.getBoundingClientRect();
         return {center:(r.left+r.right)/2,width:r.width,height:r.height,scale:scale ? scale/1120 : 1,
-          leftOfStart:!back || back.right <= r.left,rightOfStart:!roster || roster.left >= r.right,
+          leftOfStart:!back || back.width === 0 || back.right <= r.left,rightOfStart:!roster || roster.width === 0 || roster.left >= r.right,
           clipped:el.scrollWidth > el.clientWidth+1 || el.scrollHeight > el.clientHeight+1,
           inside:r.left>=0 && r.right<=innerWidth && r.top>=0 && r.bottom<=innerHeight};
       });

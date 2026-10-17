@@ -1,3 +1,5 @@
+import { drawWorkshopHousing, usesWorkshopStudy, workshopPanelColor } from './workshopStudy';
+import { clearSweepProgress, isClearCellVisible } from './clearSweep';
 import { cacheGraphicsGeometry } from './graphicsGeometryCache';
 import {drawBoardEventEffects} from './boardEventEffects';
 import { installCanvasViewport } from './canvasViewport';
@@ -34,12 +36,12 @@ import {
   type ArenaLayout,
 } from './arenaLayout';
 import { anomalyGlowStyle, anomalyOutlineSegments } from './anomalyGlow';
-import { arenaCardColorForParticipant } from './arenaCardPalette';
 import { conflictPresentationForParticipant } from './conflictPresentation';
 import { ActivePieceInterpolation } from './activePieceInterpolation';
 import { fixedStepCatchUp, MAX_FIXED_STEPS_PER_RENDER } from './fixedStepCatchUp';
 import { playfieldRenderKey, staticPlayfieldRenderKey } from './renderInvalidation';
-import { drawStyledTile } from './tileRenderer';
+import { drawStyledTile, type StyledTileOptions } from './tileRenderer';
+import { WorkshopSprites, WORKSHOP_THEME_TEXTURES } from './workshopSprites';
 import { easeInFall } from '../simulation/clearPresentation';
 import { FIRE_REFERENCE_CELL_SIZE, FIRE_REFERENCE_HEIGHT, FIRE_REFERENCE_WIDTH, writeFireHeatPixels } from './fireHeat';
 
@@ -102,6 +104,7 @@ export class PlayScene extends Phaser.Scene {
   private readonly staticCards = new Map<string, { graphics: Phaser.GameObjects.Graphics; cache: ReturnType<typeof cacheGraphicsGeometry>; key: string }>();
   private staticGraphics!: Phaser.GameObjects.Graphics;
   private graphics!: Phaser.GameObjects.Graphics;
+  private workshopSprites!: WorkshopSprites;
   private viewport?: ReturnType<typeof installCanvasViewport>;
   private readonly shieldLayers = new Map<string, { graphics: Phaser.GameObjects.Graphics; effect: Phaser.GameObjects.Graphics; maskGraphics: Phaser.GameObjects.Graphics; mask: Phaser.Display.Masks.GeometryMask }>();
   private shieldCaptureStartedAt: number | null = null;
@@ -129,7 +132,16 @@ export class PlayScene extends Phaser.Scene {
     this.runtime = runtime;
   }
 
+  preload(): void {
+    for (const {key,url} of Object.values(WORKSHOP_THEME_TEXTURES)) this.load.image(key, url);
+  }
+
+  private drawTile(graphics: Phaser.GameObjects.Graphics, tile: StyledTileOptions): void {
+    if (!this.workshopSprites.draw(graphics, tile)) drawStyledTile(graphics, tile);
+  }
+
   create(): void {
+    this.workshopSprites = new WorkshopSprites(this);
     this.staticGraphics = this.add.graphics();
     this.staticGraphics.setDepth(-2);
     this.graphics = this.add.graphics();
@@ -141,6 +153,7 @@ export class PlayScene extends Phaser.Scene {
     keyboard?.on('keydown', this.handleKeyDown, this);
     keyboard?.on('keyup', this.handleKeyUp, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.workshopSprites.destroy();
       for (const card of this.staticCards.values()) { card.cache.destroy(); card.graphics.destroy(); }
       this.staticCards.clear();
       this.viewport?.destroy();
@@ -328,7 +341,7 @@ export class PlayScene extends Phaser.Scene {
     const controlsReservedHeight = width > height ? 28 : 42;
     const layout = this.runtime.engine.kind === 'network' ? chooseNetworkLayout(width,height,count,this.runtime.mobileSolo) : this.runtime.mobileSolo
       ? chooseMobileSoloLayout(width, height, count, controlsReservedHeight)
-      : chooseArenaLayout(width, height, count, LOCAL_ARENA_CARD_GAP, Math.round(ARENA_CARD_HEADER_HEIGHT * Math.max(1, Math.min(width / 1920, height / 1080))));
+      : chooseArenaLayout(width, height - (this.workshopStudy ? 40 : 0), count, LOCAL_ARENA_CARD_GAP, Math.round((this.workshopStudy ? 80 : ARENA_CARD_HEADER_HEIGHT) * Math.max(1, Math.min(width / 1920, height / 1080))), this.workshopStudy ? 0 : 32, this.workshopStudy ? 0 : 22);
     const layoutKey = `${layout.mode}:${layout.columns}:${layout.rows}:${layout.gap ?? ARENA_CARD_GAP}:${layout.cellSize}:${layout.headerHeight ?? ARENA_CARD_HEADER_HEIGHT}:${layout.participantCards?.map((card) => `${card.x}:${card.y}:${card.cellSize}:${card.headerHeight ?? ARENA_CARD_HEADER_HEIGHT}`).join('|') ?? ''}`;
     if (layoutKey !== this.lastLayoutKey) {
       this.lastLayoutKey = layoutKey;
@@ -337,35 +350,27 @@ export class PlayScene extends Phaser.Scene {
 
     const participantIds = new Set(state.participants.map(p => p.config.id));
     for (const [id, card] of this.staticCards) if (!participantIds.has(id)) {
+      this.workshopSprites.remove(card.graphics);
       card.cache.destroy(); card.graphics.destroy(); this.staticCards.delete(id);
     }
     const staticKey = `${staticPlayfieldRenderKey(state, layoutKey, width, height)}#${[...participantIds].join(',')}`;
     if (staticKey !== this.lastStaticRenderKey) {
       this.lastStaticRenderKey = staticKey;
-      this.staticGraphics.clear();
-      if (this.runtime.mobileSolo || this.runtime.engine.kind === 'network') {
-        this.staticGraphics.fillStyle(this.runtime.mobileSolo ? 0xffe6bf : 0xfff8e9, 1);
-        this.staticGraphics.fillRect(0, 0, width, height);
-      }
+      this.workshopSprites.reset(this.staticGraphics); this.staticGraphics.clear();
+      // Keep the shared wood backdrop visible; touch hit regions are unchanged.
       if (this.runtime.mobileSolo) {
         const zoneTop = Math.floor(height * (1 - MOBILE_TOUCH_BUTTON_ZONE_FRACTION));
-        const third = width / 3;
-        this.staticGraphics.fillStyle(0xc7ebfa, 1);
-        this.staticGraphics.fillRect(0, zoneTop, third, height - zoneTop);
-        this.staticGraphics.fillStyle(0xdff4b2, 1);
-        this.staticGraphics.fillRect(third, zoneTop, third, height - zoneTop);
-        this.staticGraphics.fillStyle(0xe3cdf7, 1);
-        this.staticGraphics.fillRect(third * 2, zoneTop, third, height - zoneTop);
-        this.staticGraphics.fillStyle(0xd3efcd, 1);
-        this.staticGraphics.fillRect(third - 12, zoneTop, 24, height - zoneTop);
-        this.staticGraphics.fillRect((third * 2) - 12, zoneTop, 24, height - zoneTop);
+        this.staticGraphics.lineStyle(1, 0x79552e, .18);
+        for (const x of [width / 3, width * 2 / 3]) {
+          this.staticGraphics.lineBetween(x, zoneTop, x, height);
+        }
       }
       state.participants.forEach((participant, index) => {
         const card = layout.participantCards?.[index];
         const column = index % layout.columns;
         const row = Math.floor(index / layout.columns);
         const x = ARENA_EDGE_PADDING + column * (layout.slotWidth + (layout.gap ?? ARENA_CARD_GAP)) + ((layout.slotWidth - layout.cardWidth) / 2);
-        const y = ARENA_EDGE_PADDING + row * (layout.slotHeight + (layout.gap ?? ARENA_CARD_GAP)) + ((layout.slotHeight - layout.cardHeight) / 2);
+        const y = ARENA_EDGE_PADDING + (this.workshopStudy ? 20 : 0) + row * (layout.slotHeight + (layout.gap ?? ARENA_CARD_GAP)) + ((layout.slotHeight - layout.cardHeight) / 2);
         const id = participant.config.id;
         const cardKey = `${index}:${participant.config.teamId}:${staticPlayfieldRenderKey({ ...state, participants: [participant] }, layoutKey, width, height)}`;
         let cached = this.staticCards.get(id);
@@ -378,7 +383,7 @@ export class PlayScene extends Phaser.Scene {
           cached.key = cardKey;
           const background = this.staticGraphics;
           this.staticGraphics = cached.graphics;
-          this.staticGraphics.clear();
+          this.workshopSprites.reset(this.staticGraphics); this.staticGraphics.clear();
           try {
             this.drawStaticBoardCard(participant, this.runtime.engine.kind === 'network' ? Number(participant.config.controllerLabel ?? index) : index, state.options.matchVariant, card?.x ?? x, card?.y ?? y, card?.cardWidth ?? layout.cardWidth, card?.cardHeight ?? layout.cardHeight, card?.cellSize ?? layout.cellSize, card?.headerHeight ?? layout.headerHeight ?? ARENA_CARD_HEADER_HEIGHT);
           } finally { this.staticGraphics = background; }
@@ -394,16 +399,20 @@ export class PlayScene extends Phaser.Scene {
       // Normal rendering interpolates active pieces every frame; this key cannot skip it.
       this.lastRenderKey = '';
     }
-    this.graphics.clear();
-    for (const layer of this.shieldLayers.values()) { layer.graphics.clear(); layer.graphics.setVisible(false); layer.effect.clear(); layer.effect.setVisible(false); }
+    this.workshopSprites.reset(this.graphics); this.graphics.clear();
+    for (const layer of this.shieldLayers.values()) { this.workshopSprites.reset(layer.graphics); layer.graphics.clear(); layer.graphics.setVisible(false); layer.effect.clear(); layer.effect.setVisible(false); }
       state.participants.forEach((participant, index) => {
         const card = layout.participantCards?.[index];
       const column = index % layout.columns;
       const row = Math.floor(index / layout.columns);
       const x = ARENA_EDGE_PADDING + column * (layout.slotWidth + (layout.gap ?? ARENA_CARD_GAP)) + ((layout.slotWidth - layout.cardWidth) / 2);
-      const y = ARENA_EDGE_PADDING + row * (layout.slotHeight + (layout.gap ?? ARENA_CARD_GAP)) + ((layout.slotHeight - layout.cardHeight) / 2);
+      const y = ARENA_EDGE_PADDING + (this.workshopStudy ? 20 : 0) + row * (layout.slotHeight + (layout.gap ?? ARENA_CARD_GAP)) + ((layout.slotHeight - layout.cardHeight) / 2);
         this.drawBoardCard(participant, card?.x ?? x, card?.y ?? y, card?.cardWidth ?? layout.cardWidth, card?.cardHeight ?? layout.cardHeight, card?.cellSize ?? layout.cellSize, card?.headerHeight ?? layout.headerHeight ?? ARENA_CARD_HEADER_HEIGHT);
     });
+  }
+
+  private get workshopStudy(): boolean {
+    return usesWorkshopStudy(Boolean(this.runtime.mobileSolo), this.runtime.engine.kind === 'network', this.runtime.engine.state.participants.length);
   }
 
   private drawStaticBoardCard(
@@ -423,22 +432,27 @@ export class PlayScene extends Phaser.Scene {
     const boardX = cardX + (cardWidth - boardWidth) / 2;
     const boardY = cardY + headerHeight + Math.max(0, (cardHeight - headerHeight - boardHeight) / 2);
 
-    this.staticGraphics.fillStyle(0xb9a987, 0.18);
-    this.staticGraphics.fillRoundedRect(cardX - 2, cardY + 2, cardWidth + 4, cardHeight + 4, 12);
-    this.staticGraphics.fillStyle(0xfffbf2, 1);
-    this.staticGraphics.fillRoundedRect(cardX - 2, cardY - 2, cardWidth + 4, cardHeight + 4, 12);
-    this.staticGraphics.fillStyle(arenaCardColorForParticipant(participantIndex, matchVariant, participant.board.alive, participant.config.teamId), 0.98);
-    this.staticGraphics.fillRoundedRect(cardX, cardY, cardWidth, cardHeight, 10);
     const danger = participant.board.alive && participant.board.grid
       .slice(HIDDEN_ROWS, HIDDEN_ROWS + 5)
       .some((row) => row.some((cell) => cell !== null));
-    const borderColor = danger ? 0xff3042 : participant.board.alive ? 0x80b8ff : 0x52658c;
-    this.staticGraphics.lineStyle(danger ? 3 : 2, borderColor, 1);
-    this.staticGraphics.strokeRoundedRect(cardX, cardY, cardWidth, cardHeight, 10);
+    const panelColor = workshopPanelColor(participantIndex, matchVariant, participant.board.alive, participant.config.teamId);
+    drawWorkshopHousing(this.staticGraphics, cardX, cardY, cardWidth, cardHeight,
+      boardY, boardWidth, boardHeight, panelColor, danger, !this.runtime.mobileSolo && this.runtime.engine.kind !== 'network');
 
-    this.staticGraphics.fillStyle(0xf5fbff, 1);
+    this.staticGraphics.fillStyle(0xfffbef, 1);
     this.staticGraphics.fillRect(boardX, boardY, boardWidth, boardHeight);
-    this.staticGraphics.lineStyle(1, 0xc9dfee, 0.9);
+    if (this.workshopStudy) {
+      for (let i=0;i<10;i++) {
+        this.staticGraphics.fillStyle(0xa78952, .035*(1-i/10));
+        this.staticGraphics.fillRect(boardX+i,boardY+i,boardWidth-2*i,1);
+        this.staticGraphics.fillRect(boardX+i,boardY+i,1,boardHeight-i);
+      }
+    }
+    // Inset shadow keeps the cream grid distinct from the enamel housing.
+    this.staticGraphics.fillStyle(0x6b502d, 0.09);
+    this.staticGraphics.fillRect(boardX, boardY, boardWidth, Math.min(4, cellSize * .18));
+    this.staticGraphics.fillRect(boardX, boardY, Math.min(3, cellSize * .12), boardHeight);
+    this.staticGraphics.lineStyle(1, 0xb9c9c5, 0.48);
     for (let x = 0; x <= BOARD_WIDTH; x += 1) {
       this.staticGraphics.lineBetween(boardX + x * cellSize, boardY, boardX + x * cellSize, boardY + boardHeight);
     }
@@ -453,8 +467,8 @@ export class PlayScene extends Phaser.Scene {
     for (let y = 0; y < VISIBLE_HEIGHT && !settling && !reflecting; y += 1) {
       for (let x = 0; x < BOARD_WIDTH; x += 1) {
         const kind = participant.board.grid[y + HIDDEN_ROWS]?.[x];
-        if (kind) drawStyledTile(this.staticGraphics, {
-          style: participant.resolvedTileStyle,
+        if (kind) this.drawTile(this.staticGraphics, {
+          style: participant.resolvedTileStyle, polished: true,
           kind,
           x: boardX + x * cellSize,
           y: boardY + y * cellSize,
@@ -488,10 +502,6 @@ export class PlayScene extends Phaser.Scene {
     const boardY = cardY + headerHeight + Math.max(0, (cardHeight - headerHeight - boardHeight) / 2);
     const conflict = conflictPresentationForParticipant(this.runtime.engine.state, participant.config.id);
     const shield = shieldPresentationForParticipant(this.runtime.engine.state, participant.config.id);
-    if (participant.board.clearFlashMs > 0 && participant.board.alive) {
-      this.graphics.lineStyle(3, 0x15c8ff, 1);
-      this.graphics.strokeRoundedRect(cardX,cardY,cardWidth,cardHeight,8);
-    }
     const originalGraphics = this.graphics;
     const lift = 0;
     const rise = this.runtime.engine.state.attackQueues[participant.config.id]?.[0];
@@ -514,7 +524,7 @@ export class PlayScene extends Phaser.Scene {
       const clearing = this.runtime.engine.state.clearPresentations.some((e) => e.participantId === participant.config.id);
       if (!clearing) for (let y = 0; y < VISIBLE_HEIGHT; y++) for (let x = 0; x < BOARD_WIDTH; x++) {
         const kind = participant.board.grid[y + HIDDEN_ROWS]?.[x];
-        if (kind) drawStyledTile(this.graphics, { style: participant.resolvedTileStyle, kind,
+        if (kind) this.drawTile(this.graphics, { style: participant.resolvedTileStyle, polished: true, kind,
           x: boardX + x * cellSize, y: figureY + y * cellSize, size: cellSize,
           color: kind === 'anomaly' ? ANOMALY_COLOR : kind === 'garbage' ? 0x9aa2b7 : TETROMINO_COLORS[kind], alpha: 1, state: 'settled' });
       }
@@ -534,8 +544,8 @@ export class PlayScene extends Phaser.Scene {
         for (const cell of pieceCells(ghost)) {
           const visibleY = cell.y - HIDDEN_ROWS;
           if (visibleY >= 0 && visibleY < VISIBLE_HEIGHT) {
-            drawStyledTile(this.graphics, {
-              style: participant.resolvedTileStyle,
+            this.drawTile(this.graphics, {
+              style: participant.resolvedTileStyle, polished: true,
               kind: ghost.definition.settledKind,
               x: boardX + cell.x * cellSize,
               y: figureY + visibleY * cellSize,
@@ -556,8 +566,8 @@ export class PlayScene extends Phaser.Scene {
       for (const cell of activeCells) {
         const visibleY = cell.y - HIDDEN_ROWS;
         if (visibleY >= 0 && visibleY < VISIBLE_HEIGHT) {
-          drawStyledTile(this.graphics, {
-            style: participant.resolvedTileStyle,
+          this.drawTile(this.graphics, {
+            style: participant.resolvedTileStyle, polished: true,
             kind: renderedActive.definition.settledKind,
             x: boardX + cell.x * cellSize,
             y: figureY + visibleY * cellSize,
@@ -616,8 +626,8 @@ export class PlayScene extends Phaser.Scene {
       if (y < 0 || y >= VISIBLE_HEIGHT) continue;
       const x = boardX + cell.x * size;
       const py = boardY + y * size;
-      if (cell.remaining > 0) drawStyledTile(this.graphics, {
-        style: participant.resolvedTileStyle, kind: piece.definition.settledKind,
+      if (cell.remaining > 0) this.drawTile(this.graphics, {
+        style: participant.resolvedTileStyle, polished: true, kind: piece.definition.settledKind,
         x, y: py, size, color: pieceColor(piece.definition), alpha: cell.remaining, state: 'active',
       });
       if (cell.heat <= 0 || (this.calmEffects && cell.remaining === 0)) continue;
@@ -750,17 +760,18 @@ export class PlayScene extends Phaser.Scene {
       candidate.participantId === participant.config.id
     ));
     if (!event || !participant.board.alive) return;
+    const sweep = clearSweepProgress(event.remainingMs, event.durationMs);
     const drawRow = (cells: typeof event.rows[number]['cells'], y: number, cleared = false): void => {
       if (y < -1 || y >= VISIBLE_HEIGHT) return;
       cells.forEach((kind, x) => {
-        if (!kind) return;
-        drawStyledTile(this.graphics, {
-          style: participant.resolvedTileStyle,
+        if (!kind || (cleared && !isClearCellVisible(x, BOARD_WIDTH, sweep, this.calmEffects))) return;
+        this.drawTile(this.graphics, {
+          style: participant.resolvedTileStyle, polished: true,
           kind,
           x: boardX + x * cellSize,
           y: boardY + y * cellSize,
           size: cellSize,
-          color: cleared ? 0xaedcff : kind === 'anomaly' ? ANOMALY_COLOR : kind === 'garbage' ? 0x9aa2b7 : TETROMINO_COLORS[kind],
+          color: kind === 'anomaly' ? ANOMALY_COLOR : kind === 'garbage' ? 0x9aa2b7 : TETROMINO_COLORS[kind],
           alpha: 1,
           state: 'settled',
         });
@@ -770,8 +781,18 @@ export class PlayScene extends Phaser.Scene {
       event.sourceGrid.forEach((row, y) => drawRow(row, y - HIDDEN_ROWS, event.removedRows.includes(y)));
       const visibleRemoved = event.removedRows.filter((y) => y >= HIDDEN_ROWS);
       for (const y of visibleRemoved) {
-        this.graphics.fillStyle(0xb1daff, 0.25);
-        this.graphics.fillRect(boardX, boardY + (y - HIDDEN_ROWS) * cellSize, BOARD_WIDTH * cellSize, cellSize);
+        const rowY = boardY + (y - HIDDEN_ROWS) * cellSize;
+        if (this.calmEffects) {
+          this.graphics.lineStyle(Math.max(1, cellSize * .07), 0xfff8e9, .95);
+          this.graphics.strokeRect(boardX + 1, rowY + 1, BOARD_WIDTH * cellSize - 2, cellSize - 2);
+        } else if (sweep > 0 && sweep < 1) {
+          const edge = boardX + Math.floor(sweep * BOARD_WIDTH) * cellSize;
+          const band = Math.max(1, cellSize * .09);
+          this.graphics.fillStyle(0x75583b, .32);
+          this.graphics.fillRect(edge, rowY + 1, band + 1, cellSize - 2);
+          this.graphics.fillStyle(0xfff9ed, 1);
+          this.graphics.fillRoundedRect(edge, rowY + 1, band, cellSize - 2, band / 2);
+        }
       }
       return;
     }

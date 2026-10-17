@@ -56,7 +56,7 @@ for (const mode of ['Выживание', 'Битва', 'Командный бо
     await press(page, 0);
     await expect(page.locator('[data-slot="2"]')).toHaveValue('gamepad-0');
     await expect(page.locator('[data-player-name="2"]')).toHaveValue('Александр Великий');
-    await press(page, 0, 2);
+    await press(page, 0, 9);
     await expect(page.locator('.hud-card')).toHaveCount(4);
     await expect(page.locator('.hud-identity strong').nth(2)).toHaveText('Александр Великий');
     await press(page, 0);
@@ -137,7 +137,7 @@ test('phone solo ignores Y and keeps only the touch player', async ({ page }) =>
   await page.getByLabel('Имя игрока 1').fill('Александр Великий');
   await press(page, 0);
   await expect(page.getByRole('dialog')).toHaveCount(0);
-  await page.getByRole('button', { name: 'Start', exact: true }).click();
+  await page.getByRole('button', { name: 'Начать матч', exact: true }).click();
   await expect(page.locator('.hud-card')).toHaveCount(1);
   await expect(page.locator('.hud-identity strong')).toHaveText('Александр Великий');
 });

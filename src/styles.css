@@ -798,6 +798,9 @@ body.calm-effects .shield-slot.is-burning { filter: drop-shadow(0 0 8px #ff7626)
 .premium-surface .screen-back {
   min-height: 52px;
   padding: 10px 18px;
+}
+.premium-surface .screen-back,
+#app .preferences-reset-actions [data-reset-preferences] {
   border: 2px solid #96aec7;
   border-bottom-width: 5px;
   border-radius: 15px;
@@ -1699,6 +1702,185 @@ html:has(.settings-screen), body:has(.settings-screen) { height:100dvh; overflow
 
 #app[data-input-mode="gamepad"] .input-badge { min-width:30px; width:auto; flex-basis:auto; padding:0 4px; }
 
-#app .context-pad-hint { display:none; margin-left:8px; }
-#app[data-input-mode="gamepad"] .context-pad-hint { display:inline-flex; }
-#app:has(.screen-back) .release-footer-action:has(.input-back) { display:none; }
+
+/* One settings grid, shared section rhythm and a single device-wide reset. */
+#app .settings-screen[data-screen="settings"] { padding:16px 28px 0; gap:10px; }
+#app .settings-screen[data-screen="settings"] .release-heading { width:min(1080px,100%); margin:0 auto; gap:20px; }
+#app .settings-screen[data-screen="settings"] .release-heading h1 { font-size:32px; }
+#app .settings-screen[data-screen="settings"] .settings-list { width:min(1080px,100%); margin:0 auto; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; padding:2px 8px 10px; align-items:start; }
+#app .settings-screen[data-screen="settings"] .settings-section { padding:16px; border-radius:20px; background:#fffdf8; box-shadow:0 4px 0 #d5ccb6; }
+#app .settings-screen[data-screen="settings"] .settings-section > header { gap:12px; margin:0 0 10px; }
+#app .settings-screen[data-screen="settings"] .settings-section h2 { font-size:22px; line-height:1.15; }
+#app .settings-screen[data-screen="settings"] .settings-icon { width:42px; height:42px; flex-basis:42px; font-size:22px; border-radius:12px; border-bottom-width:3px; }
+#app .settings-screen[data-screen="settings"] .settings-audio-section { grid-column:1; grid-row:1; }
+#app .settings-screen[data-screen="settings"] .settings-display-section { grid-column:2; grid-row:1; }
+#app .settings-screen[data-screen="settings"] .settings-stick-section { grid-column:3; grid-row:1; }
+#app .settings-screen[data-screen="settings"] .setup-audio-controls { padding:0; gap:12px; }
+#app .settings-screen[data-screen="settings"] .volume-control { min-height:42px; padding:0; margin:0; grid-template-columns:minmax(0,1fr) 44px; gap:6px; font-size:13px; }
+#app .settings-screen[data-screen="settings"] .volume-control > input { grid-column:1 / -1; grid-row:2; }
+#app .settings-screen[data-screen="settings"] .volume-control > output { grid-column:2; grid-row:1; }
+#app .settings-screen[data-screen="settings"] .volume-control > span { overflow-wrap:normal; }
+#app .settings-screen[data-screen="settings"] .settings-section-note { margin:0 0 12px; font-size:13px; line-height:1.4; color:#607895; }
+#app .settings-screen[data-screen="settings"] .settings-display-section .settings-action { min-height:48px; margin:0; padding:8px 0; border:0; border-top:1px solid #e4dfd2; border-radius:0; background:transparent; gap:12px; }
+#app .settings-screen[data-screen="settings"] .settings-action strong { font-size:16px; line-height:1.3; }
+#app .settings-screen[data-screen="settings"] .settings-action small { font-size:12px; line-height:1.4; margin-top:4px; }
+#app .settings-screen[data-screen="settings"] .settings-fps { flex-wrap:wrap; }
+#app .settings-screen[data-screen="settings"] .settings-fps > span, #app .settings-screen[data-screen="settings"] .settings-display-section .menu-select { width:100%; min-width:0; }
+#app .settings-screen[data-screen="settings"] .settings-display-section .menu-select { flex:1 1 100%; }
+#app .settings-screen[data-screen="settings"] .settings-links { grid-column:1 / -1; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+#app .settings-screen[data-screen="settings"] .settings-navigation { min-height:64px; grid-template-columns:minmax(0,1fr) 16px; padding:14px 16px; gap:8px; border-radius:16px; border-bottom-width:3px; }
+#app .settings-screen[data-screen="settings"] .settings-navigation .settings-icon { display:none; }
+#app .settings-screen[data-screen="settings"] .settings-navigation small { font-size:12px; }
+#app .preferences-reset-actions { align-items:center; justify-content:space-between; gap:14px; padding:16px 0 0; border-top:1px solid #ccd5d7; }
+#app .preferences-reset-actions > span { font-size:14px; font-weight:700; color:#31577f; }
+#app .preferences-reset-actions small { display:block; margin-top:4px; font-size:12px; font-weight:400; color:#607895; }
+#app .preferences-reset-actions button { font-size:14px; font-weight:700; min-height:44px; padding:10px 16px; }
+#app [data-preferences-status]:empty { display:none; }
+#app .pause-settings-panel .settings-stick-section { padding:16px; margin:12px 0; }
+#app .pause-settings-panel .settings-stick-section > header { display:flex; align-items:center; gap:10px; }
+#app .pause-settings-panel .settings-section-note { font-size:13px; margin:8px 0; }
+#app .pause-settings-panel .settings-stick-section .eyebrow { display:none; }
+#app .pause-settings-panel .settings-stick-section h2 { margin:0; font-size:20px; }
+#app .pause-settings-panel .volume-control { grid-template-columns:125px minmax(0,1fr) 44px; margin:8px 0; }
+@media(max-width:700px) {
+  #app .settings-screen[data-screen="settings"] { padding:16px 12px 0; gap:14px; }
+  #app .settings-screen[data-screen="settings"] .settings-list { grid-template-columns:minmax(0,1fr); gap:14px; padding:2px 4px 18px; }
+  #app .settings-screen[data-screen="settings"] .settings-section { grid-column:1; grid-row:auto; padding:16px; }
+  #app .settings-screen[data-screen="settings"] .settings-stick-section { order:0; }
+  #app .settings-screen[data-screen="settings"] .settings-links { grid-template-columns:minmax(0,1fr); }
+  #app .settings-screen[data-screen="settings"] .settings-navigation { min-height:70px; }
+  #app .preferences-reset-actions { flex-direction:column; align-items:stretch; }
+  #app .preferences-reset-actions button { width:100%; }
+  #app .settings-screen[data-screen="settings"] .volume-control, #app .pause-settings-panel .volume-control { grid-template-columns:minmax(0,1fr) 44px; gap:6px; }
+  #app .settings-screen[data-screen="settings"] .volume-control > input, #app .pause-settings-panel .volume-control > input { grid-column:1 / -1; grid-row:2; }
+  #app .settings-screen[data-screen="settings"] .volume-control > output, #app .pause-settings-panel .volume-control > output { grid-column:2; grid-row:1; }
+}
+
+#app .settings-screen[data-screen="settings"] .release-footer { min-height:36px; padding-block:8px; box-shadow:none; }
+#app .settings-screen[data-screen="settings"] .settings-stick-section .volume-control + .volume-control { margin-top:12px; }
+#app[data-layout="desktop"] .desktop-menu-stage .settings-screen[data-screen="settings"] .release-footer { height:auto; min-height:36px; padding-block:8px; }
+
+#app .settings-screen[data-screen="settings"] > .preferences-reset-actions { flex:0 0 auto; width:min(1064px,100%); margin:0 auto; padding-top:12px; }
+#app .settings-screen[data-screen="settings"] .settings-display-section .settings-action:has(.menu-select) { flex-wrap:wrap; }
+#app .settings-screen[data-screen="settings"] .settings-display-section .settings-action:has(.menu-select) > span { width:100%; flex-basis:100%; }
+/* Desktop settings balance native display controls against sound and analog controls. */
+#app .settings-screen[data-screen="settings"] .settings-list { grid-template-columns:repeat(2,minmax(0,1fr)); }
+#app .settings-screen[data-screen="settings"] .settings-display-section { grid-column:2; grid-row:1 / span 2; }
+#app .settings-screen[data-screen="settings"] .settings-stick-section { grid-column:1; grid-row:2; }
+#app .settings-screen[data-screen="settings"] .volume-control { grid-template-columns:150px minmax(0,1fr) 44px; min-height:36px; }
+#app .settings-screen[data-screen="settings"] .volume-control > input, #app .settings-screen[data-screen="settings"] .volume-control > output { grid-column:auto; grid-row:auto; }
+#app .settings-screen[data-screen="settings"] .volume-control > span { white-space:normal; }
+#app .settings-screen[data-screen="settings"] .settings-display-section .settings-action:has(.menu-select) { flex-wrap:nowrap; }
+#app .settings-screen[data-screen="settings"] .settings-display-section .settings-action:has(.menu-select) > span { width:auto; flex:1 1 52%; }
+#app .settings-screen[data-screen="settings"] .settings-display-section .menu-select { width:auto; flex:1 1 48%; }
+#app .settings-screen[data-screen="settings"] .settings-section-note { margin-bottom:6px; }
+#app .settings-screen[data-screen="settings"] .settings-stick-section .volume-control + .volume-control { margin-top:0; }
+#app .settings-screen[data-screen="settings"] .settings-utility { flex:0 0 auto; display:flex; align-items:center; justify-content:space-between; width:min(1064px,100%); margin:0 auto; padding-top:10px; border-top:1px solid #ccd5d7; gap:12px; }
+#app .settings-screen[data-screen="settings"] .settings-utility .settings-links { display:flex; gap:8px; }
+#app .settings-screen[data-screen="settings"] .settings-utility .settings-navigation { min-height:44px; display:flex; align-items:center; gap:8px; padding:8px 12px; border-radius:10px; border-width:1px; box-shadow:none; }
+#app .settings-screen[data-screen="settings"] .settings-utility .settings-navigation strong { font-size:14px; }
+#app .settings-screen[data-screen="settings"] .settings-utility .settings-navigation small, #app .settings-screen[data-screen="settings"] .settings-utility .settings-navigation > b { display:none; }
+#app .settings-screen[data-screen="settings"] .settings-utility .preferences-reset-actions { margin:0; padding:0; border:0; flex:0 0 auto; }
+@media(max-width:700px) {
+  #app .settings-screen[data-screen="settings"] .settings-list { grid-template-columns:minmax(0,1fr); }
+  #app .settings-screen[data-screen="settings"] .settings-section { grid-column:1; grid-row:auto; }
+  #app .settings-screen[data-screen="settings"] .volume-control { grid-template-columns:minmax(0,1fr) 44px; }
+  #app .settings-screen[data-screen="settings"] .volume-control > input { grid-column:1 / -1; grid-row:2; }
+  #app .settings-screen[data-screen="settings"] .volume-control > output { grid-column:2; grid-row:1; }
+  #app .settings-screen[data-screen="settings"] .settings-display-section .settings-action:has(.menu-select) { flex-wrap:wrap; }
+  #app .settings-screen[data-screen="settings"] .settings-display-section .settings-action:has(.menu-select) > span, #app .settings-screen[data-screen="settings"] .settings-display-section .menu-select { width:100%; flex-basis:100%; }
+  #app .settings-screen[data-screen="settings"] .settings-utility { flex-direction:column; align-items:stretch; gap:8px; }
+  #app .settings-screen[data-screen="settings"] .settings-utility .settings-links { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); }
+  #app .settings-screen[data-screen="settings"] .settings-utility .settings-navigation { justify-content:center; }
+}
+/* Settings utility icons and contextual reset shortcut. */
+#app .settings-action-icon { width:30px; height:30px; flex:0 0 30px; display:inline-grid; place-items:center; border:1px solid #88b6d2; border-radius:9px; background:#d8effb; color:#225c8c; }
+#app .settings-action-icon svg { width:21px; height:21px; }
+#app .settings-action-icon-lab { background:#eadcf8; border-color:#b69bcf; color:#79529c; }
+#app .settings-screen[data-screen="settings"] .settings-utility .settings-navigation { gap:9px; }
+#app .preferences-reset-actions button { display:flex; align-items:center; justify-content:center; gap:9px; }
+#app .input-reset { display:none; background:#ffe6a0; border-color:#c1a55c; color:#765617; }
+#app[data-input-mode="gamepad"] .input-reset { display:inline-flex; }
+#app .settings-controls-help { width:100%; margin-top:8px; min-height:42px; display:flex; align-items:center; gap:10px; padding:7px 10px; border:1px solid #aac2d3; border-radius:12px; background:#edf6fb; color:#245378; font-size:14px; font-weight:750; text-align:left; }
+#app .settings-controls-help > b { margin-left:auto; color:#247cf0; font-size:22px; }
+#app .settings-controls-help .settings-action-icon { width:26px; height:26px; flex-basis:26px; border:0; background:transparent; }
+#app .settings-screen[data-screen="settings"] .settings-stick-section .volume-control { min-height:32px; }
+#app .settings-screen[data-screen="settings"] .setup-audio-controls { gap:8px; }
+
+/* Every menu uses the viewport height, including the scaled desktop composition.
+   Keep the logical stage at 640px so its container queries and scale stay stable. */
+#app[data-layout="desktop"] .desktop-menu-stage > :is(.release-screen, .rules-screen) {
+  position: relative;
+  height: calc(100dvh / var(--menu-stage-scale));
+  min-height: 0;
+  top: calc((640px - 100dvh / var(--menu-stage-scale)) / 2);
+}
+#app[data-layout="desktop"] .desktop-menu-stage .release-guidance-footer {
+  position: relative;
+  inset: auto;
+  margin: auto calc(50% - 560px) 0;
+}
+#app .debug-lab-screen {
+  height: 100dvh;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding-bottom: 0;
+}
+#app .debug-lab-screen .debug-lab-content {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+#app .settings-screen[data-screen="laboratory"] { padding-bottom: 0; }
+#app .settings-screen[data-screen="laboratory"] .laboratory-unavailable { min-height: 0; overflow-y: auto; }
+#app[data-layout] main.rules-screen { padding-bottom: 0; border-bottom: 0; border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+#app .rules-footer { padding-bottom: 8px; }
+#app.network-root .network-screen.release-screen.premium-surface { height: 100dvh; min-height: 0; overflow: hidden; padding-bottom: 0; }
+#app[data-layout="mobile"] .main-menu-screen .main-menu-primary { min-height: 0; overflow-y: auto; }
+#app .debug-lab-screen > .debug-lab-header { flex: 0 0 auto; }
+#app[data-layout="mobile"] .debug-lab-screen .debug-lab-content { grid-auto-rows: max-content; align-content: start; }
+#app[data-layout="mobile"] .debug-lab-screen .debug-group-heading,
+#app[data-layout="mobile"] .debug-lab-screen .debug-fields,
+#app[data-layout="mobile"] .debug-lab-screen .debug-ai-grid { grid-template-columns: minmax(0, 1fr); }
+#app[data-layout="mobile"] .debug-lab-screen .debug-lab-header { gap: 8px; margin-bottom: 12px; }
+#app[data-layout="mobile"] .debug-lab-screen .debug-lab-header h1 { font-size: 22px; }
+#app[data-layout="mobile"] .debug-lab-screen .debug-lab-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+/* Controller shortcuts share the same footer row on every menu. */
+#app[data-gamepad-hints="connected"] .release-footer-action { display: flex; }
+#app[data-gamepad-hints="none"] .release-footer-action { display: none; }
+#app .release-footer-action .input-reset { display: inline-flex; align-items: center; justify-content: center; }
+#app .preferences-guidance-footer { flex: 0 0 auto; border-top: 2px solid #dfc9a5; padding: 10px 12px; background: #fff8e9ee; color: #173d73; }
+#app .preferences-guidance-footer .release-footer-action { font-size: 13px; gap: 8px; }
+#app .preferences-guidance-footer .input-badge { width: 28px; height: 28px; flex-basis: 28px; }
+#app .menu-metadata-footer .release-footer-actions { margin-bottom: 8px; }
+#app[data-gamepad-hints="none"] .menu-metadata-footer .release-footer-actions,
+#app[data-gamepad-hints="none"] .preferences-guidance-footer { display: none; }
+#app .release-footer-actions { flex-wrap: wrap; gap: 8px 24px; }
+#app[data-gamepad-hints="connected"] .footer-start kbd { display: inline-flex; align-items: center; justify-content: center; }
+#app[data-gamepad-hints="none"] .footer-start kbd { display: none; }
+#app .release-footer-action .input-badge { width: auto; min-width: 30px; flex: 0 0 auto; padding-inline: 5px; }
+
+/* The settings reset is an ordinary footer action, never the primary Start. */
+#app .footer-reset { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 36px; padding: 5px 12px; border: 1px solid #a8bdd4; border-radius: 10px; background: #fffdf8; color: #31577f; box-shadow: none; font-size: 14px; font-weight: 700; line-height: 1.2; cursor: pointer; }
+#app .footer-reset .input-reset { width: auto; min-width: 28px; height: 28px; flex: 0 0 auto; padding-inline: 5px; align-items: center; justify-content: center; }
+#app[data-gamepad-hints="connected"] .footer-reset .input-reset { display: inline-flex; }
+#app[data-gamepad-hints="none"] .footer-reset .input-reset { display: none; }
+#app .preferences-guidance-footer:has(.footer-reset) { display: block; }
+#app .release-footer-actions:has(.footer-reset) { display: flex; }
+#app .footer-reset.is-ui-selected, #app .footer-reset:focus-visible { outline: 3px solid #247cf0; outline-offset: 2px; }
+#app .footer-start kbd { width: auto; min-width: 30px; flex-basis: auto; padding-inline: 4px; }
+@media (max-height: 600px) {
+  #app[data-layout="desktop"] .settings-screen[data-screen="settings"] .settings-section { padding: 12px; }
+  #app[data-layout="desktop"] .settings-screen[data-screen="settings"] .settings-list { gap: 8px; }
+}
+#app :is(.settings-screen, .preferences-guidance-footer) .release-footer-action .input-badge { height: 30px; min-width: 30px; }
+
+/* AI selection shares the profile modal layer and keeps difficulties in one column. */
+#app[data-layout] > .profile-choice-backdrop > .ai-difficulty-choice { width: min(420px, 100%); max-height: calc(100dvh - 40px); overflow-y: auto; padding: 16px; border-radius: 20px; box-shadow: 0 18px 60px #12356455; }
+#app .ai-difficulty-choice .profile-choice-actions { gap: 10px; }
+#app .ai-difficulty-choice .profile-choice-actions button { min-height: 46px; font-size: 17px; text-align: left; }
+#app .ai-difficulty-choice [data-ai-cancel] { margin-top: 4px; }
+.input-badge.input-ai { border-color: #2265a2; background: #399ee3; box-shadow: inset 0 2px #ffffff88, 0 3px 0 #2265a2; }

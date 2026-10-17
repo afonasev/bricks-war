@@ -7,7 +7,7 @@ for (const players of [1, 4]) {
     await page.getByRole('button',{name:players === 1 ? /^Выживание/ : /^Битва/}).click();
     if (players === 1 && await page.getByRole('button',{name:'Удалить Игрок 2'}).count()) await page.getByRole('button',{name:'Удалить Игрок 2'}).click();
     if (players === 4) while (await page.getByRole('button',{name:'Добавить ИИ',exact:true}).count()) await page.getByRole('button',{name:'Добавить ИИ',exact:true}).first().click();
-    await page.getByRole('button',{name:'Start',exact:true}).click();
+    await page.locator('#start-match').click();
     await expect(page.locator('.hud-card')).toHaveCount(players);
     await expect(page.locator('.match-loading')).toHaveCount(0);
     await expect(page.locator('#countdown')).toBeHidden({timeout:6000});
@@ -42,7 +42,7 @@ test('preserves phone clock and touch pause',async({page})=>{
   await page.setViewportSize({width:390,height:844});
   await page.goto('/?muted=1');
   await page.getByRole('button',{name:/^Выживание/}).click();
-  await page.getByRole('button',{name:'Start',exact:true}).click();
+  await page.locator('#start-match').click();
   await expect(page.locator('.match-loading')).toHaveCount(0);
     await expect(page.locator('#countdown')).toBeHidden({timeout:6000});
     await expect(page.locator('#arena-event-notice')).toBeHidden({timeout:6000});

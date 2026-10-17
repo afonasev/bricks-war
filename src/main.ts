@@ -1,4 +1,5 @@
 import './styles.css';
+import './toyWorkshop.css';
 import { installBrowserInteractions } from './ui/browserInteractions';
 import { registerPwaServiceWorker } from './pwa/register';
 import { BricksWarApp } from './ui/app';

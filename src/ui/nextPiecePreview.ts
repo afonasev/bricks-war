@@ -10,8 +10,9 @@ export function nextPiecePreviewMarkup(definition: PieceDefinition): string {
   const color = definition.source === 'anomaly'
     ? '#e216a9'
     : ({ I: '#15c8ff', J: '#3a78d4', L: '#ff8a36', O: '#ffd21f', S: '#75cf8d', T: '#a355d5', Z: '#e55c6d' }[definition.classicKind ?? 'T']);
+  const frame = ['Z','L','O','S','I','J','T'].indexOf(definition.classicKind ?? 'T');
   const cells = shape.map((cell) => (
-    `<i class="hud-next-cell${definition.source === 'anomaly' ? ' is-anomaly' : ''}" style="--x:${cell.x - minX};--y:${cell.y - minY};--cell:${cellSize}px;--piece-color:${color}"></i>`
+    `<i class="hud-next-cell${definition.source === 'anomaly' ? ' is-anomaly' : ''}" style="--frame-x:${(frame % 3) * 50}%;--frame-y:${Math.floor(frame / 3) * 50}%;--x:${cell.x - minX};--y:${cell.y - minY};--cell:${cellSize}px;--piece-color:${color}"></i>`
   )).join('');
   return `<span class="hud-next-piece" aria-label="Следующая фигура" style="--preview-width:${width * cellSize}px;--preview-height:${height * cellSize}px">${cells}</span>`;
 }

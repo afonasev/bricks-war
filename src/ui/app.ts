@@ -1,3 +1,5 @@
+import { WORKSHOP_THEME_TEXTURES } from '../rendering/workshopSprites';
+import { footerResetButtonMarkup, gamepadFaceLabels, gamepadFooterAction, gamepadFooterHintsMarkup, showGamepadFooterHints } from './gamepadFooterHints';
 import { MatchLoading } from './matchLoading';
 import { prepareAnomalyArrivalPlaytest } from './anomalyArrivalPlaytest';
 import { rulesScreenMarkup, bindRulesScreen } from './visualRules';
@@ -170,21 +172,35 @@ function escapeHtml(value: string): string {
 }
 
 interface ReleaseFooterOptions {
+  ai?: string;
   confirm?: string;
   back?: string;
   start?: string;
   roster?: string;
+  reset?: string;
 }
 
-function releaseFooterMarkup({ confirm, back, start, roster }: ReleaseFooterOptions): string {
-  const showGamepadActions = !isMobilePlayViewport();
-  const confirmHint = confirm && showGamepadActions ? `<span class="release-footer-action"><b class="input-badge input-confirm">A</b>${confirm}</span>` : '';
-  const backHint = back && showGamepadActions ? `<span class="release-footer-action"><b class="input-badge input-back">B</b>${back}</span>` : '';
-  const rosterHint = roster && showGamepadActions ? `<span class="release-footer-action"><b class="input-badge input-roster">Y</b>${roster}</span>` : '';
+function settingsActionIcon(kind: 'rules' | 'controls' | 'lab'): string {
+  const paths = {
+    rules: '<path d="M4 5h6l2 2 2-2h6v15h-6l-2 2-2-2H4z"/><path d="M12 7v15M7 9h2m-2 4h2m6-4h2m-2 4h2"/>',
+    controls: '<path d="M7 7h10c3 0 5 10 3 11-2 1-4-3-5-3H9c-1 0-3 4-5 3C2 17 4 7 7 7Z"/><path d="M7 9v5m-2-2.5h4m7-2h.01m2 3h.01"/>',
+    lab: '<path d="M9 3h6m-5 0v7L4 20c-.5 1 .5 2 2 2h12c1.5 0 2.5-1 2-2l-6-10V3M7 16h10"/><path d="M10 18h.01m4 1h.01"/>',
+  };
+  return `<span class="settings-action-icon settings-action-icon-${kind}" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" focusable="false">${paths[kind]}</svg></span>`;
+}
+
+function releaseFooterMarkup({ confirm, back, start, roster, reset, ai }: ReleaseFooterOptions): string {
+  const showGamepadActions = showGamepadFooterHints();
+  const confirmHint = gamepadFooterAction(confirm, 'confirm');
+  const backHint = gamepadFooterAction(back, 'back');
+  const rosterHint = gamepadFooterAction(roster, 'roster');
+  const aiHint = gamepadFooterAction(ai, 'ai');
+  const resetHint = reset ? footerResetButtonMarkup() : '';
   return `<footer class="release-footer main-menu-footer release-guidance-footer">
     <div class="release-footer-inner${start ? ' release-footer-start-layout' : ''}">
-      ${start ? `${showGamepadActions ? `<div class="release-footer-side release-footer-before-start">${confirmHint}${backHint}</div>` : ''}<button class="primary-button footer-start" id="start-match" type="button">${showGamepadActions ? '<kbd aria-hidden="true">X</kbd>' : ''}<span>${start}</span></button>${showGamepadActions ? `<div class="release-footer-side release-footer-after-start">${rosterHint}</div>` : ''}` : `${showGamepadActions ? `<div class="release-footer-actions">${confirmHint}${backHint}${rosterHint}</div>` : ''}`}
+      ${start ? `${showGamepadActions ? `<div class="release-footer-side release-footer-before-start">${confirmHint}${backHint}</div>` : ''}<button class="primary-button footer-start" id="start-match" type="button">${showGamepadActions ? '<kbd aria-hidden="true">Start</kbd>' : ''}<span>${start}</span></button>${showGamepadActions ? `<div class="release-footer-side release-footer-after-start">${aiHint}${rosterHint}</div>` : ''}` : `<div class="release-footer-actions">${confirmHint}${backHint}${rosterHint}${resetHint}</div>`}
     </div>
+    ${reset ? '<output data-preferences-status role="status"></output>' : ''}
     ${releaseMetadataMarkup()}
   </footer>`;
 }
@@ -233,6 +249,8 @@ export class BricksWarApp {
   private readonly liveGamepads = new Map<number, { device: string; token: number; profile: string | null }>();
   private connectionToken = 0;
   private readonly profileChoices: Array<{ index: number; token: number; slot?: number; controller?: SlotValue; page?: number; draft?: string }> = [];
+  private aiChoiceOpen = false;
+  private lastAiDifficulty: AiDifficulty = 'medium';
   private setupNavigationGamepadIndex: number | null = null;
   private readonly onGamepadConnectionChange = (event: GamepadEvent): void => {
     if (event.type === 'gamepaddisconnected') {
@@ -262,6 +280,7 @@ export class BricksWarApp {
       onGamepadRoster: (index) => this.placeGamepadWithY(index),
       onGamepadsSnapshot: (pads) => this.syncLiveGamepads(pads),
       onGamepadStart: () => this.startSetupFromGamepad(),
+      onGamepadAddAi: () => this.openAiDifficultyChoice(),
       acceptsGamepad: (gamepadIndex) => this.profileChoices[0] ? (this.profileChoices[0].index < 0 || gamepadIndex === this.profileChoices[0].index) : this.setupNavigationGamepadIndex === null || gamepadIndex === this.setupNavigationGamepadIndex,
     });
   }
@@ -269,6 +288,9 @@ export class BricksWarApp {
   private readonly updateDesktopLayout = (): void => {
     this.root.dataset.layout = isMobilePlayViewport() ? 'mobile' : 'desktop';
     configureDesktopStage(this.root);
+    // Keep this viewport-centered dialog outside the scaled desktop composition.
+    const aiBackdrop = this.root.querySelector('[data-ai-choice]')?.parentElement;
+    if (aiBackdrop) this.root.append(aiBackdrop);
     configureDesktopLabPages(this.root, () => this.menuFocus.activate(this.router.current()));
   };
 
@@ -277,6 +299,7 @@ export class BricksWarApp {
     window.addEventListener('resize', () => {
       this.updateDesktopLayout();
       this.updateClientUpdateButton();
+      if (this.aiChoiceOpen && isMobilePlayViewport()) { this.closeAiDifficultyChoice(); return; }
       if (this.profileChoices.length) { this.renderProfileChoice(); this.menuFocus.activate(this.router.current()); }
     });
     this.tuning = loadGameTuning() ?? cloneGameTuning(DEFAULT_GAME_TUNING);
@@ -331,9 +354,8 @@ export class BricksWarApp {
   private readonly menuScroll = new Map<string, number[]>();
   private refreshPadHints(): void {
     const pad = Array.from(navigator.getGamepads?.() ?? []).find(p => p?.connected && p.index === this.menuFocus.activeGamepadIndex());
-    const family = /dualsense|dualshock|playstation|sony|054c/i.test(pad?.id ?? '') ? ['✕','○','□','△'] : /nintendo|switch|057e/i.test(pad?.id ?? '') ? ['B','A','Y','X'] : /xbox|xinput|045e/i.test(pad?.id ?? '') ? ['A','B','X','Y'] : ['Низ','Право','Лево','Верх'];
-    this.root.querySelectorAll<HTMLElement>('.screen-back,#pause-settings-back,[data-history-back]').forEach(button=>{let hint=button.querySelector<HTMLElement>('.context-pad-hint');if(!hint){hint=document.createElement('b');hint.className='context-pad-hint input-badge';hint.setAttribute('aria-hidden','true');button.append(hint);}hint.textContent=family[1]!;});
-    for (const [selector,index] of [['.input-confirm',0],['.input-back',1],['.footer-start kbd',2],['.input-roster',3]] as const) this.root.querySelectorAll(selector).forEach(item => { item.textContent = family[index]!; });
+    const family = gamepadFaceLabels(pad?.id ?? '');
+    for (const [selector,index] of [['.input-confirm',0],['.input-back',1],['.input-ai',2],['.input-roster',3]] as const) this.root.querySelectorAll(selector).forEach(item => { item.textContent = family[index]!; });
   }
 
   private rememberFocus(): void {
@@ -349,12 +371,13 @@ export class BricksWarApp {
     });
     this.root.querySelectorAll<HTMLElement>('.settings-list, .release-panel, .profile-choice-actions, .controls-reference').forEach((el,index) => { el.scrollTop = this.menuScroll.get(screen)?.[index] ?? 0; });
     this.refreshPadHints();
-    this.menuFocus.activate(screen, this.profileChoices.length ? 0 : this.router.selectionFor(screen, this.root.querySelectorAll('[data-ui-focus]:not([disabled])').length));
+    this.menuFocus.activate(screen, this.aiChoiceOpen ? (['easy','medium','hard','expert'] as const).indexOf(this.lastAiDifficulty) : this.profileChoices.length ? 0 : this.router.selectionFor(screen, this.root.querySelectorAll('[data-ui-focus]:not([disabled])').length));
   }
 
   private navigate(screen: AppScreen, parent?: AppScreen): void {
     this.rememberFocus();
     this.profileChoices.length = 0;
+    this.aiChoiceOpen = false;
     if (screen === 'survival' || screen === 'battle' || screen === 'team-battle') {
       this.setupNavigationGamepadIndex = null;
       // AI entries are inactive in Survival; its visible empty cards must also be empty Y destinations.
@@ -369,6 +392,7 @@ export class BricksWarApp {
   }
 
   private navigateBack(): void {
+    if (this.aiChoiceOpen) { this.closeAiDifficultyChoice(); return; }
     const historyClose = this.root.querySelector<HTMLButtonElement>('[data-history-back]'); if (historyClose) { historyClose.click(); return; }
     const displayCancel = this.root.querySelector<HTMLButtonElement>('[data-display-no]');
     if (displayCancel) { displayCancel.click(); return; }
@@ -522,15 +546,19 @@ export class BricksWarApp {
           ${isLocalPlaytestFlag('audio-prototypes') ? this.audioPrototypeGalleryMarkup() : ''}
           <section class="release-panel settings-section settings-display-section"><header><span class="settings-icon settings-icon-screen" aria-hidden="true">▣</span><div><p class="eyebrow">ЭКРАН</p><h2>Изображение</h2></div></header>
             ${desktop ? `<label class="settings-action"><span><strong>Разрешение окна</strong><small>Размер в логических пикселях, с учётом масштаба ОС; полный экран — весь монитор</small></span><select id="desktop-resolution" data-menu-select-layout="dropdown"><option value="auto" ${this.desktopDisplay.auto ? 'selected' : ''}>Auto — по экрану</option>${(this.desktopDisplay.resolutions ?? [[960,540],[1280,720],[1440,900],[1600,900],[1920,1080],[2560,1440],[3840,2160]]).map(([w,h]) => `<option value="${w}x${h}" ${!this.desktopDisplay.auto && w === this.desktopDisplay.width && h === this.desktopDisplay.height ? 'selected' : ''}>${w} × ${h}</option>`).join('')}</select></label><label class="settings-action"><span><strong>Режим экрана</strong><small>Полный экран или отдельное окно</small></span><select id="desktop-window-mode"><option value="windowed" ${!this.desktopDisplay.fullscreen ? 'selected' : ''}>Оконный</option><option value="fullscreen" ${this.desktopDisplay.fullscreen ? 'selected' : ''}>Полный экран</option></select></label><output id="desktop-display-status" class="settings-status" role="status"></output>` : ''}
-            ${mobile || desktop ? '' : `<button class="settings-action" id="toggle-fullscreen" type="button"><span><strong>Полноэкранный режим</strong><small>Использовать весь экран для игровых полей</small></span><b>${document.fullscreenElement ? 'Вкл' : 'Выкл'}</b></button><output id="fullscreen-status" class="settings-status" role="status"></output>`}
-            <label class="settings-action"><span><strong>Спокойные эффекты</strong><small>Меньше движения, частиц и ярких вспышек</small></span><input id="calm-effects" type="checkbox" ${this.releaseSettings.calmEffects ? 'checked' : ''} /></label>
+            ${mobile || desktop ? '' : `<button class="settings-action" id="toggle-fullscreen" type="button"><span><strong>Полноэкранный режим</strong></span><b>${document.fullscreenElement ? 'Вкл' : 'Выкл'}</b></button><output id="fullscreen-status" class="settings-status" role="status"></output>`}
+            <label class="settings-action"><span><strong>Спокойные эффекты</strong><small>Меньше движения и вспышек</small></span><input id="calm-effects" type="checkbox" ${this.releaseSettings.calmEffects ? 'checked' : ''} /></label>
+            ${this.displayPreferencesMarkup()}
           </section>
-          ${this.preferenceExtrasMarkup()}
-          <button class="release-panel settings-action settings-navigation" id="open-rules" type="button"><span class="settings-icon" aria-hidden="true">✦</span><span><strong>Правила</strong><small>Фигуры, атаки и защита — на примерах</small></span><b>›</b></button>
-          ${mobile ? '' : `<button class="release-panel settings-action settings-navigation" id="open-controls" type="button"><span class="settings-icon settings-icon-gamepad" aria-hidden="true">🎮</span><span><strong>Управление</strong><small>Клавиатура и геймпад</small></span><b>›</b></button>`}
-          <button class="release-panel settings-action settings-navigation" id="open-settings-lab" type="button"><span class="settings-icon settings-icon-lab" aria-hidden="true">⌁</span><span><strong>Лаборатория дизайна</strong><small>Тонкая настройка игрового баланса</small></span><b>›</b></button>
+          ${this.stickPreferencesMarkup(true)}
         </section>
-        ${releaseFooterMarkup({ confirm: mobile ? undefined : 'Select', back: 'Back' })}
+        <div class="settings-utility"><nav class="settings-links" aria-label="Справка и инструменты">
+          <button class="release-panel settings-action settings-navigation" id="open-rules" type="button">${settingsActionIcon('rules')}<span><strong>Правила</strong><small>Фигуры, атаки и защита — на примерах</small></span><b>›</b></button>
+
+          <button class="release-panel settings-action settings-navigation" id="open-settings-lab" type="button">${settingsActionIcon('lab')}<span><strong>Лаборатория дизайна</strong><small>Тонкая настройка игрового баланса</small></span><b>›</b></button>
+          </nav>
+        </div>
+        ${releaseFooterMarkup({ confirm: 'Confirm', back: 'Back', reset: 'Reset settings' })}
       </main>
     `;
     this.root.querySelector('#settings-back')?.addEventListener('click', () => this.navigateBack());
@@ -603,7 +631,7 @@ export class BricksWarApp {
   }
 
   private renderSetup(): void {
-    if (!this.root.querySelector('[data-profile-choice]') && this.root.querySelector(`[data-screen="${this.selectedMode}"]`)) this.rememberFocus();
+    if (!this.root.querySelector('[data-profile-choice], [data-ai-choice]') && this.root.querySelector(`[data-screen="${this.selectedMode}"]`)) this.rememberFocus();
     this.disconnectPlayerNameResizeObserver();
     this.destroyGame();
     this.countdownReady = false;
@@ -635,7 +663,7 @@ export class BricksWarApp {
         ${mode === 'survival' || mobile ? '' : this.modeSettingsMarkup()}
         <p class="setup-error" id="setup-error" role="alert" aria-live="polite"></p>
         </div>
-        ${releaseFooterMarkup({ roster: mobile ? undefined : 'Join', confirm: mobile ? undefined : 'Confirm', back: 'Back', start: 'Start' })}
+        ${releaseFooterMarkup({ ai: !mobile && mode !== 'survival' ? 'Добавить ИИ' : undefined, roster: mobile ? undefined : 'Войти / сменить место', confirm: mobile ? undefined : 'Выбрать', back: 'Назад', start: 'Начать матч' })}
       </main>
     `;
 
@@ -697,6 +725,7 @@ export class BricksWarApp {
     this.bindMenuAudioUnlock();
     this.showValidation();
     this.renderProfileChoice();
+    this.renderAiDifficultyChoice();
     this.activateMenuFocus(this.router.current());
     this.setupPlayerNameFitting();
   }
@@ -783,12 +812,45 @@ export class BricksWarApp {
   }
 
   private startSetupFromGamepad(): void {
-    if (this.profileChoices.length) return;
+    if (this.root.querySelector('[role="dialog"], [data-virtual-keyboard], [aria-expanded="true"]')) return;
     const screen = this.router.current();
     if (screen !== 'survival' && screen !== 'battle' && screen !== 'team-battle') return;
     const button = this.root.querySelector<HTMLButtonElement>('#start-match');
     if (!button || button.disabled) return;
     button.click();
+  }
+
+  private canAddAiFromGamepad(): boolean {
+    return !isMobilePlayViewport() && ['battle', 'team-battle'].includes(this.router.current()) && this.slots.includes('off');
+  }
+
+  private openAiDifficultyChoice(): void {
+    if (!this.canAddAiFromGamepad() || this.root.querySelector('[role="dialog"], [data-virtual-keyboard], [aria-expanded="true"]')) return;
+    this.rememberFocus();
+    this.aiChoiceOpen = true;
+    this.renderSetup();
+  }
+
+  private closeAiDifficultyChoice(): void {
+    this.aiChoiceOpen = false;
+    this.renderSetup();
+  }
+
+  private renderAiDifficultyChoice(): void {
+    if (!this.aiChoiceOpen) return;
+    if (!this.canAddAiFromGamepad()) { this.aiChoiceOpen = false; return; }
+    const levels: readonly AiDifficulty[] = ['easy', 'medium', 'hard', 'expert'];
+    const labels = { easy: 'Лёгкая', medium: 'Средняя', hard: 'Сложная', expert: 'Эксперт' };
+    this.root.insertAdjacentHTML('beforeend', `<div class="profile-choice-backdrop"><section class="release-panel profile-choice ai-difficulty-choice" data-ai-choice role="dialog" aria-modal="true" aria-labelledby="ai-choice-title"><p class="eyebrow">НОВЫЙ СОПЕРНИК</p><h2 id="ai-choice-title">Сложность ИИ</h2><div class="profile-choice-actions">${levels.map(level => `<button type="button" data-ai-level="${level}" data-ui-focus>${labels[level]}</button>`).join('')}<button type="button" data-ai-cancel data-ui-focus>Отмена</button></div></section></div>`);
+    this.root.querySelectorAll<HTMLButtonElement>('[data-ai-level]').forEach(button => button.addEventListener('click', () => {
+      const level = button.dataset.aiLevel as AiDifficulty;
+      const slot = this.slots.indexOf('off');
+      if (!this.aiChoiceOpen || !this.canAddAiFromGamepad() || slot < 0 || !levels.includes(level)) return;
+      this.lastAiDifficulty = level;
+      this.aiChoiceOpen = false;
+      this.setSlot(slot, `ai-${level}`);
+    }));
+    this.root.querySelector('[data-ai-cancel]')?.addEventListener('click', () => this.closeAiDifficultyChoice());
   }
 
   private durationOptionsMarkup(): string {
@@ -898,7 +960,7 @@ export class BricksWarApp {
   }
 
   private placeGamepadWithY(index: number): void {
-    if (isMobilePlayViewport() || !['survival', 'battle', 'team-battle'].includes(this.router.current())) return;
+    if (this.aiChoiceOpen || isMobilePlayViewport() || !['survival', 'battle', 'team-battle'].includes(this.router.current())) return;
     const live = this.liveGamepads.get(index);
     if (!live || this.profileChoices.some((choice) => choice.index === index)) return;
     const controller = `gamepad-${index}` as GamepadController;
@@ -1024,7 +1086,7 @@ export class BricksWarApp {
         <main class="release-screen premium-surface settings-screen" data-screen="laboratory">
           <header class="release-heading"><button class="screen-back" id="close-debug-lab" type="button">← Настройки</button><div><p class="eyebrow">ЛАБОРАТОРИЯ ДИЗАЙНА</p><h1>Только для локальной сборки</h1></div></header>
           <section class="release-panel laboratory-unavailable"><h2>Настройки релизного баланса защищены</h2><p>В публичной версии лаборатория показывает только это пояснение. Запустите проект на localhost, чтобы менять параметры следующего матча и сохранять их на этом устройстве.</p></section>
-          <footer class="menu-metadata-footer">${releaseMetadataMarkup()}</footer>
+          <footer class="menu-metadata-footer">${gamepadFooterHintsMarkup()}${releaseMetadataMarkup()}</footer>
         </main>`;
       this.root.querySelector('#close-debug-lab')?.addEventListener('click', () => this.navigateBack());
       this.activateMenuFocus('laboratory');
@@ -1066,7 +1128,7 @@ export class BricksWarApp {
             <div class="debug-fields debug-message-fields">${MESSAGE_TEMPLATE_KEYS.map((key) => this.debugMessageFieldMarkup(key)).join('')}</div>
           </section>
         </div>
-        <footer class="menu-metadata-footer">${releaseMetadataMarkup()}</footer>
+        <footer class="menu-metadata-footer">${gamepadFooterHintsMarkup()}${releaseMetadataMarkup()}</footer>
       </main>
     `;
     this.bindDebugTuning();
@@ -1342,7 +1404,7 @@ export class BricksWarApp {
   }
 
   private startMatch(): void {
-    if (this.matchLoading || !this.showValidation()) return;
+    if (this.aiChoiceOpen || this.matchLoading || !this.showValidation()) return;
     const loading = new MatchLoading(this.root, () => this.destroyGame(), () => this.navigateBack());
     this.matchLoading = loading;
     // Keep Web Audio unlock inside the initiating user gesture.
@@ -1474,7 +1536,7 @@ export class BricksWarApp {
       type: Phaser.AUTO,
       parent: 'game-canvas',
       backgroundColor: '#071b4a',
-      transparent: !mobileMatch,
+      transparent: true,
       antialias: this.releaseSettings.antialias,
       fps: {limit:this.releaseSettings.fpsLimit},
       render: { pixelArt: false, roundPixels: true },
@@ -1770,7 +1832,8 @@ export class BricksWarApp {
           : mobileSoloMatch ? `${identityMarkup}${statsMarkup}${shieldInventory}${compactMobileAi ? '' : nextPiecePreviewMarkup(participant.board.nextPiece)}`
           : `<div class="desktop-field-heading">${identityMarkup}${statsMarkup}${shieldInventory}${nextPiecePreviewMarkup(participant.board.nextPiece)}</div>`;
         return `
-        <article class="hud-card ${mobileSoloMatch && index === 0 ? 'mobile-player-card' : ''} ${compactMobileAi ? 'mobile-ai-card' : ''} hud-palette-${identity.palette} ${participant.board.alive ? '' : 'is-out'} ${participant.board.active?.definition.source === 'anomaly' ? 'has-active-anomaly' : ''} ${senderRows ? 'is-conflict-sender' : ''} ${incomingRows ? 'is-conflict-target' : ''} ${impactRows ? 'is-conflict-impact' : ''} ${defended || shieldBlocked ? 'is-conflict-defense' : ''} ${cleanupRows ? 'is-cleaning' : ''} ${participant.shieldReady ? 'has-shield' : ''} ${participantEvent ? 'has-player-event' : ''}" style="--player-name-color:${playerAccentForSlot(index)};--sender-color:${senderAccent};${mobileStyle}" data-team="${identity.teamLabel ? identity.palette : ''}" data-tile-style="${participant.resolvedTileStyle}" data-next-piece="${participant.board.nextPiece.id}" data-active-y="${participant.board.active?.y ?? ''}" data-attack-rows="${senderRows}" data-incoming-rows="${incomingRows || impactRows}" data-event-kind="${participantEvent?.kind ?? ''}" data-shield-remaining-ms="${state.shieldPresentations.find(e => e.participantId === participant.config.id)?.remainingMs ?? 0}" data-shield-debt="${state.shieldPresentations.filter(e => e.participantId === participant.config.id).reduce((n,e) => n + e.deferredImpacts.reduce((m,i) => m + i.rows, 0), 0)}" data-gray-rows="${participant.board.grid.filter(row => row.some(cell => cell === 'garbage')).length}">
+        <article class="hud-card ${mobileSoloMatch && index === 0 ? 'mobile-player-card' : ''} ${compactMobileAi ? 'mobile-ai-card' : ''} hud-palette-${identity.palette} ${participant.board.alive ? '' : 'is-out'} ${participant.board.active?.definition.source === 'anomaly' ? 'has-active-anomaly' : ''} ${senderRows ? 'is-conflict-sender' : ''} ${incomingRows ? 'is-conflict-target' : ''} ${impactRows ? 'is-conflict-impact' : ''} ${defended || shieldBlocked ? 'is-conflict-defense' : ''} ${cleanupRows ? 'is-cleaning' : ''} ${participant.shieldReady ? 'has-shield' : ''} ${participantEvent ? 'has-player-event' : ''}" style="--preview-atlas:url('${WORKSHOP_THEME_TEXTURES[participant.resolvedTileStyle].url}');--player-name-color:${playerAccentForSlot(index)};--sender-color:${senderAccent};${mobileStyle}" data-team="${identity.teamLabel ? identity.palette : ''}" data-tile-style="${participant.resolvedTileStyle}" data-next-piece="${participant.board.nextPiece.id}" data-active-y="${participant.board.active?.y ?? ''}" data-attack-rows="${senderRows}" data-incoming-rows="${incomingRows || impactRows}" data-event-kind="${participantEvent?.kind ?? ''}" data-shield-remaining-ms="${state.shieldPresentations.find(e => e.participantId === participant.config.id)?.remainingMs ?? 0}" data-shield-debt="${state.shieldPresentations.filter(e => e.participantId === participant.config.id).reduce((n,e) => n + e.deferredImpacts.reduce((m,i) => m + i.rows, 0), 0)}" data-gray-rows="${participant.board.grid.filter(row => row.some(cell => cell === 'garbage')).length}">
+          <div class="wood-panel-shell" aria-hidden="true"></div><div class="wood-panel-foot" aria-hidden="true"></div>
           ${mobilePlayerMarkup}
 
           ${participantEvent ? `<span class="player-event-symbol" data-kind="${participantEvent.kind}" data-accent="${participantEvent.accent}" style="--event-duration:${participantEvent.lifetimeMs}ms" aria-hidden="true">${matchEventIconMarkup(participantEvent.icon)}</span><div class="match-event-plaque player-event-notice is-${noticeRegion}" data-kind="${participantEvent.kind}" data-accent="${participantEvent.accent}" style="--event-duration:${participantEvent.lifetimeMs}ms" role="status" aria-label="${escapeHtml([participantEvent.title, participantEvent.detail].filter(Boolean).join('. '))}">${matchEventPlaqueMarkup(participantEvent, participantEvent.template && participantEvent.values ? formatParticipantEventMarkup(participantEvent.template, participantEvent.values) : escapeHtml(participantEvent.title))}</div>` : ''}
@@ -1954,7 +2017,7 @@ export class BricksWarApp {
   private async showReleaseHistory(): Promise<void> {
     if (!desktop || this.root.querySelector('[data-release-history]')) return;
     const backdrop = document.createElement('div'); backdrop.className = 'profile-choice-backdrop';
-    backdrop.innerHTML = `<section class="release-panel release-history" data-release-history role="dialog" aria-modal="true"><h2>Что нового</h2><p role="status">Загружаем историю…</p><div class="release-history-list"></div><button type="button" data-history-back data-ui-focus>Закрыть</button></section>`;
+    backdrop.innerHTML = `<section class="release-panel release-history" data-release-history role="dialog" aria-modal="true"><h2>Что нового</h2><p role="status">Загружаем историю…</p><div class="release-history-list"></div><button type="button" data-history-back data-ui-focus>Закрыть</button><footer class="preferences-guidance-footer">${gamepadFooterHintsMarkup()}</footer></section>`;
     const close = () => { backdrop.remove(); this.activateMenuFocus('main-menu'); };
     backdrop.querySelector('[data-history-back]')?.addEventListener('click', close);
     this.root.append(backdrop); this.activateMenuFocus('main-menu');
@@ -2007,7 +2070,7 @@ export class BricksWarApp {
     if (!panel) return;
     panel.innerHTML = `<h2>Настройки</h2><div class="pause-preferences-scroll">${this.setupAudioMarkup()}
       ${desktop ? `<label class="settings-action"><span>Разрешение окна</span><select data-pause-resolution><option value="auto" ${this.desktopDisplay.auto ? 'selected' : ''}>Auto — по экрану</option>${(this.desktopDisplay.resolutions ?? [[1280,720]]).map(([w,h]) => `<option value="${w}x${h}" ${!this.desktopDisplay.auto && w === this.desktopDisplay.width && h === this.desktopDisplay.height ? 'selected' : ''}>${w} × ${h}</option>`).join('')}</select></label><label class="settings-action"><span>Режим экрана</span><select data-pause-window><option value="windowed" ${!this.desktopDisplay.fullscreen ? 'selected' : ''}>Оконный</option><option value="fullscreen" ${this.desktopDisplay.fullscreen ? 'selected' : ''}>Полный экран</option></select></label>` : `<button type="button" data-pause-fullscreen>Полноэкранный режим</button>`}
-      <label class="settings-action"><span>Спокойные эффекты</span><input data-pause-calm type="checkbox" ${this.releaseSettings.calmEffects ? 'checked' : ''} /></label>${this.preferenceExtrasMarkup()}</div><button id="pause-settings-back" ${panel.hasAttribute('data-network-preferences') ? 'data-network-prefs-back' : ''} type="button">← Назад к паузе</button>`;
+      <label class="settings-action"><span>Спокойные эффекты</span><input data-pause-calm type="checkbox" ${this.releaseSettings.calmEffects ? 'checked' : ''} /></label>${this.preferenceExtrasMarkup()}</div><button id="pause-settings-back" ${panel.hasAttribute('data-network-preferences') ? 'data-network-prefs-back' : ''} type="button">← Назад к паузе</button><footer class="preferences-guidance-footer">${gamepadFooterHintsMarkup(true)}</footer>`;
     panel.querySelector('#pause-settings-back')?.addEventListener('click', onBack);
     panel.querySelector('[data-pause-calm]')?.addEventListener('change', event => { this.releaseSettings.calmEffects = (event.target as HTMLInputElement).checked; document.body.classList.toggle('calm-effects', this.releaseSettings.calmEffects); this.persistPreferences(); });
     panel.querySelector('[data-pause-fullscreen]')?.addEventListener('click', () => { void (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch(() => { const status = panel.querySelector('[data-preferences-status]'); if (status) status.textContent = 'Не удалось изменить режим экрана'; }); });
@@ -2023,11 +2086,18 @@ export class BricksWarApp {
     return saved;
   }
 
-  private preferenceExtrasMarkup(): string {
-    return `<section class="preference-inputs"><label class="settings-action"><span><strong>Сглаживание</strong><small>Применится в следующем матче</small></span><input data-preference-aa type="checkbox" ${this.releaseSettings.antialias ? 'checked' : ''} /></label><label class="settings-action"><span><strong>Ограничение кадров</strong><small>Применится в следующем матче. Частота экрана может ограничивать результат.</small></span><select data-preference-fps>${[0,30,60,120].map(value => `<option value="${value}" ${this.releaseSettings.fpsLimit === value ? 'selected' : ''}>${value ? value + ' кадр/с' : 'Без ограничения'}</option>`).join('')}</select></label><h2>Управление стиком</h2><p>Общие настройки этого устройства. D-pad не меняется.</p>
+  private displayPreferencesMarkup(): string {
+    return `<label class="settings-action"><span><strong>Сглаживание</strong><small>В следующем матче</small></span><input data-preference-aa type="checkbox" ${this.releaseSettings.antialias ? 'checked' : ''} /></label><label class="settings-action settings-fps"><span><strong>Ограничение кадров</strong><small>В следующем матче, в пределах частоты экрана</small></span><select data-preference-fps>${[0,30,60,120].map(value => `<option value="${value}" ${this.releaseSettings.fpsLimit === value ? 'selected' : ''}>${value ? value + ' кадр/с' : 'Без ограничения'}</option>`).join('')}</select></label>`;
+  }
+
+  private stickPreferencesMarkup(showHelp = false): string {
+    return `<section class="release-panel settings-section settings-stick-section preference-inputs"><header><span class="settings-icon settings-icon-gamepad" aria-hidden="true">🎮</span><div><p class="eyebrow">УПРАВЛЕНИЕ</p><h2>Стик геймпада</h2></div></header><p class="settings-section-note">D-pad работает без изменений</p>
       <label class="volume-control"><span>Чувствительность</span><input data-stick="stickSensitivity" type="range" min="50" max="200" step="5" value="${Math.round(this.releaseSettings.stickSensitivity * 100)}" /><output>${Math.round(this.releaseSettings.stickSensitivity * 100)}%</output></label>
-      <label class="volume-control"><span>Мёртвая зона</span><input data-stick="stickDeadzone" type="range" min="0" max="50" step="1" value="${Math.round(this.releaseSettings.stickDeadzone * 100)}" /><output>${Math.round(this.releaseSettings.stickDeadzone * 100)}%</output></label></section>
-      <div class="preferences-reset-actions"><button type="button" data-reset-preferences="audio">Сбросить звук</button><button type="button" data-reset-preferences="input">Сбросить управление</button><button type="button" data-reset-preferences="display">Сбросить экран и эффекты</button><button type="button" data-reset-preferences="all">Сбросить все настройки</button></div><output data-preferences-status role="status"></output>`;
+      <label class="volume-control"><span>Мёртвая зона</span><input data-stick="stickDeadzone" type="range" min="0" max="50" step="1" value="${Math.round(this.releaseSettings.stickDeadzone * 100)}" /><output>${Math.round(this.releaseSettings.stickDeadzone * 100)}%</output></label>${showHelp ? `<button id="open-controls" class="settings-controls-help" type="button">${settingsActionIcon('controls')}<span>Подробнее об управлении</span><b aria-hidden="true">›</b></button>` : ''}</section>`;
+  }
+
+  private preferenceExtrasMarkup(): string {
+    return `<section class="pause-display-preferences">${this.displayPreferencesMarkup()}</section>${this.stickPreferencesMarkup()}`;
   }
 
   private bindPreferenceExtras(): void {
@@ -2040,17 +2110,20 @@ export class BricksWarApp {
       this.persistPreferences();
     }));
     this.root.querySelectorAll<HTMLButtonElement>('[data-reset-preferences]').forEach(button => button.addEventListener('click', () => {
-      const group = button.dataset.resetPreferences;
-      if (group === 'all' || group === 'audio') {
-        for (const key of ['master', 'music', 'effects'] as const) this.releaseSettings[key] = DEFAULT_RELEASE_SETTINGS[key];
-        this.releaseSettings.musicDirection = DEFAULT_RELEASE_SETTINGS.musicDirection; this.releaseSettings.sfxDirection = DEFAULT_RELEASE_SETTINGS.sfxDirection; this.audio.setDirections(this.releaseSettings.musicDirection,this.releaseSettings.sfxDirection);
-        this.audio.setMasterVolume(this.releaseSettings.master); this.audio.setMusicVolume(this.releaseSettings.music); this.audio.setEffectsVolume(this.releaseSettings.effects);
-      }
-      if (group === 'all' || group === 'input') { this.releaseSettings.stickSensitivity = 1; this.releaseSettings.stickDeadzone = 0; }
-      if (group === 'all' || group === 'display') {
-        this.releaseSettings.antialias = true; this.releaseSettings.fpsLimit = 0; this.releaseSettings.calmEffects = false; document.body.classList.remove('calm-effects');
-        if (desktop) void this.previewDisplay({ width: 1280, height: 720, fullscreen: false, auto: true });
-      }
+      for (const key of ['master', 'music', 'effects'] as const) this.releaseSettings[key] = DEFAULT_RELEASE_SETTINGS[key];
+      this.releaseSettings.musicDirection = DEFAULT_RELEASE_SETTINGS.musicDirection;
+      this.releaseSettings.sfxDirection = DEFAULT_RELEASE_SETTINGS.sfxDirection;
+      this.audio.setDirections(this.releaseSettings.musicDirection, this.releaseSettings.sfxDirection);
+      this.audio.setMasterVolume(this.releaseSettings.master);
+      this.audio.setMusicVolume(this.releaseSettings.music);
+      this.audio.setEffectsVolume(this.releaseSettings.effects);
+      this.releaseSettings.stickSensitivity = 1;
+      this.releaseSettings.stickDeadzone = 0;
+      this.releaseSettings.antialias = true;
+      this.releaseSettings.fpsLimit = 0;
+      this.releaseSettings.calmEffects = false;
+      document.body.classList.remove('calm-effects');
+      if (desktop) void this.previewDisplay({ width: 1280, height: 720, fullscreen: false, auto: true });
       this.refreshPreferenceScreen();
       this.persistPreferences();
     }));

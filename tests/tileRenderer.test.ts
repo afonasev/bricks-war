@@ -21,6 +21,7 @@ const TEST_ANOMALY: PieceDefinition = {
 class RecordingGraphics {
   readonly calls: Array<[string, ...unknown[]]> = [];
   private record(name: string, ...args: unknown[]): this { this.calls.push([name, ...args]); return this; }
+  fillGradientStyle(...args: unknown[]): this { return this.record('fillGradientStyle', ...args); }
   fillStyle(...args: unknown[]): this { return this.record('fillStyle', ...args); }
   lineStyle(...args: unknown[]): this { return this.record('lineStyle', ...args); }
   fillRoundedRect(...args: unknown[]): this { return this.record('fillRoundedRect', ...args); }
@@ -39,20 +40,26 @@ function draw(style: TileStyle, kind: 'T' | 'anomaly' | 'garbage' = 'T', size = 
 }
 
 describe('procedural tile renderer', () => {
-  it('gives Classic a clean square body without a raised construction detail', () => {
-    expect(draw('classic').map(([name]) => name)).toEqual([
-      'fillStyle', 'fillRect', 'fillStyle', 'fillRect',
-      'fillStyle', 'fillRect', 'fillStyle', 'fillRect',
-    ]);
-    expect(draw('classic').map(([name]) => name)).not.toContain('fillCircle');
+  it('gives Classic a glossy molded face without construction studs', () => {
+    const calls = draw('classic');
+    expect(calls.filter(([name]) => name === 'fillRoundedRect').length).toBeGreaterThanOrEqual(4);
+    expect(calls.map(([name]) => name)).not.toContain('fillCircle');
+    expect(calls).toContainEqual(['fillStyle', 0xffffff, .66]);
   });
 
-  it('keeps the prior glossy raised-detail brick as Construction', () => {
-    expect(draw('construction-bricks').map(([name]) => name)).toEqual([
-      'fillStyle', 'fillRoundedRect', 'fillStyle', 'fillRoundedRect',
-      'fillStyle', 'fillRoundedRect', 'fillStyle', 'fillCircle',
-      'fillStyle', 'fillCircle', 'lineStyle', 'strokeRoundedRect',
-    ]);
+  it('keeps the raised round construction motif on its toy shell', () => {
+    const calls = draw('construction-bricks');
+    expect(calls.filter(([name]) => name === 'fillCircle')).toHaveLength(3);
+    expect(calls.filter(([name]) => name === 'fillRoundedRect').length).toBeGreaterThanOrEqual(4);
+  });
+
+  it('keeps ordinary ghosts quiet without face highlights', () => {
+    for (const style of TILE_STYLE_IDS) {
+      const calls = draw(style, 'T', 24, 'ghost');
+      expect(calls.slice(0,4).map(([name]) => name)).toEqual(['fillStyle', 'fillRoundedRect', 'lineStyle', 'strokeRoundedRect']);
+      expect(calls).not.toContainEqual(['fillStyle', 0xffffff, .66]);
+      expect(calls[0]).toEqual(['fillStyle', 0x55c978, .22]);
+    }
   });
 
   it('does not flatten ordinary materials with one universal perimeter outline', () => {
@@ -199,5 +206,34 @@ describe('procedural tile renderer', () => {
     expect(participant.board.grid.flat().filter((cell) => cell === 'garbage')).toHaveLength(0);
     expect(engine.state.pendingConflict).toBeNull();
     expect(engine.state.participants[1]!.board.grid.flat().filter(Boolean)).toHaveLength(0);
+  });
+});
+
+
+describe('polished solo review material', () => {
+  it('changes only the body, preserving ghost and hazard drawing', () => {
+    for (const [kind,state] of [['T','ghost'],['garbage','settled']] as const) {
+      const render=(polished:boolean)=>{
+        const g=new RecordingGraphics();
+        drawStyledTile(g as never,{style:'classic',kind,state,x:0,y:0,size:36,color:0x55c978,alpha:1,polished});
+        return g.calls;
+      };
+      expect(render(true)).toEqual(render(false));
+    }
+  });
+  it('keeps active and settled bodies identical and within their cell', () => {
+    const render=(state:'active'|'settled')=>{
+      const g=new RecordingGraphics();
+      drawStyledTile(g as never,{style:'classic',kind:'T',state,x:0,y:0,size:36,color:0x55c978,alpha:1,polished:true});
+      return g.calls;
+    };
+    expect(render('active')).toEqual(render('settled'));
+    const calls=render('active');
+    expect(calls.some(([name])=>name==='fillGradientStyle')).toBe(true);
+    for(const [name,...args] of calls)if(name==='fillRect'||name==='fillRoundedRect'){
+      const [x,y,w,h]=args as number[];
+      expect(x).toBeGreaterThanOrEqual(0);expect(y).toBeGreaterThanOrEqual(0);
+      expect(x!+w!).toBeLessThanOrEqual(36);expect(y!+h!).toBeLessThanOrEqual(36);
+    }
   });
 });

@@ -69,7 +69,7 @@ for (const [width,height] of ([[1920,1080],[2560,1440],[1440,960],[1366,768],[12
       await page.getByRole('button',{name:'← Главное меню',exact:true}).click();
     }
     await page.getByRole('button',{name:/^Настройки/}).click(); await expectDesktopFit(page);
-    await page.getByRole('button',{name:/^Управление/}).click(); await expectDesktopFit(page);
+    await page.getByRole('button',{name:/^Подробнее об управлении/}).click(); await expectDesktopFit(page);
     await page.getByRole('button',{name:'← Настройки',exact:true}).click();
     await page.getByRole('button',{name:/^Лаборатория дизайна/}).click();
     const field = page.getByLabel('Предельное падение',{exact:true}); await field.fill('210');

@@ -1,3 +1,5 @@
+import { WORKSHOP_THEME_TEXTURES } from '../rendering/workshopSprites';
+import { gamepadFooterHintsMarkup } from '../ui/gamepadFooterHints';
 import {MenuFocusController} from '../ui/menuNavigation';
 import {loadReleaseSettings} from '../ui/releaseSettings';
 import { clientUpdate } from '../pwa/clientUpdate';
@@ -70,7 +72,7 @@ export class NetworkApp {
   }
   private button(label:string,action:string,disabled=false):string {return `<button type="button" data-net-action="${action}" ${disabled?'disabled':''}>${label}</button>`;}
   private shell(title:string,body:string):void {
-    this.root.innerHTML=`<main class="network-screen release-screen premium-surface mode-setup-screen" data-network-view="${this.view}"><header class="network-heading release-heading"><button type="button" class="screen-back" data-net-action="menu" aria-label="Главное меню">← Главное меню</button><div><p class="eyebrow">BRICKS WAR · СЕТЬ</p><h1>${title}</h1></div></header><output class="network-status" role="status" id="network-status"></output><div class="network-content">${body}</div><footer class="menu-metadata-footer">${releaseMetadataMarkup()}</footer></main>`;
+    this.root.innerHTML=`<main class="network-screen release-screen premium-surface mode-setup-screen" data-network-view="${this.view}"><header class="network-heading release-heading"><button type="button" class="screen-back" data-net-action="menu" aria-label="Главное меню">← Главное меню</button><div><p class="eyebrow">BRICKS WAR · СЕТЬ</p><h1>${title}</h1></div></header><output class="network-status" role="status" id="network-status"></output><div class="network-content">${body}</div><footer class="menu-metadata-footer">${gamepadFooterHintsMarkup()}${releaseMetadataMarkup()}</footer></main>`;
     this.bind();
   }
   private bind():void {
@@ -352,7 +354,7 @@ export class NetworkApp {
       },onState:()=>this.updateArena(),
       onLayout:layout=>{this.layout=layout;this.updateArena();},onFinished:()=>{}};
     const scene=new PlayScene(this.arenaRuntime);
-    const preferences=loadReleaseSettings();this.game=new Phaser.Game({type:Phaser.AUTO,antialias:preferences.antialias,fps:{limit:preferences.fpsLimit},parent:'network-canvas',backgroundColor:'#fff8e9',scale:{mode:Phaser.Scale.RESIZE,width:'100%',height:'100%'},scene:[scene],audio:{noAudio:true}});
+    const preferences=loadReleaseSettings();this.game=new Phaser.Game({type:Phaser.AUTO,antialias:preferences.antialias,fps:{limit:preferences.fpsLimit},parent:'network-canvas',backgroundColor:'#fff8e9',transparent:true,scale:{mode:Phaser.Scale.RESIZE,width:'100%',height:'100%'},scene:[scene],audio:{noAudio:true}});
   }
   private updateArena():void {
     const session=this.session;const snapshot=session?.snapshot;if(!session||!snapshot?.state||this.view!=='arena'||!this.arenaElement)return;
@@ -379,8 +381,8 @@ export class NetworkApp {
           const palette=p.config.teamId?(p.config.teamId==='team-1'?1:2):Math.min(3,Math.max(0,slot))+1;
           const preview=i===0?nextPiecePreviewMarkup(p.board.nextPiece):'';
           const shields=i===0?shieldInventoryMarkup(p, session.state):'';
-          return `<article class="hud-card network-field-card hud-palette-slot-${palette} ${i===0?'network-own-card':'network-mini-card'} ${card.cardWidth<=250?'is-compact':''} ${p.board.alive?'':'is-out'}" style="left:${card.x}px;top:${card.y}px;width:${card.cardWidth}px;height:${card.cardHeight}px;--network-header:${card.headerHeight}px;--player-name-color:${playerAccentForSlot(slot)}">
-            <header class="network-field-heading" data-field="${p.config.id}"><div class="hud-identity"><strong>${escape(p.config.label)}${p.config.teamId?` · К${p.config.teamId==='team-2'?2:1}`:''}</strong></div><div class="hud-stats"><b>${p.score.toLocaleString('ru-RU')} очков</b>${i===0?`<span>${p.placedPieces} фигур</span>`:''}</div>${i===0?'':`<small>${p.board.alive?'В игре':'Выбыл'}</small>`}</header>${shields}${preview}${p.board.alive?'':'<b class="out-label">ВЫБЫЛ</b>'}</article>`;
+          return `<article class="hud-card network-field-card hud-palette-slot-${palette} ${i===0?'network-own-card':'network-mini-card'} ${card.cardWidth<=250?'is-compact':''} ${p.board.alive?'':'is-out'}" style="--preview-atlas:url('${WORKSHOP_THEME_TEXTURES[p.resolvedTileStyle].url}');left:${card.x}px;top:${card.y}px;width:${card.cardWidth}px;height:${card.cardHeight}px;--network-header:${card.headerHeight}px;--player-name-color:${playerAccentForSlot(slot)}">
+            <div class="wood-panel-shell" aria-hidden="true"></div><div class="wood-panel-foot" aria-hidden="true"></div><header class="network-field-heading" data-field="${p.config.id}"><div class="hud-identity"><strong>${escape(p.config.label)}${p.config.teamId?` · К${p.config.teamId==='team-2'?2:1}`:''}</strong></div><div class="hud-stats"><b>${p.score.toLocaleString('ru-RU')} очков</b>${i===0?`<span>${p.placedPieces} фигур</span>`:''}</div>${i===0?'':`<small>${p.board.alive?'В игре':'Выбыл'}</small>`}</header>${shields}${preview}${p.board.alive?'':'<b class="out-label">ВЫБЫЛ</b>'}</article>`;
         }).join('');
       }
     }

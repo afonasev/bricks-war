@@ -51,7 +51,8 @@ describe('shared menu input', () => {
     expect(gamepadMenuAction(gamepad(1, { axes: [0.8, 0] }))).toBe('increase');
     expect(gamepadMenuAction(gamepad(2, { pressed: [0] }))).toBe('confirm');
     expect(gamepadMenuAction(gamepad(3, { pressed: [1] }))).toBe('back');
-    expect(gamepadMenuAction(gamepad(4, { pressed: [2] }))).toBe('start');
+    expect(gamepadMenuAction(gamepad(4, { pressed: [2] }))).toBe('add-ai');
+    expect(gamepadMenuAction(gamepad(4, { pressed: [9] }))).toBe('start');
   });
 
   it('emits one action per deliberate input and ignores stick drift or inactive screens', () => {
@@ -103,5 +104,20 @@ describe('independent Y press edges', () => {
     latch.read([], true);
     latch.read([pad], true, undefined, undefined, (index) => actions.push(index));
     expect(actions).toEqual([0]);
+  });
+});
+
+describe('AI picker and Start press edges', () => {
+  it('requires release before repeating X, A or Start across menu transitions', () => {
+    for (const [button, action] of [[2, 'add-ai'], [0, 'confirm'], [9, 'start']] as const) {
+      const latch = new GamepadMenuLatch();
+      const pad = gamepad(0, { pressed: [button] });
+      expect(latch.read([pad], true)).toBe(action);
+      expect(latch.read([pad], true)).toBeNull();
+      expect(latch.read([pad], false)).toBeNull();
+      expect(latch.read([pad], true)).toBeNull();
+      latch.read([gamepad(0)], true);
+      expect(latch.read([pad], true)).toBe(action);
+    }
   });
 });

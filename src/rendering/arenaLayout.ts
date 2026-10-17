@@ -103,6 +103,8 @@ function measureLayout(
   mode: ArenaLayoutMode,
   gap: number,
   headerHeight: number,
+  housingInset = 0,
+  housingHorizontalInset = housingInset,
 ): ArenaLayout {
   const slotWidth = (
     width - (ARENA_EDGE_PADDING * 2) - (gap * (columns - 1))
@@ -111,19 +113,19 @@ function measureLayout(
     height - (ARENA_EDGE_PADDING * 2) - (gap * (rows - 1))
   ) / rows;
   const cellSize = Math.max(0, Math.floor(Math.min(
-    (slotWidth - ARENA_CARD_HORIZONTAL_PADDING) / 10,
-    (slotHeight - headerHeight - ARENA_CARD_BOTTOM_PADDING) / 20,
+    (slotWidth - ARENA_CARD_HORIZONTAL_PADDING - housingHorizontalInset * 2) / 10,
+    (slotHeight - headerHeight - ARENA_CARD_BOTTOM_PADDING - housingInset * 2) / 20,
   )));
   const cardWidth = (cellSize * 10) + ARENA_CARD_HORIZONTAL_PADDING;
   const cardHeight = headerHeight + (cellSize * 20) + ARENA_CARD_BOTTOM_PADDING;
   return { mode, columns, rows, slotWidth, slotHeight, cardWidth, cardHeight, cellSize, gap, headerHeight };
 }
 
-export function chooseArenaLayout(width: number, height: number, participantCount: number, gap = ARENA_CARD_GAP, headerHeight = ARENA_CARD_HEADER_HEIGHT): ArenaLayout {
+export function chooseArenaLayout(width: number, height: number, participantCount: number, gap = ARENA_CARD_GAP, headerHeight = ARENA_CARD_HEADER_HEIGHT, housingInset = 0, housingHorizontalInset = housingInset): ArenaLayout {
   const count = Math.max(1, Math.min(4, participantCount));
-  const horizontal = measureLayout(width, height, count, 1, 'horizontal', gap, headerHeight);
+  const horizontal = measureLayout(width, height, count, 1, 'horizontal', gap, headerHeight, housingInset, housingHorizontalInset);
   if (count <= 2) return horizontal;
-  const grid = measureLayout(width, height, 2, 2, 'grid-2x2', gap, headerHeight);
+  const grid = measureLayout(width, height, 2, 2, 'grid-2x2', gap, headerHeight, housingInset, housingHorizontalInset);
   return grid.cellSize > horizontal.cellSize ? grid : horizontal;
 }
 
