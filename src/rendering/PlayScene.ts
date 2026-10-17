@@ -584,8 +584,9 @@ export class PlayScene extends Phaser.Scene {
     }
 
     this.graphics = originalGraphics;
+    // Event contours enclose the whole housing interior, including its HUD header.
     if (participant.board.alive) drawBoardEventEffects(this.graphics, this.runtime.engine.state,
-      participant.config.id, boardX,boardY,boardWidth,boardHeight,this.calmEffects);
+      participant.config.id, cardX,cardY,cardWidth,cardHeight,this.calmEffects);
     if (conflict.impactRows > 0 && conflict.impactProgress > 0 && participant.board.alive) {
       const impactProgress = Math.max(0, Math.min(1, conflict.impactProgress));
       const impactAlpha = this.calmEffects ? 0.82 : Math.max(0.2, impactProgress);
