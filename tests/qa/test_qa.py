@@ -1,7 +1,9 @@
 import importlib.util
 import io
 import json
+import os
 from pathlib import Path
+import socket
 import sys
 import tempfile
 import unittest
@@ -121,6 +123,40 @@ class PlaywrightReportTests(unittest.TestCase):
             with self.subTest(report=report):
                 with self.assertRaises(ValueError):
                     qa.validate_playwright(report, self.expected)
+
+
+class BrowserPortTests(unittest.TestCase):
+    def test_port_default_override_and_invalid_values(self):
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(qa.local_qa_port(), 4187)
+        with patch.dict(os.environ, {'BRICKS_LOCAL_QA_PORT': '4287'}):
+            self.assertEqual(qa.local_qa_port(), 4287)
+        for value in ['', '0', '65536', '1.5', '-1', '4187; echo bad']:
+            with self.subTest(value=value), patch.dict(os.environ, {'BRICKS_LOCAL_QA_PORT': value}):
+                with self.assertRaisesRegex(ValueError, 'BRICKS_LOCAL_QA_PORT'):
+                    qa.local_qa_port()
+
+    def test_busy_port_stops_ui_and_full_before_unit_or_build_and_keeps_server_alive(self):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
+            listener.bind(('127.0.0.1', 0))
+            listener.listen()
+            port = listener.getsockname()[1]
+            for route in ['ui', 'full']:
+                with self.subTest(route=route), tempfile.TemporaryDirectory() as directory:
+                    args = ['qa.py', route, '--reason', 'port admission contract', '--output', directory]
+                    with patch.dict(os.environ, {'BRICKS_LOCAL_QA_PORT': str(port)}), patch.object(
+                            sys, 'argv', args), patch.object(qa, 'run_command') as run:
+                        with redirect_stdout(io.StringIO()):
+                            self.assertEqual(qa.main(), 1)
+                        run.assert_not_called()
+                    result = json.loads(next(Path(directory).glob('*/result.json')).read_text())
+                    self.assertFalse(result['passed'])
+                    self.assertEqual(result['checks'], [])
+                    self.assertEqual(result['browser_origin'], f'http://127.0.0.1:{port}')
+                    self.assertIn(f'QA port {port} unavailable', result['error'])
+                    with socket.create_connection(('127.0.0.1', port), timeout=1):
+                        connection, _ = listener.accept()
+                        connection.close()
 
 
 class LoadReportTests(unittest.TestCase):

@@ -13,7 +13,6 @@ export const TILE_STYLES: readonly TileStyleDefinition[] = [
   { id: 'stone-fortress', label: 'Каменная крепость', shortLabel: 'Крепость' },
   { id: 'marmalade', label: 'Мармелад', shortLabel: 'Мармелад' },
   { id: 'forest-mosaic', label: 'Лесная мозаика', shortLabel: 'Лес' },
-  { id: 'sea-crystals', label: 'Морские кристаллы', shortLabel: 'Кристаллы' },
 ] as const;
 
 export const TILE_STYLE_IDS = TILE_STYLES.map(({ id }) => id) as readonly TileStyle[];

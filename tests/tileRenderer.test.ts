@@ -78,15 +78,15 @@ describe('procedural tile renderer', () => {
     }
   });
 
-  it('gives all seven original materials distinct bounded primitive signatures', () => {
+  it('gives all six available materials distinct bounded primitive signatures', () => {
     const signatures = TILE_STYLE_IDS.map((style) => draw(style).map(([name]) => name).join(','));
-    expect(new Set(signatures).size).toBe(7);
+    expect(new Set(signatures).size).toBe(6);
     expect(signatures.every((signature) => !/text|image|sprite/i.test(signature))).toBe(true);
     const semanticSignatures = TILE_STYLE_IDS.map((style) => tileRenderSignature({
       style, kind: 'T', size: 24, state: 'active',
     }));
-    expect(new Set(semanticSignatures.map(({ silhouette }) => silhouette)).size).toBe(7);
-    expect(new Set(semanticSignatures.map(({ surfacePattern }) => surfacePattern)).size).toBe(7);
+    expect(new Set(semanticSignatures.map(({ silhouette }) => silhouette)).size).toBe(6);
+    expect(new Set(semanticSignatures.map(({ surfacePattern }) => surfacePattern)).size).toBe(6);
   });
 
   it('drops fine detail but keeps material contrast at the smallest cells', () => {
@@ -236,4 +236,12 @@ describe('polished solo review material', () => {
       expect(x!+w!).toBeLessThanOrEqual(36);expect(y!+h!).toBeLessThanOrEqual(36);
     }
   });
+});
+
+
+it('renders legacy crystal ordinary and anomaly states exactly as Classic',()=>{
+ for(const kind of ['T','anomaly','garbage'] as const)for(const state of ['active','ghost','preview','settled'] as const) {
+  expect(draw('sea-crystals',kind,24,state)).toEqual(draw('classic',kind,24,state));
+  expect(tileRenderSignature({style:'sea-crystals',kind,size:24,state})).toEqual(tileRenderSignature({style:'classic',kind,size:24,state}));
+ }
 });

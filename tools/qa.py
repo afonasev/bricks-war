@@ -6,6 +6,8 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
+import socket
 import subprocess
 import time
 import uuid
@@ -79,6 +81,23 @@ def run_command(command, directory, label, env=None):
             'wall_seconds': round(time.monotonic() - started, 4), 'log': label + '.log'}
 
 
+def local_qa_port():
+    value = os.environ.get('BRICKS_LOCAL_QA_PORT', '4187')
+    if not re.fullmatch(r'[0-9]+', value) or not 1 <= int(value) <= 65535:
+        raise ValueError('BRICKS_LOCAL_QA_PORT must be an integer from 1 to 65535')
+    return int(value)
+
+
+def check_browser_port(port):
+    # Preflight only: Playwright still owns startup and detects a later race.
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
+        try:
+            listener.bind(('127.0.0.1', port))
+        except OSError as error:
+            raise ValueError(f'QA port {port} unavailable; choose another BRICKS_LOCAL_QA_PORT. '
+                             'Do not stop or reuse a foreign server.') from error
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('route', choices=['unit-ui', 'ui', 'focused', 'full'])
@@ -106,6 +125,12 @@ def main():
     (directory / 'plan.json').write_text(json.dumps(state, indent=2))
     started = time.monotonic()
     try:
+        if args.route in ['ui', 'full']:
+            port = local_qa_port()
+            state['browser_origin'] = f'http://127.0.0.1:{port}'
+            check_browser_port(port)
+            state['browser_port_preflight'] = 'passed'
+            (directory / 'plan.json').write_text(json.dumps(state, indent=2))
         report_path = directory / 'unit.json'
         cmd = ['node', 'node_modules/vitest/vitest.mjs', 'run', '--config', 'vitest.config.ts', *files,
                '--reporter=default', '--reporter=json', '--outputFile=' + str(report_path)]
@@ -123,7 +148,6 @@ def main():
             config = 'playwright.smoke.config.ts' if args.route == 'ui' else 'playwright.config.ts'
             cmd = ['node', 'node_modules/@playwright/test/cli.js', 'test', '-c', config, '--reporter=list,json']
             check = run_command(cmd, directory, 'browser', env); state['checks'].append(check)
-            state['browser_origin'] = f"http://127.0.0.1:{int(os.environ.get('BRICKS_LOCAL_QA_PORT', '4187'))}"
             if check['exit_code'] != 0:
                 raise ValueError('Browser command failed')
             check['results'] = validate_playwright(load_report(report_path), UI_BROWSER if args.route == 'ui' else None)

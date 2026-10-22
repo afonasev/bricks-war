@@ -42,11 +42,11 @@ for (const mode of ['Выживание', 'Битва', 'Командный бо
     await press(page, 0);
     await expect(page.locator('[data-slot="2"]')).toHaveValue('gamepad-0');
     await page.getByLabel('Имя игрока 3').fill('Александр Великий');
-    await select(page, 'Стиль участника 3', 'Морские кристаллы');
+    await select(page, 'Стиль участника 3', 'Лесная мозаика');
     await press(page, 0);
     await expect(page.locator('[data-slot="3"]')).toHaveValue('gamepad-0');
     await expect(page.getByLabel('Имя игрока 4')).toHaveValue('Александр Великий');
-    await expect(page.locator('[data-tile-style="3"]')).toHaveValue('sea-crystals');
+    await expect(page.locator('[data-tile-style="3"]')).toHaveValue('forest-mosaic');
     // Both newly pressed devices are processed in the same frame.
     await page.evaluate(() => { (window as any).rosterPads.forEach((pad: any) => { pad.buttons[3].pressed = true; }); });
     await expect(page.locator('[data-slot="2"]')).toHaveValue('gamepad-0');
@@ -104,7 +104,7 @@ test('preserves manual controller replacement name and forgets live assignment o
     await page.setViewportSize({ width, height });
     const control = page.getByRole('combobox', { name: 'Участник 1', exact: true });
     expect(await control.evaluate(el => el.scrollWidth <= el.clientWidth && el.scrollHeight <= el.clientHeight)).toBe(true);
-    await page.screenshot({ path: `evidence/short-gamepad-labels/controller-${width}x${height}.png` });
+    await page.screenshot({ path: `${process.env.BRICKS_GAMEPAD_SCREENSHOTS ?? 'evidence/short-gamepad-labels'}/controller-${width}x${height}.png` });
   }
   await emptySlot(page, 0);
   await press(page, 0);

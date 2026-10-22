@@ -22,3 +22,10 @@ describe('isolated network setup preferences',()=>{
     const denied={getItem:()=>{throw Error();},setItem:()=>{throw Error();}};expect(()=>savePersonal({name:'Anna'},denied)).not.toThrow();expect(loadCreatorRules('battle',denied).battleTimeMode).toBe('until-victory');
   });
 });
+
+
+it('preserves retired-style bot difficulty/team and personal controls/name',()=>{
+ const s=storage();s.setItem(NETWORK_SETUP_KEY,JSON.stringify({personal:{name:'Анна',tileStyle:'sea-crystals',controls:'gamepad-3',teamId:'team-2'},bots:[{difficulty:'expert',tileStyle:'sea-crystals',teamId:'team-2'},{difficulty:'easy',tileStyle:'marmalade',teamId:'team-1'}]}));
+ expect(loadPersonal('touch',s)).toEqual({name:'Анна',tileStyle:'random',controls:'gamepad-3',teamId:'team-2'});
+ expect(loadCreator(s).bots).toEqual([{difficulty:'expert',tileStyle:'random',teamId:'team-2'},{difficulty:'easy',tileStyle:'marmalade',teamId:'team-1'}]);
+});

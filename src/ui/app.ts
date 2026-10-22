@@ -22,7 +22,7 @@ import { MUSIC_DIRECTIONS, type AudioPreviewCategory, type MusicDirectionId } fr
 import { isSfxPresetId, SFX_PACK_OPTIONS } from '../audio/sfxPresets';
 import { AiController } from '../controllers/ai';
 import { HumanInputRouter } from '../controllers/input';
-import { connectedGamepads, type ConnectedGamepad, type GamepadControls } from '../controllers/gamepads';
+import { connectedGamepads, gamepadDisplayName, type ConnectedGamepad, type GamepadControls } from '../controllers/gamepads';
 import { mobileTouchActionAt, type MobileTouchAction } from '../controllers/mobileTouchZones';
 import type {
   AiDifficulty,
@@ -640,7 +640,7 @@ export class BricksWarApp {
     window.scrollTo({ top: 0 });
     const mobile = isMobilePlayViewport();
     const title = mode === 'survival' ? 'Выживание' : mode === 'team-battle' ? 'Командный бой' : 'Битва';
-    const subtitle = mobile ? (mode === 'survival' ? 'Играйте в одиночку и побейте рекорд' : 'Вы против одного или двух ИИ') : mode === 'survival'
+    const subtitle = mobile ? (mode === 'survival' ? 'Играйте в одиночку и побейте рекорд' : 'Вы против 1–3 ИИ') : mode === 'survival'
       ? 'Продержитесь как можно дольше и попадите в локальный топ-10'
       : mode === 'team-battle' ? 'Две команды по два игрока' : 'От двух до четырёх игроков — каждый за себя';
     const records = mode === 'survival' ? loadSoloRecords() : [];
@@ -1321,7 +1321,7 @@ export class BricksWarApp {
       <article class="participant-card occupied ${playerClass}" data-slot-card="${index}">
         <header>${human ? `<span class="editable-name-field"><textarea class="player-name editable-player-name" data-player-name="${index}" aria-label="Имя игрока ${index + 1}" rows="1" maxlength="18">${escapeHtml(this.playerNameForSlot(index))}</textarea></span>` : '<strong class="player-name">ИИ</strong>'}<button class="remove-participant" type="button" data-remove-slot="${index}" aria-label="Удалить ${human ? escapeHtml(this.playerNameForSlot(index)) : 'ИИ'}" title="Удалить"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v5m4-5v5" /></svg></button></header>
         <label><span>${human ? 'Управление' : 'Сложность'}</span><select data-slot="${index}" aria-label="Участник ${index + 1}">${this.slotOptions(index, value, survival).filter((option) => option.value !== 'off').map((option) => `<option value="${option.value}" ${option.value === value ? 'selected' : ''} ${option.disabled ? 'disabled' : ''}>${escapeHtml(option.label)}</option>`).join('')}</select></label>
-        <label><span>Стиль фигур</span><span class="tile-style-control">${this.tileStylePreviewMarkup(index, style)}<select data-tile-style="${index}" aria-label="Стиль участника ${index + 1}"><option value="random" ${style === 'random' ? 'selected' : ''}>Случайный</option>${TILE_STYLES.map((option) => `<option value="${option.id}" ${option.id === style ? 'selected' : ''}>${option.label}</option>`).join('')}</select></span></label>
+        <label><span>Стиль фигур</span><span class="tile-style-control">${this.tileStylePreviewMarkup(index, style)}<select data-menu-select-layout="style-list" data-tile-style="${index}" aria-label="Стиль участника ${index + 1}"><option value="random" ${style === 'random' ? 'selected' : ''}>Случайный</option>${TILE_STYLES.map((option) => `<option value="${option.id}" ${option.id === style ? 'selected' : ''}>${option.label}</option>`).join('')}</select></span></label>
       </article>
     `;
   }
@@ -1332,7 +1332,7 @@ export class BricksWarApp {
     const connected = connectedGamepads();
     const gamepadOptions = connected.map((gamepad) => ({
       value: gamepad.controller,
-      label: `Геймпад ${gamepad.index + 1}`,
+      label: gamepadDisplayName(gamepad.index),
       disabled: assigned.has(gamepad.controller),
     }));
     if (isGamepadSlot(selected) && !connected.some((gamepad) => gamepad.controller === selected)) {
@@ -1951,6 +1951,7 @@ export class BricksWarApp {
     this.router.open('results', 'main-menu');
     const ordered = [...state.participants].sort((a, b) => (a.placement ?? 99) - (b.placement ?? 99));
     const survival = state.isSurvival;
+    const soloSurvival = survival && state.participants.length === 1;
     const simultaneous = state.endReason === 'simultaneous-elimination';
     const teamBattle = state.options.matchVariant === 'teams';
     const resultTitle = simultaneous ? 'Одновременное выбывание'
@@ -1970,10 +1971,10 @@ export class BricksWarApp {
       : [];
     layer.innerHTML = `
       <section class="results-panel ${survival ? 'survival-results-panel' : ''}" aria-labelledby="results-title">
-        <p class="eyebrow">${survival ? 'РЕЗУЛЬТАТЫ ВЫЖИВАНИЯ' : state.endReason === 'timeout' ? 'ВРЕМЯ ВЫШЛО' : resultTitle.toLocaleUpperCase('ru-RU')}</p>
-        <h2 id="results-title">${survival ? 'Итоги выживания' : state.endReason === 'timeout' ? 'Время вышло' : resultTitle}</h2>
+        ${survival ? '' : `<p class="eyebrow">${state.endReason === 'timeout' ? 'ВРЕМЯ ВЫШЛО' : resultTitle.toLocaleUpperCase('ru-RU')}</p>`}
+        <h2 id="results-title">${survival ? 'Итоги' : state.endReason === 'timeout' ? 'Время вышло' : resultTitle}</h2>
         ${simultaneous ? '<p class="survival-result-copy">Последние соперники выбыли одновременно. Победитель определён по очкам; при равных очках — ничья.</p>' : ''}
-        ${survival ? `<p class="survival-result-copy">Место — по очкам за линии.</p><div class="survival-results-columns"><section class="survival-current-results" aria-labelledby="match-results-heading"><h3 id="match-results-heading">Результаты матча</h3><ol class="results-list survival-match-results">${ordered.map((participant) => `<li class="place-${participant.placement}" style="--player-name-color:${playerAccentForSlot(state.participants.indexOf(participant))}"><span class="result-place">#${participant.placement}</span><span><strong>${state.winnerIds.includes(participant.config.id) ? '♛ ' : ''}${escapeHtml(participant.config.label)}</strong><small>${this.controllerLabel(participant.config)} · ${formatDuration(participant.survivalMs)}</small></span><time>${participant.score.toLocaleString('ru-RU')}</time></li>`).join('')}</ol></section><section class="survival-local-records" aria-labelledby="local-records-heading"><h3 id="local-records-heading">Локальный топ-10</h3><ol class="results-list survival-record-list">${survivalResult?.records.map((record) => `<li class="${currentRecordIds.has(record.id) ? 'is-current-record' : ''}"><span class="result-place">#${1 + survivalResult.records.filter((other) => other.lineScore > record.lineScore).length}</span><span class="record-identity"><strong>${escapeHtml(record.name)}</strong></span><span class="record-metrics"><time>${record.lineScore.toLocaleString('ru-RU')}</time><span class="record-secondary">${recordDateMarkup(record.finishedAt)}<small class="record-duration" aria-label="Время выживания ${formatDuration(record.elapsedMs).slice(0, -2)}">◷ ${formatDuration(record.elapsedMs).slice(0, -2)}</small></span></span></li>`).join('')}</ol></section></div>` : ''}
+        ${survival ? `<div class="survival-results-columns"><section class="survival-current-results ${soloSurvival ? 'is-solo' : ''}" aria-labelledby="match-results-heading"><h3 id="match-results-heading">Этот матч</h3><ol class="results-list survival-match-results">${ordered.map((participant) => `<li class="${soloSurvival ? '' : `place-${participant.placement}`}" style="--player-name-color:${playerAccentForSlot(state.participants.indexOf(participant))}">${soloSurvival ? '' : `<span class="result-place">#${participant.placement}</span>`}<span><strong>${!soloSurvival && state.winnerIds.includes(participant.config.id) ? '♛ ' : ''}${escapeHtml(participant.config.label)}</strong><small class="result-controller">${this.controllerLabel(participant.config)} · ${formatDuration(participant.survivalMs)}</small></span><time>${participant.score.toLocaleString('ru-RU')}</time></li>`).join('')}</ol></section><section class="survival-local-records" aria-labelledby="local-records-heading"><h3 id="local-records-heading">Рекорды</h3><ol class="results-list survival-record-list">${survivalResult?.records.map((record) => `<li class="${currentRecordIds.has(record.id) ? 'is-current-record' : ''}"><span class="result-place">#${1 + survivalResult.records.filter((other) => other.lineScore > record.lineScore).length}</span><span class="record-identity"><strong>${escapeHtml(record.name)}</strong></span><span class="record-metrics"><time>${record.lineScore.toLocaleString('ru-RU')}</time><span class="record-secondary">${recordDateMarkup(record.finishedAt)}<small class="record-duration" aria-label="Время выживания ${formatDuration(record.elapsedMs).slice(0, -2)}">◷ ${formatDuration(record.elapsedMs).slice(0, -2)}</small></span></span></li>`).join('')}</ol></section></div>` : ''}
         ${teamSummary.length ? `<div class="team-results">${teamSummary.map((team) => {
           const members = state.participants.filter((_participant, index) => teamIdForSlot(index) === team.teamId);
           const winner = members.some((participant) => state.winnerIds.includes(participant.config.id));
@@ -1983,7 +1984,7 @@ export class BricksWarApp {
           ${ordered.map((participant) => `
             <li class="place-${participant.placement} ${participant.board.alive ? '' : 'is-eliminated'}" style="--player-name-color:${playerAccentForSlot(state.participants.indexOf(participant))}">
               <span class="result-place">#${participant.placement}</span>
-              <span><strong>${state.winnerIds.includes(participant.config.id) ? '♛ ' : ''}${escapeHtml(participant.config.label)}${participant.board.alive ? '' : ' (ВЫБЫЛ)'}</strong><small>${this.controllerLabel(participant.config)} · ${formatPieces(participant.placedPieces)} · ${formatDuration(participant.survivalMs)}</small></span>
+              <span><strong>${state.winnerIds.includes(participant.config.id) ? '♛ ' : ''}${escapeHtml(participant.config.label)}${participant.board.alive ? '' : ' (ВЫБЫЛ)'}</strong><small class="result-controller">${this.controllerLabel(participant.config)} · ${formatPieces(participant.placedPieces)} · ${formatDuration(participant.survivalMs)}</small></span>
               <time>${participant.score.toLocaleString('ru-RU')}</time>
             </li>
           `).join('')}
@@ -2247,9 +2248,10 @@ export class BricksWarApp {
   }
 
   private controllerLabel(config: ParticipantConfig): string {
-    if (config.controller === 'human-1') return 'КЛАВИАТУРА 1 · WASD';
-    if (config.controller === 'human-2') return 'КЛАВИАТУРА 2 · СТРЕЛКИ';
-    if (isGamepadController(config.controller)) return `ГЕЙМПАД ${Number(config.controller.slice('gamepad-'.length)) + 1} · ${config.controllerLabel ?? 'НЕДОСТУПЕН'}`;
+    if (config.controller === 'human-1') return 'Клавиатура WASD';
+    if (config.controller === 'human-2') return 'Клавиатура стрелки';
+    if (isGamepadController(config.controller)) return gamepadDisplayName(Number(config.controller.slice('gamepad-'.length)));
+    if (config.controller === 'mobile-touch') return 'СЕНСОРНОЕ УПРАВЛЕНИЕ';
     const labels: Record<AiDifficulty, string> = {
       easy: 'ЛЁГКИЙ',
       medium: 'СРЕДНИЙ',

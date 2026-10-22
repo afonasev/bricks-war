@@ -149,3 +149,66 @@
 @media (max-height: 700px) {
   #app[data-layout="mobile"] .survival-record-list li strong { font-size: 12px; line-height: 1.1; }
 }
+
+/* Approved A: the current match and saved records have distinct surfaces. */
+#app .survival-results-columns { display: grid; gap: 12px; margin-top: 12px; }
+#app .survival-results-columns > section {
+  min-width: 0; padding: 12px; border: 1px solid #c5d1c5; border-radius: 12px;
+}
+#app .survival-results-columns .survival-current-results {
+  background: #e9f2df; border-color: #9eb88a;
+}
+#app .survival-results-columns .survival-local-records { background: #f4f6f1; }
+#app .survival-results-columns h3 { margin: 0 0 8px; font-size: 17px; }
+#app .survival-current-results h3 { color: #356344; }
+#app .survival-results-columns .results-list { margin: 0; }
+#app[data-layout="desktop"] .survival-results-columns { grid-template-columns: repeat(2, minmax(0,1fr)); }
+#app[data-layout="mobile"] .survival-results-columns { gap: 8px; margin-top: 8px; }
+#app[data-layout="mobile"] .survival-results-columns > section { padding: 8px; border-radius: 10px; }
+#app[data-layout="mobile"] .survival-results-columns h3 { margin: 0 0 5px; }
+@media (max-height: 700px) {
+  #app[data-layout="mobile"] .survival-results-columns { gap: 6px; margin-top: 6px; }
+  #app[data-layout="mobile"] .survival-results-columns > section { padding: 5px 6px; }
+}
+@media (max-height: 450px) and (orientation: landscape) {
+  #app[data-layout="mobile"] .survival-results-panel .survival-results-columns { margin-top: 0; gap: 8px; }
+}
+/* Keep a full eligible top ten inside compact phone layouts, including long names. */
+@media (max-height: 600px) and (orientation: portrait) {
+  #app[data-layout="mobile"] .mobile-survival-records li { padding-block: 0; }
+  #app[data-layout="mobile"] .mobile-survival-records li strong { font-size: 11px; line-height: 1; }
+}
+@media (max-height: 450px) and (orientation: landscape) {
+  #app[data-layout="mobile"] .mobile-survival-records li { padding-block: 0; }
+}
+/* Retain a one-pixel inset after fractional desktop scaling. */
+#app[data-layout="desktop"] .desktop-menu-stage .mode-setup-screen[data-screen="survival"] .release-guidance-footer { margin-bottom: 1px; }
+#app[data-layout="desktop"] .survival-results-panel .results-actions { margin-top: 12px; }
+
+/* F1–F3: consistent device text, compact actions, and no solo podium. */
+#app .results-panel .results-list small.result-controller {
+  font-family: inherit; font-size: 12px; font-weight: 600; line-height: 1.25;
+  letter-spacing: normal; text-transform: none;
+}
+#app .survival-current-results.is-solo .survival-match-results li {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+#app .results-panel .results-actions {
+  grid-template-columns: repeat(2, minmax(0, 190px)); justify-content: center;
+}
+#app .results-panel .results-actions > button {
+  width: 100%; min-height: 44px; padding: 8px 12px; font-size: 16px;
+}
+#app .results-panel .results-actions #play-again b { font-size: 20px; }
+#app[data-layout="mobile"] .results-panel .results-list small.result-controller { font-size: 11px; }
+#app[data-layout="mobile"] .results-panel .results-actions { grid-template-columns: minmax(0, 240px); }
+#app[data-layout="mobile"] .results-panel .results-actions > button { font-size: 14px; }
+@media (max-height: 450px) and (orientation: landscape) {
+  #app[data-layout="mobile"] .survival-results-panel .results-actions { grid-template-columns: minmax(0, 160px); }
+}
+@media (max-height: 600px) and (orientation: portrait) {
+  #app[data-layout="mobile"] .survival-results-panel { padding: 8px; }
+  #app[data-layout="mobile"] .survival-results-columns > section { padding: 4px 6px; }
+  #app[data-layout="mobile"] .survival-results-columns h3 { margin-bottom: 3px; }
+  #app[data-layout="mobile"] .survival-results-panel .results-actions { margin-top: 6px; }
+}

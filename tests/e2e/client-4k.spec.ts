@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import { mkdir, writeFile } from 'node:fs/promises';
 
-const evidence = 'evidence/add-client-4k-support';
+const evidence = process.env.BRICKS_4K_EVIDENCE ?? 'evidence/add-client-4k-support';
 
 async function fit(page: Page): Promise<void> {
   const issues = await page.evaluate(() => {
@@ -45,7 +45,7 @@ for (const [width,height,density] of [[3840,2160,1],[2560,1440,1],[2560,1440,1.5
           Object.assign(window,{qa4kPads:pads});
           localStorage.setItem('bricks-war:slot-selections:v1',JSON.stringify(players===4?['human-1','human-2','gamepad-0','gamepad-1']:['human-1','off','off','off']));
           localStorage.setItem('bricks-war:player-names:v1',JSON.stringify(Array(4).fill('Александр Великий')));
-          localStorage.setItem('bricks-war:solo-records:v1',JSON.stringify(Array.from({length:10},(_,i)=>({id:`r${i}`,name:'Александр Великий',elapsedMs:600000,lineScore:10000-i,finishedAt:1780000000000,placedPieces:1000}))));
+          localStorage.setItem('bricks-war:solo-records:v1',JSON.stringify(Array.from({length:10},(_,i)=>({id:`r${i}`,name:`Александр Велики${i}`,elapsedMs:600000,lineScore:10000-i,finishedAt:1780000000000,placedPieces:1000}))));
         }, {players});
         const id = `${width}x${height}-dpr${density}-${players}p`;
         await page.goto('/?muted=1');

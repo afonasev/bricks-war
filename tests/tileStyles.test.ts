@@ -21,9 +21,9 @@ function configs(...styles: ParticipantConfig['tileStyle'][]): ParticipantConfig
 }
 
 describe('tile style catalog', () => {
-  it('contains the seven bounded original styles and Russian labels', () => {
+  it('contains the six available styles and Russian labels', () => {
     expect(TILE_STYLES.map(({ id }) => id)).toEqual([
-      'classic', 'construction-bricks', 'pixel-adventure', 'stone-fortress', 'marmalade', 'forest-mosaic', 'sea-crystals',
+      'classic', 'construction-bricks', 'pixel-adventure', 'stone-fortress', 'marmalade', 'forest-mosaic',
     ]);
     expect(TILE_STYLES.every(({ label, shortLabel }) => label.length > 0 && shortLabel.length > 0)).toBe(true);
     expect(DEFAULT_TILE_STYLE).toBe('classic');
@@ -31,7 +31,7 @@ describe('tile style catalog', () => {
     expect(tileStyleLabel('random')).toBe('Случайный');
     expect(tileStyleLabel('construction-bricks')).toBe('Конструктор');
     expect(isTileStyle('construction-bricks')).toBe(true);
-    expect(isTileStyle('sea-crystals')).toBe(true);
+    expect(isTileStyle('sea-crystals')).toBe(false);
     expect(isTileStyle('unknown')).toBe(false);
     // @ts-expect-error Unknown IDs must not type-check as a concrete style.
     const invalid: TileStyle = 'unknown';
@@ -78,12 +78,26 @@ describe('participant tile style resolution', () => {
 
   it('repeats only after the unreserved pool is exhausted', () => {
     const reserved: ParticipantConfig[] = [
-      ...configs('classic', 'construction-bricks', 'pixel-adventure', 'stone-fortress', 'marmalade', 'forest-mosaic', 'sea-crystals'),
+      ...configs('classic', 'construction-bricks', 'pixel-adventure', 'stone-fortress', 'marmalade', 'forest-mosaic'),
       { id: 'random-1', label: 'R1', controller: 'ai', difficulty: 'easy', tileStyle: 'random' },
       { id: 'random-2', label: 'R2', controller: 'ai', difficulty: 'easy', tileStyle: 'random' },
     ];
     const resolved = resolveParticipantTileStyles(reserved, 99);
     expect(resolved.get('random-1')).toBeDefined();
     expect(resolved.get('random-2')).toBeDefined();
+  });
+});
+
+
+describe('retired crystal assignments', () => {
+  it('resolves legacy choices through Random and never assigns retired styles', () => {
+    const players=configs('sea-crystals','random','random','random');
+    for(let seed=0;seed<64;seed++) {
+      const values=[...resolveParticipantTileStyles(players,seed).values()];
+      expect(values.every(value=>isTileStyle(value))).toBe(true);
+      expect(values).not.toContain('sea-crystals');
+      expect(new Set(values).size).toBe(4);
+      expect(resolveParticipantTileStyles(players,seed)).toEqual(resolveParticipantTileStyles(configs('random','random','random','random'),seed));
+    }
   });
 });

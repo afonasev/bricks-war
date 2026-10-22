@@ -47,6 +47,7 @@ export function isGamepadController(controller: ControllerType): controller is G
 export function gamepadIndexForController(controller: GamepadController): number {
   return Number(controller.slice('gamepad-'.length));
 }
+// sea-crystals is a retired wire identity, rendered as Classic; never selectable.
 export type TileStyle = 'classic' | 'construction-bricks' | 'pixel-adventure' | 'stone-fortress' | 'marmalade' | 'forest-mosaic' | 'sea-crystals';
 export type TileStyleSelection = TileStyle | 'random';
 export type BattleDifficulty = 'family' | 'normal' | 'sport';

@@ -17,12 +17,16 @@ export interface GamepadControls {
 const STICK_THRESHOLD = 0.5;
 const buttonPressed = (gamepad: Gamepad, index: number): boolean => gamepad.buttons[index]?.pressed ?? false;
 
+export function gamepadDisplayName(index: number): string {
+  return `Геймпад ${index + 1}`;
+}
+
 export function connectedGamepads(source: Navigator = navigator): ConnectedGamepad[] {
   const gamepads = typeof source.getGamepads === 'function' ? source.getGamepads() : [];
   return Array.from(gamepads).flatMap((gamepad) => gamepad?.connected ? [{
     controller: `gamepad-${gamepad.index}` as GamepadController,
     index: gamepad.index,
-    label: gamepad.id.trim() || `Геймпад ${gamepad.index + 1}`,
+    label: gamepadDisplayName(gamepad.index),
   }] : []);
 }
 

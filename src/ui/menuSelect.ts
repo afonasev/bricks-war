@@ -52,8 +52,10 @@ export function enhanceMenuSelects(root: HTMLElement): void {
     const label = selectLabel(select);
     const wrapper = document.createElement('span');
     wrapper.className = 'menu-select';
-    const dropdown = select.dataset.menuSelectLayout === 'dropdown';
+    const compact = select.dataset.menuSelectLayout === 'style-list';
+    const dropdown = select.dataset.menuSelectLayout === 'dropdown' || compact;
     wrapper.classList.toggle('is-dropdown', dropdown);
+    wrapper.classList.toggle('is-style-list', compact);
     const trigger = document.createElement('button');
     trigger.type = 'button';
     trigger.disabled = select.disabled;
@@ -110,6 +112,8 @@ export function enhanceMenuSelects(root: HTMLElement): void {
 
     let highlighted = select.selectedIndex;
     let suppressKeyboardClick = false;
+    let mobileDialog: HTMLDialogElement | null = null;
+    const mobile = (): boolean => root.closest<HTMLElement>('[data-layout]')?.dataset.layout === 'mobile';
     const desktop = (): boolean => root.dataset.layout === 'desktop' && !dropdown;
     const pageSize = (): number => 6;
     const pager = document.createElement('span');
@@ -121,7 +125,7 @@ export function enhanceMenuSelects(root: HTMLElement): void {
     previousPage.textContent = '← Предыдущие';
     nextPage.textContent = 'Следующие →';
     pager.append(previousPage, pageLabel, nextPage);
-    listbox.append(pager);
+    if (!compact) listbox.append(pager);
     const disabled = Array.from(select.options, (option) => option.disabled);
 
     const render = (): void => {
@@ -149,15 +153,23 @@ export function enhanceMenuSelects(root: HTMLElement): void {
       else trigger.setAttribute('aria-activedescendant', options[highlighted]?.id ?? '');
     };
     const close = (): void => {
+      if (mobileDialog) {
+        wrapper.append(listbox);
+        mobileDialog.close();
+        mobileDialog.remove();
+        mobileDialog = null;
+      }
       listbox.hidden = true;
       trigger.setAttribute('aria-expanded', 'false');
       wrapper.classList.remove('is-open');
       wrapper.classList.remove('opens-upward');
       listbox.style.removeProperty('--menu-select-available-height');
+      listbox.style.removeProperty('left');
       highlighted = select.selectedIndex;
       render();
     };
     const positionListbox = (): void => {
+      if (mobileDialog) return;
       if (desktop()) {
         wrapper.classList.remove('opens-upward');
         listbox.style.removeProperty('--menu-select-available-height');
@@ -166,11 +178,33 @@ export function enhanceMenuSelects(root: HTMLElement): void {
       const rootBounds = root.getBoundingClientRect();
       const triggerBounds = trigger.getBoundingClientRect();
       const gap = 8;
-      const spaceAbove = Math.max(0, triggerBounds.top - Math.max(0, rootBounds.top) - gap);
-      const spaceBelow = Math.max(0, Math.min(window.innerHeight, rootBounds.bottom) - triggerBounds.bottom - gap);
+      let visibleTop = Math.max(0, rootBounds.top);
+      let visibleBottom = Math.min(window.innerHeight, rootBounds.bottom);
+      if (compact) {
+        for (let parent = wrapper.parentElement; parent && parent !== root; parent = parent.parentElement) {
+          if (/(auto|scroll|hidden|clip)/.test(getComputedStyle(parent).overflowY)) {
+            const bounds = parent.getBoundingClientRect();
+            visibleTop = Math.max(visibleTop, bounds.top);
+            visibleBottom = Math.min(visibleBottom, bounds.bottom);
+          }
+        }
+      }
+      const spaceAbove = Math.max(0, triggerBounds.top - visibleTop - gap);
+      const spaceBelow = Math.max(0, visibleBottom - triggerBounds.bottom - gap);
       const opensUpward = spaceAbove > spaceBelow;
       wrapper.classList.toggle('opens-upward', opensUpward);
-      listbox.style.setProperty('--menu-select-available-height', `${Math.floor(opensUpward ? spaceAbove : spaceBelow)}px`);
+      // Desktop menus may live in a scaled stage; limits are measured in viewport pixels.
+      const scaleY = compact && trigger.offsetHeight ? triggerBounds.height / trigger.offsetHeight : 1;
+      listbox.style.setProperty('--menu-select-available-height', `${Math.floor((opensUpward ? spaceAbove : spaceBelow) / scaleY)}px`);
+      if (compact) {
+        listbox.style.removeProperty('left');
+        const popup = listbox.getBoundingClientRect();
+        const left = Math.max(8, rootBounds.left + 8);
+        const right = Math.min(window.innerWidth - 8, rootBounds.right - 8);
+        const shift = Math.max(left - popup.left, Math.min(0, right - popup.right));
+        const scaleX = trigger.offsetWidth ? triggerBounds.width / trigger.offsetWidth : 1;
+        listbox.style.left = `${shift / scaleX}px`;
+      }
     };
     const open = (): void => {
       root.querySelectorAll<HTMLElement>('.menu-select.is-open [data-menu-select-trigger]').forEach((other) => {
@@ -180,6 +214,33 @@ export function enhanceMenuSelects(root: HTMLElement): void {
       listbox.hidden = false;
       trigger.setAttribute('aria-expanded', 'true');
       wrapper.classList.add('is-open');
+      if (mobile()) {
+        mobileDialog = document.createElement('dialog');
+        mobileDialog.className = `menu-select-modal menu-select${compact ? ' is-style-list' : ''}`;
+        mobileDialog.setAttribute('aria-label', label);
+        const heading = document.createElement('h2');
+        heading.textContent = label;
+        const hint = document.createElement('p');
+        hint.className = 'menu-select-modal-hint';
+        hint.textContent = 'Нажмите снаружи, чтобы отменить';
+        mobileDialog.append(heading, listbox, hint);
+        root.append(mobileDialog);
+        mobileDialog.addEventListener('cancel', (event) => { event.preventDefault(); close(); });
+        mobileDialog.addEventListener('click', (event) => {
+          if (event.target !== event.currentTarget) return;
+          const bounds = (event.currentTarget as HTMLDialogElement).getBoundingClientRect();
+          if (event.clientX < bounds.left || event.clientX > bounds.right
+            || event.clientY < bounds.top || event.clientY > bounds.bottom) close();
+        });
+        mobileDialog.addEventListener('keydown', (event) => {
+          const next = menuSelectCommandForKey(event.key, true);
+          if (!next) return;
+          event.preventDefault();
+          event.stopPropagation();
+          command(next);
+        });
+        mobileDialog.showModal();
+      }
       positionListbox();
       render();
       if (!desktop()) options[highlighted]?.scrollIntoView({ block: 'nearest' });
@@ -243,15 +304,16 @@ export function enhanceMenuSelects(root: HTMLElement): void {
     nextPage.addEventListener('click', () => changePage(1));
     const onResize = (): void => {
       if (!select.isConnected) { window.removeEventListener('resize', onResize); return; }
+      if (mobileDialog && !mobile()) { close(); return; }
       if (!listbox.hidden) { positionListbox(); render(); }
     };
     window.addEventListener('resize', onResize);
     select.addEventListener('change', render);
     document.addEventListener('pointerdown', (event) => {
-      if (!wrapper.contains(event.target as Node)) close();
+      if (!wrapper.contains(event.target as Node) && !mobileDialog?.contains(event.target as Node)) close();
     });
     document.addEventListener('focusin', (event) => {
-      if (!wrapper.contains(event.target as Node)) close();
+      if (!wrapper.contains(event.target as Node) && !mobileDialog?.contains(event.target as Node)) close();
     });
     render();
   });

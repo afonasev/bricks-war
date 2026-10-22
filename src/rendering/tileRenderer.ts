@@ -36,20 +36,20 @@ export function detailTierForCell(size: number): 0 | 1 | 2 {
 }
 
 export function tileRenderSignature(options: Pick<StyledTileOptions, 'style' | 'kind' | 'size' | 'state'>): TileRenderSignature {
-  const styleCues: Record<TileStyle, readonly [string, string]> = {
+  const style = options.style === 'sea-crystals' ? 'classic' : options.style;
+  const styleCues: Record<Exclude<TileStyle, 'sea-crystals'>, readonly [string, string]> = {
     classic: ['clean-square', 'glossy-molded-face'],
     'construction-bricks': ['construction-brick', 'gloss-and-raised-detail'],
     'pixel-adventure': ['hard-square', 'embossed-pixel-checker'],
     'stone-fortress': ['molded-slab', 'embossed-mortar'],
     marmalade: ['rounded-candy', 'crescent-and-gloss'],
     'forest-mosaic': ['leaf-tile', 'embossed-leaf'],
-    'sea-crystals': ['diamond-tile', 'inset-diamond'],
   };
   const [silhouette, surfacePattern] = options.kind === 'garbage'
     ? ['hazard-square', 'neutral-cracks']
-    : styleCues[options.style];
+    : styleCues[style];
   return {
-    material: options.kind === 'garbage' ? 'neutral-hazard' : options.style,
+    material: options.kind === 'garbage' ? 'neutral-hazard' : style,
     state: options.state,
     detailTier: detailTierForCell(options.size),
     usesGameplayColor: options.kind !== 'garbage',
@@ -158,11 +158,6 @@ function drawToyMotif(g: Phaser.GameObjects.Graphics, x: number, y: number, size
     g.lineBetween(cx-r,cy,cx,cy+r);
     g.lineBetween(cx,cy-r,cx+r,cy);
     g.lineBetween(cx-r*.6,cy+r*.6,cx-r*.9,cy-r*.1);
-  } else {
-    g.fillStyle(dark,alpha*.4);
-    g.fillTriangle(cx,cy-r,cx+r,cy,cx,cy+r);
-    g.fillTriangle(cx,cy-r,cx,cy+r,cx-r,cy);
-    if (tier > 1) { g.fillStyle(light,alpha*.7); g.fillTriangle(cx,cy-r*.7,cx,cy+r*.7,cx-r*.7,cy); }
   }
 }
 
@@ -184,23 +179,12 @@ const HazardColor = HAZARD_COLOR;
 
 function drawAnomalyIdentity(g: Phaser.GameObjects.Graphics, x: number, y: number, size: number, alpha: number, style: TileStyle): void {
   const pixel = style === 'pixel-adventure';
-  const crystal = style === 'sea-crystals';
   const radius = pixel ? 0 : Math.max(1, size * 0.16);
   g.lineStyle(Math.max(2, size * 0.12), ANOMALY_DARK, 0.86 * alpha);
-  if (crystal) {
-    g.lineBetween(x + size / 2, y + 1, x + size - 1, y + size / 2);
-    g.lineBetween(x + size - 1, y + size / 2, x + size / 2, y + size - 1);
-    g.lineBetween(x + size / 2, y + size - 1, x + 1, y + size / 2);
-    g.lineBetween(x + 1, y + size / 2, x + size / 2, y + 1);
-  } else if (pixel) g.strokeRect(x + 1, y + 1, size - 2, size - 2);
+  if (pixel) g.strokeRect(x + 1, y + 1, size - 2, size - 2);
   else g.strokeRoundedRect(x + 1, y + 1, size - 2, size - 2, radius);
   g.lineStyle(Math.max(1, size * 0.055), 0xffeafd, 0.96 * alpha);
-  if (crystal) {
-    g.lineBetween(x + size / 2, y + 3, x + size - 3, y + size / 2);
-    g.lineBetween(x + size - 3, y + size / 2, x + size / 2, y + size - 3);
-    g.lineBetween(x + size / 2, y + size - 3, x + 3, y + size / 2);
-    g.lineBetween(x + 3, y + size / 2, x + size / 2, y + 3);
-  } else if (pixel) g.strokeRect(x + 3, y + 3, size - 6, size - 6);
+  if (pixel) g.strokeRect(x + 3, y + 3, size - 6, size - 6);
   else g.strokeRoundedRect(x + 3, y + 3, size - 6, size - 6, Math.max(1, radius - 1));
 
   const cx = x + size / 2;
@@ -214,7 +198,8 @@ function drawAnomalyIdentity(g: Phaser.GameObjects.Graphics, x: number, y: numbe
 }
 
 export function drawStyledTile(g: Phaser.GameObjects.Graphics, options: StyledTileOptions): void {
-  const { style, kind, x, y, size, alpha } = options;
+  const { kind, x, y, size, alpha } = options;
+  const style = options.style === 'sea-crystals' ? 'classic' : options.style;
   if (kind === 'garbage') {
     drawHazard(g, x, y, size, alpha);
     return;

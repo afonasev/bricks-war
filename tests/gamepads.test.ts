@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { connectedGamepads, gamepadControls } from '../src/controllers/gamepads';
+import { connectedGamepads, gamepadControls, gamepadDisplayName } from '../src/controllers/gamepads';
 
 function gamepad(index: number, overrides: Partial<Gamepad> = {}): Gamepad {
   return {
@@ -18,9 +18,17 @@ describe('browser gamepad discovery', () => {
   it('lists every connected pad and tolerates unavailable API', () => {
     expect(connectedGamepads({} as Navigator)).toEqual([]);
     expect(connectedGamepads({ getGamepads: () => [gamepad(0), null, gamepad(2)] } as unknown as Navigator)).toEqual([
-      { controller: 'gamepad-0', index: 0, label: 'Pad 0' },
-      { controller: 'gamepad-2', index: 2, label: 'Pad 2' },
+      { controller: 'gamepad-0', index: 0, label: 'Геймпад 1' },
+      { controller: 'gamepad-2', index: 2, label: 'Геймпад 3' },
     ]);
+  });
+
+  it('keeps long hardware names out of display labels without renumbering device indices', () => {
+    const pad = gamepad(4, { id: 'Wireless Controller With A Very Long Vendor And Product Name' });
+    expect(connectedGamepads({ getGamepads: () => [null, pad] } as unknown as Navigator)[0])
+      .toEqual({ controller: 'gamepad-4', index: 4, label: 'Геймпад 5' });
+    expect(gamepadDisplayName(1)).toBe('Геймпад 2');
+    expect(pad.id).toBe('Wireless Controller With A Very Long Vendor And Product Name');
   });
 
   it('normalizes stick, directional pad, and A/Cross into game actions', () => {

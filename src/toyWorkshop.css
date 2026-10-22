@@ -47,7 +47,6 @@
 #app :is(.tile-style-preview[data-style="stone-fortress"] i, [data-tile-style="stone-fortress"] .hud-next-cell)::after { background: linear-gradient(transparent 45%, #493047 46% 55%, transparent 56%), linear-gradient(90deg, transparent 45%, #493047 46% 55%, transparent 56%) bottom / 100% 50% no-repeat; }
 #app :is(.tile-style-preview[data-style="marmalade"] i, [data-tile-style="marmalade"] .hud-next-cell)::after { border-radius: 50%; box-shadow: -1px 1px 0 1px #493047; }
 #app :is(.tile-style-preview[data-style="forest-mosaic"] i, [data-tile-style="forest-mosaic"] .hud-next-cell)::after { border: 1px solid #493047; border-radius: 70% 0; transform: rotate(-20deg); }
-#app :is(.tile-style-preview[data-style="sea-crystals"] i, [data-tile-style="sea-crystals"] .hud-next-cell)::after { border: 1px solid #493047; inset: 30%; transform: rotate(45deg); }
 
 /* F1 material review: only one local desktop board until visual acceptance. */
 #app[data-layout="desktop"] .arena-screen:not(.network-arena):has(.hud-grid[data-count="1"]) {

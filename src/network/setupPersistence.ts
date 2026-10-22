@@ -14,7 +14,7 @@ function write(storage: Store | null, patch: Record<string,unknown>): void {try 
 export function loadPersonal(fallback: NetworkControls = 'keyboard', storage: Store | null = browserStorage()): PersonalPreferences {
   const r = record(read(storage).personal);
   return {name: typeof r.name === 'string' && r.name.trim().length > 0 && [...r.name.trim()].length<=32 ? r.name : 'Игрок',
-    tileStyle: typeof r.tileStyle === 'string' && (r.tileStyle === 'random' || isTileStyle(r.tileStyle)) ? r.tileStyle : loadNetworkStyle(storage),
+    tileStyle: r.tileStyle === 'sea-crystals' ? 'random' : typeof r.tileStyle === 'string' && (r.tileStyle === 'random' || isTileStyle(r.tileStyle)) ? r.tileStyle : loadNetworkStyle(storage),
     controls: ['keyboard','arrows','touch','gamepad','gamepad-2','gamepad-3','tilt'].includes(String(r.controls)) ? r.controls as NetworkControls : fallback,
     teamId: r.teamId === 'team-2' ? 'team-2' : 'team-1'};
 }
@@ -26,7 +26,15 @@ export function loadCreator(storage: Store | null = browserStorage()): {mode: Ne
   const r=read(storage); const bots=Array.isArray(r.bots)?r.bots:[];
   return {mode: ['survival','battle','team-battle'].includes(String(r.mode)) ? r.mode as NetworkMode : 'survival',
     roomName: typeof r.roomName === 'string' && r.roomName.trim() && [...r.roomName.trim()].length<=32 ? r.roomName : 'Друзья',
-    bots: bots.slice(0,6).flatMap(value=>{const b=record(value);return ['easy','medium','hard','expert'].includes(String(b.difficulty)) && (b.tileStyle==='random'||typeof b.tileStyle==='string'&&isTileStyle(b.tileStyle)) && ['team-1','team-2'].includes(String(b.teamId)) ? [b as unknown as BotTemplate] : [];})};
+    bots: bots.slice(0,6).flatMap(value=>{
+      const b=record(value);
+      // Retiring a material must not discard the player's retained AI seat.
+      const tileStyle=b.tileStyle==='sea-crystals'?'random':b.tileStyle;
+      return ['easy','medium','hard','expert'].includes(String(b.difficulty))
+        && (tileStyle==='random'||typeof tileStyle==='string'&&isTileStyle(tileStyle))
+        && ['team-1','team-2'].includes(String(b.teamId))
+        ? [{...b,tileStyle} as unknown as BotTemplate] : [];
+    })};
 }
 export function loadCreatorRules(mode: NetworkMode, storage: Store | null = browserStorage()): ResolvedRoomRules {
   const r=record(record(read(storage).profiles)[mode]); const defaults=defaultRoomRules(mode);

@@ -33,9 +33,17 @@ function parseRecord(value: unknown, index: number): SoloRecord | null {
 }
 
 function sortRecords(records: readonly SoloRecord[]): SoloRecord[] {
+  const counts = new Map<string, number>();
   return records.map((record, index) => ({ record, index }))
     .sort((left, right) => right.record.lineScore - left.record.lineScore || left.index - right.index)
     .map(({ record }) => record)
+    .filter((record) => {
+      const player = record.name.trim().replace(/\s+/g, ' ').toLocaleLowerCase('ru-RU');
+      const count = counts.get(player) ?? 0;
+      if (count >= 3) return false;
+      counts.set(player, count + 1);
+      return true;
+    })
     .slice(0, 10);
 }
 

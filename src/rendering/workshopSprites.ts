@@ -6,7 +6,6 @@ import pixelUrl from '../assets/workshop/pixel-adventure-f6.webp';
 import stoneUrl from '../assets/workshop/stone-fortress-f6.webp';
 import marmaladeUrl from '../assets/workshop/marmalade-f6.webp';
 import forestUrl from '../assets/workshop/forest-mosaic-f6.webp';
-import crystalUrl from '../assets/workshop/sea-crystals-f7.webp';
 import type { StyledTileOptions } from './tileRenderer';
 import frames from '../assets/workshop/tiles-f5.json';
 
@@ -18,7 +17,7 @@ export const WORKSHOP_THEME_TEXTURES: Record<TileStyle, {key:string;url:string}>
   'stone-fortress': {key:'workshop-tiles-stone-f6',url:stoneUrl},
   marmalade: {key:'workshop-tiles-marmalade-f6',url:marmaladeUrl},
   'forest-mosaic': {key:'workshop-tiles-forest-f6',url:forestUrl},
-  'sea-crystals': {key:'workshop-tiles-crystal-f7',url:crystalUrl},
+  'sea-crystals': {key:'workshop-tiles-legacy-classic',url:classicUrl},
 };
 const frameForKind: Record<string, number> = { Z: 0, L: 1, O: 2, S: 3, I: 4, J: 5, T: 6 };
 

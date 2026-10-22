@@ -55,7 +55,7 @@ for (const [width,height] of ([[1920,1080],[2560,1440],[1440,960],[1366,768],[12
     await page.setViewportSize({width,height});
     await page.addInitScript(() => {
       localStorage.setItem('bricks-war:player-names:v1',JSON.stringify(Array(4).fill('Александр Великий')));
-      localStorage.setItem('bricks-war:solo-records:v1',JSON.stringify(Array.from({length:10},(_,i)=>({id:`r${i}`,name:'Александр Великий',elapsedMs:600000,lineScore:10000-i,finishedAt:1780000000000,placedPieces:1000}))));
+      localStorage.setItem('bricks-war:solo-records:v1',JSON.stringify(Array.from({length:10},(_,i)=>({id:`r${i}`,name:`Александр Велики${i}`,elapsedMs:600000,lineScore:10000-i,finishedAt:1780000000000,placedPieces:1000}))));
     });
     await page.goto('/?muted=1');
     await expect(page.locator('.main-menu-screen')).toBeVisible();
@@ -86,16 +86,21 @@ for (const [width,height] of ([[1920,1080],[2560,1440],[1440,960],[1366,768],[12
   });
 }
 
-test('desktop select pages keep every option reachable with keyboard and pointer',async({page})=>{
+test('compact style list keeps every option reachable with keyboard and pointer',async({page})=>{
   await page.setViewportSize({width:1280,height:480}); await page.goto('/?muted=1');
   await page.getByRole('button',{name:/^Битва/}).click();
   const trigger=page.getByRole('combobox',{name:'Стиль участника 1',exact:true}); await trigger.click();
   const list=page.getByRole('listbox',{name:'Стиль участника 1',exact:true});
-  await list.getByRole('button',{name:'Следующие →',exact:true}).click(); await expectDesktopFit(page);
-  await list.getByRole('option',{name:'Морские кристаллы',exact:true}).click();
-  await expect(page.locator('[data-tile-style="0"]')).toHaveValue('sea-crystals');
+  await expect(list.locator('.menu-select-pages')).toHaveCount(0);
+  await expect(list.getByRole('option')).toHaveCount(7);
+  const rows=await list.getByRole('option').evaluateAll(elements=>elements.map(el=>{const r=el.getBoundingClientRect();return {x:r.x,y:r.y};}));
+  expect(new Set(rows.map(row=>Math.round(row.x))).size).toBe(1);
+  expect(rows.every((row,index)=>index===0||row.y>rows[index-1]!.y)).toBe(true);
+  await expectDesktopFit(page);
+  await list.getByRole('option',{name:'Лесная мозаика',exact:true}).click();
+  await expect(page.locator('[data-tile-style="0"]')).toHaveValue('forest-mosaic');
   await trigger.click(); await trigger.press('ArrowUp'); await trigger.press('Enter');
-  await expect(page.locator('[data-tile-style="0"]')).not.toHaveValue('sea-crystals');
+  await expect(page.locator('[data-tile-style="0"]')).not.toHaveValue('forest-mosaic');
   await expectDesktopFit(page);
 });
 
@@ -104,7 +109,7 @@ for (const [width,height] of [[1280,480],[800,620]] as const) {
     test(`arena, pause settings and results fit ${mode} ${width}x${height}`, async({page})=>{
       test.setTimeout(60_000);
       await page.setViewportSize({width,height});
-      await page.addInitScript(()=> { localStorage.setItem('bricks-war:player-names:v1', JSON.stringify(Array(4).fill('WWWWWWWWWWWWWWWWWW'))); localStorage.setItem('bricks-war:solo-records:v1',JSON.stringify(Array.from({length:10},(_,i)=>({id:`r${i}`,name:'Александр Великий',elapsedMs:100000,lineScore:10000-i})))); });
+      await page.addInitScript(()=> { localStorage.setItem('bricks-war:player-names:v1', JSON.stringify(Array(4).fill('WWWWWWWWWWWWWWWWWW'))); localStorage.setItem('bricks-war:solo-records:v1',JSON.stringify(Array.from({length:10},(_,i)=>({id:`r${i}`,name:`Александр Велики${i}`,elapsedMs:100000,lineScore:10000-i})))); });
       await page.goto('/?muted=1&playtest-fast=20&playtest-score=123456');
       await page.getByRole('button',{name:new RegExp(`^${mode}`)}).click();
       if (mode==='Битва') {
@@ -112,7 +117,7 @@ for (const [width,height] of [[1280,480],[800,620]] as const) {
         await page.getByRole('option',{name:'2 мин',exact:true}).click();
         await page.locator('[data-add-ai="3"]').click();
       }
-      await page.getByRole('button',{name:/^Start/}).click();
+      await page.locator('#start-match').click();
       await expect(page.locator('.hud-card').first()).toBeVisible(); await expectDesktopFit(page);
       const hudFit = await page.locator('.hud-card').evaluateAll(cards => cards.flatMap(card => {
         const outer = card.getBoundingClientRect();
@@ -138,15 +143,10 @@ for (const [width,height] of [[1280,480],[800,620]] as const) {
           const layout = await page.locator('.survival-results-columns').evaluate(wrapper => {
             const match = wrapper.querySelector('.survival-current-results')!.getBoundingClientRect();
             const records = wrapper.querySelector('.survival-local-records')!.getBoundingClientRect();
-            return { wide: innerWidth >= 1100, match: match.toJSON(), records: records.toJSON() };
+            return { match: match.toJSON(), records: records.toJSON() };
           });
-          if (layout.wide) {
-            expect(layout.match.right).toBeLessThanOrEqual(layout.records.left);
-            expect(Math.abs(layout.match.top-layout.records.top)).toBeLessThan(1);
-          } else {
-            expect(layout.match.bottom).toBeLessThanOrEqual(layout.records.top);
-            expect(Math.abs(layout.match.left-layout.records.left)).toBeLessThan(1);
-          }
+          expect(layout.match.right).toBeLessThanOrEqual(layout.records.left);
+          expect(Math.abs(layout.match.top-layout.records.top)).toBeLessThan(1);
           await expectDesktopFit(page);
         };
         for (const [resultWidth,resultHeight] of [[1920,1080],[1100,720],[1099,720],[800,620],[1280,480]]) {
@@ -172,7 +172,7 @@ for (const [width,height] of [[1280,480],[800,620]] as const) {
 
 test('desktop compositions keep proportions and records form one column through resizing', async ({page}) => {
   await page.setViewportSize({width:1920,height:1080});
-  await page.addInitScript(() => localStorage.setItem('bricks-war:solo-records:v1',JSON.stringify(Array.from({length:10},(_,i)=>({id:`r${i}`,name:'Александр Великий',elapsedMs:600000,lineScore:10000-i,finishedAt:1780000000000,placedPieces:1000})))));
+  await page.addInitScript(() => localStorage.setItem('bricks-war:solo-records:v1',JSON.stringify(Array.from({length:10},(_,i)=>({id:`r${i}`,name:`Александр Велики${i}`,elapsedMs:600000,lineScore:10000-i,finishedAt:1780000000000,placedPieces:1000})))));
   await page.goto('/?muted=1');
   await page.getByRole('button',{name:/^Выживание/}).click();
   const composition = () => page.evaluate(() => {

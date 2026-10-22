@@ -3,7 +3,7 @@ import { loadNetworkStyle, saveNetworkStyle, NETWORK_STYLE_KEY } from '../src/ne
 
 describe('network player style preference',()=>{
   it('defaults to random for absent, invalid and unavailable storage',()=>{
-    for(const value of [null,'unknown','"classic"','random'])expect(loadNetworkStyle({getItem:()=>value})).toBe('random');
+    for(const value of [null,'unknown','"classic"','random','sea-crystals'])expect(loadNetworkStyle({getItem:()=>value})).toBe('random');
     expect(loadNetworkStyle(null)).toBe('random');
     expect(loadNetworkStyle({getItem:()=>{throw new Error('blocked');}})).toBe('random');
   });

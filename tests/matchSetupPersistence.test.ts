@@ -19,14 +19,14 @@ describe('match setup preferences', () => {
     const battle = loadBattleSetup('battle', store);
     Object.assign(battle.options, { battleTimeMode: 'timed', conflictEnabled: false, battleDifficulty: 'sport', conflictTargeting: 'hunt-leader' });
     battle.durationMinutes = 7;
-    saveMatchSetup('battle', battle, ['sea-crystals', 'random', 'classic', 'marmalade'], store);
+    saveMatchSetup('battle', battle, ['forest-mosaic', 'random', 'classic', 'marmalade'], store);
     const team = loadBattleSetup('team-battle', store);
     team.durationMinutes = 9;
     saveMatchSetup('team-battle', team, loadSetupTileStyles(store), store);
     saveMatchSetup('survival', { ...battle, options: { ...battle.options, conflictEnabled: false } }, loadSetupTileStyles(store), store);
     expect(loadBattleSetup('battle', store)).toEqual(battle);
     expect(loadBattleSetup('team-battle', store)).toEqual(team);
-    expect(loadSetupTileStyles(store)).toEqual(['sea-crystals', 'random', 'classic', 'marmalade']);
+    expect(loadSetupTileStyles(store)).toEqual(['forest-mosaic', 'random', 'classic', 'marmalade']);
   });
   it('migrates explicit legacy timed/off/leader choices without modifying the legacy key', () => {
     const legacy = JSON.stringify({ battleTimeMode: 'timed', conflictEnabled: false, conflictTargeting: 'hunt-leader', battleDifficulty: 'family' });
@@ -48,4 +48,13 @@ describe('match setup preferences', () => {
     const fallback = loadBattleSetup('battle', denied);
     expect(() => saveMatchSetup('battle', fallback, ['random', 'random', 'random', 'random'], denied)).not.toThrow();
   });
+});
+
+
+it('replaces only retired saved styles and preserves Battle settings',()=>{
+ const previous={profiles:{battle:{durationMinutes:9,options:{battleDifficulty:'sport'}}},tileStyles:['sea-crystals','marmalade','classic','random']};
+ const store=storage({[MATCH_SETUP_STORAGE_KEY]:JSON.stringify(previous)});
+ expect(loadSetupTileStyles(store)).toEqual(['random','marmalade','classic','random']);
+ expect(loadBattleSetup('battle',store)).toMatchObject({durationMinutes:9,options:{battleDifficulty:'sport'}});
+ expect(store.getItem(MATCH_SETUP_STORAGE_KEY)).toBe(JSON.stringify(previous));
 });

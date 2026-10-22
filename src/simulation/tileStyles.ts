@@ -1,4 +1,4 @@
-import { DEFAULT_TILE_STYLE, DEFAULT_TILE_STYLE_SELECTION, TILE_STYLE_IDS } from '../domain/tileStyles';
+import { DEFAULT_TILE_STYLE, DEFAULT_TILE_STYLE_SELECTION, TILE_STYLE_IDS, isTileStyle } from '../domain/tileStyles';
 import type { ParticipantConfig, TileStyle } from '../domain/types';
 import { deriveSeed, SeededRandom } from './random';
 
@@ -18,7 +18,7 @@ export function resolveParticipantTileStyles(
   const manual = new Set<TileStyle>();
   for (const config of configs) {
     const selection = config.tileStyle ?? DEFAULT_TILE_STYLE_SELECTION;
-    if (selection !== 'random') manual.add(selection);
+    if (isTileStyle(selection)) manual.add(selection);
   }
 
   const random = new SeededRandom(deriveSeed(seed, 'participant-tile-styles'));
@@ -27,7 +27,7 @@ export function resolveParticipantTileStyles(
 
   for (const config of configs) {
     const selection = config.tileStyle ?? DEFAULT_TILE_STYLE_SELECTION;
-    if (selection !== 'random') {
+    if (isTileStyle(selection)) {
       resolved.set(config.id, selection);
       continue;
     }

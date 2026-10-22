@@ -15,7 +15,7 @@ test('new defaults and independent Battle setup survive reload and other modes',
   await choose(page, 'Длительность матча', '7 мин');
   await choose(page, 'Режим атаки', 'Только лидеру');
   await choose(page, 'Сложность битвы', 'Спортивный');
-  await choose(page, 'Стиль участника 1', 'Морские кристаллы');
+  await choose(page, 'Стиль участника 1', 'Лесная мозаика');
   await page.getByRole('button', { name: '← Главное меню', exact: true }).click();
   await page.getByRole('button', { name: /^Выживание/ }).click();
   await page.getByRole('button', { name: '← Главное меню', exact: true }).click();
@@ -29,7 +29,7 @@ test('new defaults and independent Battle setup survive reload and other modes',
   await expect(page.locator('#match-duration')).toHaveValue('7');
   await expect(page.locator('#attack-mode')).toHaveValue('hunt-leader');
   await expect(page.locator('#battle-difficulty')).toHaveValue('sport');
-  await expect(page.locator('[data-tile-style="0"]')).toHaveValue('sea-crystals');
+  await expect(page.locator('[data-tile-style="0"]')).toHaveValue('forest-mosaic');
   await page.screenshot({ path: 'evidence/persist-match-settings/battle-restored.png' });
   await page.getByRole('button', { name: '← Главное меню', exact: true }).click();
   await page.getByRole('button', { name: /^Командный бой/ }).click();

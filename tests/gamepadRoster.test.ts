@@ -22,7 +22,7 @@ describe('Y roster transitions', () => {
   it('exchanges complete configurations with AI including difficulty and style', () => {
     const before = roster();
     before[1]!.controller = 'human-2';
-    before[2]!.style = 'sea-crystals';
+    before[2]!.style = 'forest-mosaic';
     const next = moveGamepad(before, 'gamepad-0')!;
     expect(next[2]).toEqual(before[3]);
     expect(next[3]).toEqual(before[2]);

@@ -17,6 +17,30 @@ describe('solo records', () => {
     expect(records.at(-1)?.total).toBe(1);
   });
 
+  it('filters a legacy leaderboard by normalized name before taking ten without rewriting display names', () => {
+    const names = ['  Вася ', 'ВАСЯ', 'вася', 'Вася', 'Вася', 'Анна  Мария', ' анна мария ', 'АННА МАРИЯ', 'Анна Мария', ...Array.from({ length: 8 }, (_, i) => `Другой ${i}`)];
+    const raw = JSON.stringify(names.map((name, i) => ({ id: `r${i}`, name, lineScore: 100 - i, elapsedMs: 1000, finishedAt: 1700000000000 })));
+    const store = memory(raw);
+    const records = loadSoloRecords(store);
+    expect(records.map(record => record.id)).toEqual(['r0', 'r1', 'r2', 'r5', 'r6', 'r7', 'r9', 'r10', 'r11', 'r12']);
+    expect(records[0]).toMatchObject({ name: '  Вася ', finishedAt: 1700000000000, elapsedMs: 1000 });
+    expect(store.getItem(SOLO_RECORDS_STORAGE_KEY)).toBe(raw);
+  });
+
+  it('keeps only the best three across old and simultaneous new attempts, retaining stable ties and exact highlights', () => {
+    const store = memory(JSON.stringify([300, 200, 100].map((score, i) => ({ id: `old${i}`, name: 'Юля', lineScore: score, elapsedMs: 1000 }))));
+    const result = saveSurvivalRecords([
+      { id: 'tie', name: ' юЛЯ ', lineScore: 200, elapsedMs: 1000 },
+      { id: 'best', name: 'ЮЛЯ', lineScore: 400, elapsedMs: 2000, finishedAt: 1700000000000 },
+      { id: 'other', name: 'Аня', lineScore: 50, elapsedMs: 1000 },
+    ], store);
+    expect(result.records.map(record => record.id)).toEqual(['best', 'old0', 'old1', 'other']);
+    expect(result.rankedIds).toEqual(['best', 'other']);
+    expect(result.unranked.map(record => record.id)).toEqual(['tie']);
+    expect(loadSoloRecords(store)).toEqual(result.records);
+    expect(result.records[0]).toMatchObject({ name: 'ЮЛЯ', finishedAt: 1700000000000, elapsedMs: 2000 });
+  });
+
   it('preserves completion metadata while keeping legacy records readable', () => {
     const store = memory(JSON.stringify([{ name: 'Старый', elapsedMs: 1_000, lineScore: 100, total: 100 }]));
     const saved = saveSoloRecord({ name: 'Новый', elapsedMs: 2_000, lineScore: 200, finishedAt: 1_700_000_000_000, placedPieces: 42 }, store);

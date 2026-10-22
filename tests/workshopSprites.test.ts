@@ -34,7 +34,7 @@ describe('workshop sprite lifecycle', () => {
       expect(images[0].setTextureValue).toEqual([WORKSHOP_THEME_TEXTURES[style.id].key,'1']);
       keys.add(images[0].setTextureValue[0]);
     }
-    expect(keys.size).toBe(7);expect(images).toHaveLength(1);
+    expect(keys.size).toBe(6);expect(images).toHaveLength(1);
   });
   it('reuses hidden sprites after clear, preserving exact size and ghost alpha', () => {
     const { pool, images } = harness(), g = {depth:0};
@@ -52,4 +52,13 @@ describe('workshop sprite lifecycle', () => {
     pool.reset(g);g.mask=null;pool.draw(g,tile);expect(images[0].setMaskValue).toEqual([]);
     pool.remove(g);expect(images[0].destroyed).toBe(true);
   });
+});
+
+
+it('renders a legacy crystal identity with the Classic atlas and loads no crystal assets',()=>{
+ expect(WORKSHOP_THEME_TEXTURES['sea-crystals'].url).toBe(WORKSHOP_THEME_TEXTURES.classic.url);
+ expect(Object.values(WORKSHOP_THEME_TEXTURES).every(t=>!t.url.includes('sea-crystals'))).toBe(true);
+ const {pool,images}=harness();
+ expect(pool.draw({depth:0} as never,{...tile,style:'sea-crystals'})).toBe(true);
+ expect(images[0].setTextureValue).toEqual([WORKSHOP_THEME_TEXTURES['sea-crystals'].key,'1']);
 });
