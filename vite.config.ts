@@ -1,3 +1,4 @@
+import { startupLocaleScript } from './src/i18n/bootstrap';
 import { defineConfig } from 'vitest/config';
 import { viteSingleFile } from 'vite-plugin-singlefile';
 import { VitePWA } from 'vite-plugin-pwa';
@@ -34,6 +35,7 @@ function faviconPlugin(assetRevision: string): Plugin {
     name: 'environment-favicon',
     transformIndexHtml(html, context) {
       return html
+        .replace('/* __BRICKS_LOCALE_BOOTSTRAP__ */', startupLocaleScript())
         .replace('__BRICKS_WAR_FAVICON__', context.server ? developmentFavicon : productionFavicon)
         .replace('__BRICKS_WAR_ASSET_REVISION__', assetRevision);
     },

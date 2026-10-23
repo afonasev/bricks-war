@@ -1,3 +1,4 @@
+import { text } from '../i18n/locale';
 import survivalUrl from '../assets/menu/survival.webp';
 import battleUrl from '../assets/menu/battle.webp';
 import teamBattleUrl from '../assets/menu/team-battle.webp';
@@ -8,12 +9,12 @@ import exitUrl from '../assets/menu/exit.webp';
 export type MainMenuDestination = 'survival' | 'battle' | 'team-battle' | 'network' | 'settings' | 'exit';
 
 export const MAIN_MENU_PREVIEWS: Record<MainMenuDestination, { label: string; image: string }> = {
-  survival: { label: 'Выживание: игровое поле и кубок за рекорд', image: survivalUrl },
-  battle: { label: 'Битва: четыре отдельных игровых поля', image: battleUrl },
-  'team-battle': { label: 'Командный бой: две команды по два игровых поля', image: teamBattleUrl },
-  network: { label: 'Сетевая игра: одинаковые игровые поля на разных устройствах', image: networkUrl },
-  exit: { label: 'Выход: дверь из мастерской со знаком выключения', image: exitUrl },
-  settings: { label: 'Настройки: звук, экран, управление и раздел «Как играть»', image: settingsUrl },
+  survival: { get label() { return text('previewSurvival'); }, image: survivalUrl },
+  battle: { get label() { return text('previewBattle'); }, image: battleUrl },
+  'team-battle': { get label() { return text('previewTeam'); }, image: teamBattleUrl },
+  network: { get label() { return text('previewNetwork'); }, image: networkUrl },
+  exit: { get label() { return text('previewExit'); }, image: exitUrl },
+  settings: { get label() { return text('previewSettings'); }, image: settingsUrl },
 };
 
 export function mainMenuPreviewMarkup(destination: MainMenuDestination): string {

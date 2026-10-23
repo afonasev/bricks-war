@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { RULE_EXAMPLES, SCORE_EXAMPLES, RISING_EXAMPLE } from '../src/ui/visualRulesExamples';
+import { RULE_CARDS } from '../src/ui/visualRules';
 import { clearCompletedLines, createBoard, burnBottomRows, addGrayRows } from '../src/simulation/board';
 import { isValidAnomaly } from '../src/simulation/anomaly';
 import { attackRowsForLines, scoreForLines, nextShieldCharge } from '../src/simulation/match';
@@ -27,7 +28,11 @@ describe('rules illustrations follow actual mechanics',()=>{
  });
  it('the identical stack rises exactly one row and attacks use the stated conversion',()=>{
   const board=createBoard('T','O'); board.active=null; board.grid.splice(-4,4,...decode(RISING_EXAMPLE.before)); addGrayRows(board,1);expect(board.grid.slice(-4)).toEqual(decode(RISING_EXAMPLE.after));
-  expect([2,3,4].map(attackRowsForLines)).toEqual([1,3,4]);
+  const attackRows = [2,3,4,5].map(attackRowsForLines);
+  expect(attackRows).toEqual([1,2,3,4]);
+  expect(RULE_CARDS.find(card=>card.topic==='Атака')?.notes).toEqual([
+   '2 ряда → 1 серый. 3 ряда → 2 серых. 4 ряда → 3 серых. При 5 и больше — серых рядов на 1 меньше, чем очищенных.',
+  ]);
  });
  it('shield storyboard earns on second and subsequent qualifying placements only',()=>{
   for(const survival of [false,true]) {

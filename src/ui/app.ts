@@ -1,3 +1,6 @@
+import type { FooterActionKey } from './gamepadFooterHints';
+import { html as tr, text as localeText, setLocale, LOCALES, type Locale } from '../i18n/locale';
+import { languageSettingsMarkup } from '../i18n/selector';
 import { WORKSHOP_THEME_TEXTURES } from '../rendering/workshopSprites';
 import { footerResetButtonMarkup, gamepadFaceLabels, gamepadFooterAction, gamepadFooterHintsMarkup, showGamepadFooterHints } from './gamepadFooterHints';
 import { MatchLoading } from './matchLoading';
@@ -23,7 +26,7 @@ import { isSfxPresetId, SFX_PACK_OPTIONS } from '../audio/sfxPresets';
 import { AiController } from '../controllers/ai';
 import { HumanInputRouter } from '../controllers/input';
 import { connectedGamepads, gamepadDisplayName, type ConnectedGamepad, type GamepadControls } from '../controllers/gamepads';
-import { mobileTouchActionAt, type MobileTouchAction } from '../controllers/mobileTouchZones';
+import { MOBILE_TOUCH_BUTTON_ZONE_FRACTION, mobileTouchActionAt, type MobileTouchAction } from '../controllers/mobileTouchZones';
 import type {
   AiDifficulty,
   BattleDifficulty,
@@ -71,6 +74,7 @@ import { loadGameTuning, resetGameTuning, saveGameTuning } from './gameTuningPer
 import { PlayerEventRegionLatch } from './playerEventPlacement';
 import { participantLevelUpNoticeKey } from './hudInvalidation';
 import { loadSoloRecords, saveSurvivalRecords } from './soloRecords';
+import { RatingPanels } from './ratingPanel';
 import { recordDateMarkup } from './recordDate';
 import { MenuFocusController } from './menuNavigation';
 import { enhanceMenuSelects } from './menuSelect';
@@ -172,12 +176,12 @@ function escapeHtml(value: string): string {
 }
 
 interface ReleaseFooterOptions {
-  ai?: string;
-  confirm?: string;
-  back?: string;
-  start?: string;
-  roster?: string;
-  reset?: string;
+  ai?: FooterActionKey;
+  confirm?: FooterActionKey;
+  back?: FooterActionKey;
+  start?: FooterActionKey;
+  roster?: FooterActionKey;
+  reset?: FooterActionKey;
 }
 
 function settingsActionIcon(kind: 'rules' | 'controls' | 'lab'): string {
@@ -198,7 +202,7 @@ function releaseFooterMarkup({ confirm, back, start, roster, reset, ai }: Releas
   const resetHint = reset ? footerResetButtonMarkup() : '';
   return `<footer class="release-footer main-menu-footer release-guidance-footer">
     <div class="release-footer-inner${start ? ' release-footer-start-layout' : ''}">
-      ${start ? `${showGamepadActions ? `<div class="release-footer-side release-footer-before-start">${confirmHint}${backHint}</div>` : ''}<button class="primary-button footer-start" id="start-match" type="button">${showGamepadActions ? '<kbd aria-hidden="true">Start</kbd>' : ''}<span>${start}</span></button>${showGamepadActions ? `<div class="release-footer-side release-footer-after-start">${aiHint}${rosterHint}</div>` : ''}` : `<div class="release-footer-actions">${confirmHint}${backHint}${rosterHint}${resetHint}</div>`}
+      ${start ? `${showGamepadActions ? `<div class="release-footer-side release-footer-before-start">${confirmHint}${backHint}</div>` : ''}<button class="primary-button footer-start" id="start-match" type="button">${showGamepadActions ? '<kbd aria-hidden="true">Start</kbd>' : ''}<span>${tr(start)}</span></button>${showGamepadActions ? `<div class="release-footer-side release-footer-after-start">${aiHint}${rosterHint}</div>` : ''}` : `<div class="release-footer-actions">${confirmHint}${backHint}${rosterHint}${resetHint}</div>`}
     </div>
     ${reset ? '<output data-preferences-status role="status"></output>' : ''}
     ${releaseMetadataMarkup()}
@@ -206,6 +210,7 @@ function releaseFooterMarkup({ confirm, back, start, roster, reset, ai }: Releas
 }
 
 export class BricksWarApp {
+  private readonly ratings = new RatingPanels();
   private game: Phaser.Game | null = null;
   private matchLoading: MatchLoading | null = null;
   private network: NetworkApp | null = null;
@@ -261,7 +266,7 @@ export class BricksWarApp {
     if (!this.game) this.renderCurrentScreen();
   };
   private readonly onFullscreenChange = (): void => {
-    const label = document.fullscreenElement ? 'Вкл' : 'Выкл';
+    const label = document.fullscreenElement ? tr('on') : tr('off');
     const settingsState = this.root.querySelector<HTMLElement>('#toggle-fullscreen b');
     const pauseState = this.root.querySelector<HTMLElement>('#pause-toggle-fullscreen b');
     if (settingsState) settingsState.textContent = label;
@@ -295,6 +300,7 @@ export class BricksWarApp {
   };
 
   start(): void {
+    this.ratings.start();
     this.updateDesktopLayout();
     window.addEventListener('resize', () => {
       this.updateDesktopLayout();
@@ -449,36 +455,36 @@ export class BricksWarApp {
               <div class="main-menu-brand-row"><h1 class="concept-brand-heading"><img class="concept-brand-logo" src="${conceptLogoUrl}" alt="BRICKS WAR" /></h1><div class="client-update-slot"><p class="client-update-announcement" hidden><strong>Вышла новая версия игры,</strong> готовы обновиться?</p><button class="client-update-button" type="button" hidden>Обновить</button><p class="client-update-status" role="status" hidden></p>${desktop ? '<button class="desktop-cancel-download" type="button" hidden>Отменить загрузку</button><button class="desktop-release-history" type="button">Что нового</button>' : ''}<button type="button" class="desktop-download" data-ui-focus hidden aria-label="Скачать игру для установки" title="Скачать игру"><span aria-hidden="true">⇩</span><span>Скачать игру</span></button></div></div>
             </header>
             ${shouldShowIosInstallHint() || isLocalPlaytestFlag('pwa-install-hint') ? '<aside class="pwa-install-hint" role="status"><span aria-hidden="true">⇧</span><p>Хотите играть как в приложении? Нажмите <b>Поделиться</b> в Safari, затем <b>На экран «Домой»</b>.</p><button type="button" data-dismiss-pwa-hint aria-label="Закрыть подсказку установки">×</button></aside>' : ''}
-            <nav class="mode-menu" aria-label="Главное меню">
+            <nav class="mode-menu" aria-label="${tr('menu')}">
               <button class="mode-choice mode-survival" type="button" data-destination="survival">
                 <span class="mode-icon" aria-hidden="true">♢</span>
-                <span class="mode-copy"><strong>Выживание</strong><small>Продержитесь дольше и побейте рекорд</small></span>
+                <span class="mode-copy"><strong>${tr('survival')}</strong><small>${tr('survivalHint')}</small></span>
                 <span class="mode-forward" aria-hidden="true">›</span>
               </button>
               <button class="mode-choice mode-battle" type="button" data-destination="battle">
                 <span class="mode-icon" aria-hidden="true">⚔</span>
-                <span class="mode-copy"><strong>Битва</strong><small>${mobile ? 'Сразитесь с одним или двумя ИИ' : '2–4 игрока. Каждый сражается за себя'}</small></span>
+                <span class="mode-copy"><strong>${tr('battle')}</strong><small>${mobile ? tr('battlePhoneHint') : tr('battleHint')}</small></span>
                 <span class="mode-forward" aria-hidden="true">›</span>
               </button>
               <button class="mode-choice mode-team desktop-only" type="button" data-destination="team-battle">
                 <span class="mode-icon mode-icon-team" aria-hidden="true"><i></i><i></i><i></i></span>
-                <span class="mode-copy"><strong>Командный бой</strong><small>Две команды по два игрока</small></span>
+                <span class="mode-copy"><strong>${tr('team')}</strong><small>${tr('teamHint')}</small></span>
                 <span class="mode-forward" aria-hidden="true">›</span>
               </button>
-<button class="mode-choice mode-network" type="button" data-network-entry><span class="mode-icon" aria-hidden="true">◎</span><span class="mode-copy"><strong>Сетевая игра</strong><small>Выживание, Битва и Командный бой</small></span><span class="mode-forward" aria-hidden="true">›</span></button>
+<button class="mode-choice mode-network" type="button" data-network-entry><span class="mode-icon" aria-hidden="true">◎</span><span class="mode-copy"><strong>${tr('network')}</strong><small>${tr('networkHint')}</small></span><span class="mode-forward" aria-hidden="true">›</span></button>
               <button class="mode-choice mode-settings" type="button" data-destination="settings">
                 <span class="mode-icon" aria-hidden="true">⚙</span>
-                <span class="mode-copy"><strong>Настройки</strong><small>Звук, экран, управление и как играть</small></span>
+                <span class="mode-copy"><strong>${tr('settings')}</strong><small>${tr('settingsHint')}</small></span>
                 <span class="mode-forward" aria-hidden="true">›</span>
               </button>
-              ${desktop ? '<button class="mode-choice mode-exit" id="desktop-exit" type="button"><span class="mode-icon" aria-hidden="true">⏻</span><span class="mode-copy"><strong>Выход из игры</strong><small>Закрыть приложение</small></span><span class="mode-forward" aria-hidden="true">›</span></button>' : ''}
+              ${desktop ? `<button class="mode-choice mode-exit" id="desktop-exit" type="button"><span class="mode-icon" aria-hidden="true">⏻</span><span class="mode-copy"><strong>${tr('exit')}</strong><small>${tr('exitHint')}</small></span><span class="mode-forward" aria-hidden="true">›</span></button>` : ''}
             </nav>
           </div>
           <aside id="menu-showcase" class="menu-showcase showcase-survival" data-preview="survival" aria-label="${MAIN_MENU_PREVIEWS.survival.label}">
             <div id="showcase-content" class="showcase-content" aria-hidden="true">${mainMenuPreviewMarkup('survival')}</div>
           </aside>
         </section>
-        ${releaseFooterMarkup({ confirm: mobile ? 'Open' : 'Select', back: 'Back' })}
+        ${releaseFooterMarkup({ confirm: mobile ? 'open' : 'select', back: 'back' })}
       </main>
     `;
     this.root.querySelectorAll<HTMLButtonElement>('[data-destination]').forEach((button) => {
@@ -540,25 +546,25 @@ export class BricksWarApp {
     const mobile = isMobilePlayViewport();
     this.root.innerHTML = `
       <main class="release-screen premium-surface settings-screen" data-screen="settings">
-        <header class="release-heading"><button class="screen-back" id="settings-back" type="button">← Назад</button><div><p class="eyebrow">BRICKS WAR</p><h1>Настройки</h1></div></header>
-        <section class="settings-list" aria-label="Настройки игры">
-          <section class="release-panel settings-section settings-audio-section"><header><span class="settings-icon" aria-hidden="true">♪</span><div><p class="eyebrow">ЗВУК</p><h2>Музыка и эффекты</h2></div></header>${this.setupAudioMarkup()}</section>
+        <header class="release-heading"><button class="screen-back" id="settings-back" type="button">← ${tr('back')}</button><div><p class="eyebrow">BRICKS WAR</p><h1>${tr('settings')}</h1></div></header>
+        <section class="settings-list" aria-label="${tr('settingsAria')}"><div class="settings-columns settings-left-column">
+          <section class="release-panel settings-section settings-audio-section"><header><span class="settings-icon" aria-hidden="true">♪</span><div><p class="eyebrow">${tr('sound')}</p><h2>${tr('soundTitle')}</h2></div></header>${this.setupAudioMarkup()}</section>
           ${isLocalPlaytestFlag('audio-prototypes') ? this.audioPrototypeGalleryMarkup() : ''}
-          <section class="release-panel settings-section settings-display-section"><header><span class="settings-icon settings-icon-screen" aria-hidden="true">▣</span><div><p class="eyebrow">ЭКРАН</p><h2>Изображение</h2></div></header>
-            ${desktop ? `<label class="settings-action"><span><strong>Разрешение окна</strong><small>Размер в логических пикселях, с учётом масштаба ОС; полный экран — весь монитор</small></span><select id="desktop-resolution" data-menu-select-layout="dropdown"><option value="auto" ${this.desktopDisplay.auto ? 'selected' : ''}>Auto — по экрану</option>${(this.desktopDisplay.resolutions ?? [[960,540],[1280,720],[1440,900],[1600,900],[1920,1080],[2560,1440],[3840,2160]]).map(([w,h]) => `<option value="${w}x${h}" ${!this.desktopDisplay.auto && w === this.desktopDisplay.width && h === this.desktopDisplay.height ? 'selected' : ''}>${w} × ${h}</option>`).join('')}</select></label><label class="settings-action"><span><strong>Режим экрана</strong><small>Полный экран или отдельное окно</small></span><select id="desktop-window-mode"><option value="windowed" ${!this.desktopDisplay.fullscreen ? 'selected' : ''}>Оконный</option><option value="fullscreen" ${this.desktopDisplay.fullscreen ? 'selected' : ''}>Полный экран</option></select></label><output id="desktop-display-status" class="settings-status" role="status"></output>` : ''}
-            ${mobile || desktop ? '' : `<button class="settings-action" id="toggle-fullscreen" type="button"><span><strong>Полноэкранный режим</strong></span><b>${document.fullscreenElement ? 'Вкл' : 'Выкл'}</b></button><output id="fullscreen-status" class="settings-status" role="status"></output>`}
-            <label class="settings-action"><span><strong>Спокойные эффекты</strong><small>Меньше движения и вспышек</small></span><input id="calm-effects" type="checkbox" ${this.releaseSettings.calmEffects ? 'checked' : ''} /></label>
+          ${this.stickPreferencesMarkup(true)}</div><div class="settings-columns settings-right-column"><section class="release-panel settings-section settings-display-section"><header><span class="settings-icon settings-icon-screen" aria-hidden="true">▣</span><div><p class="eyebrow">${tr('screen')}</p><h2>${tr('display')}</h2></div></header>
+            ${desktop ? `<label class="settings-action"><span><strong>${tr('resolution')}</strong><small>${tr('resolutionHint')}</small></span><select id="desktop-resolution" data-menu-select-layout="dropdown"><option value="auto" ${this.desktopDisplay.auto ? 'selected' : ''}>${tr('resolutionAuto')}</option>${(this.desktopDisplay.resolutions ?? [[960,540],[1280,720],[1440,900],[1600,900],[1920,1080],[2560,1440],[3840,2160]]).map(([w,h]) => `<option value="${w}x${h}" ${!this.desktopDisplay.auto && w === this.desktopDisplay.width && h === this.desktopDisplay.height ? 'selected' : ''}>${w} × ${h}</option>`).join('')}</select></label><label class="settings-action"><span><strong>${tr('windowMode')}</strong><small>${tr('windowHint')}</small></span><select id="desktop-window-mode"><option value="windowed" ${!this.desktopDisplay.fullscreen ? 'selected' : ''}>${tr('windowed')}</option><option value="fullscreen" ${this.desktopDisplay.fullscreen ? 'selected' : ''}>${tr('fullscreen')}</option></select></label><output id="desktop-display-status" class="settings-status" role="status"></output>` : ''}
+            ${mobile || desktop ? '' : `<button class="settings-action" id="toggle-fullscreen" type="button"><span><strong>${tr('fullscreen')}</strong></span><b>${document.fullscreenElement ? tr('on') : tr('off')}</b></button><output id="fullscreen-status" class="settings-status" role="status"></output>`}
+            <label class="settings-action"><span><strong>${tr('calm')}</strong><small>${tr('calmHint')}</small></span><input id="calm-effects" type="checkbox" ${this.releaseSettings.calmEffects ? 'checked' : ''} /></label>
             ${this.displayPreferencesMarkup()}
           </section>
-          ${this.stickPreferencesMarkup(true)}
+          ${languageSettingsMarkup()}</div>
         </section>
-        <div class="settings-utility"><nav class="settings-links" aria-label="Справка и инструменты">
-          <button class="release-panel settings-action settings-navigation" id="open-rules" type="button">${settingsActionIcon('rules')}<span><strong>Правила</strong><small>Фигуры, атаки и защита — на примерах</small></span><b>›</b></button>
+        <div class="settings-utility"><nav class="settings-links" aria-label="${tr('helpAria')}">
+          <button class="release-panel settings-action settings-navigation" id="open-rules" type="button">${settingsActionIcon('rules')}<span><strong>${tr('rules')}</strong><small>${tr('rulesHint')}</small></span><b>›</b></button>
 
-          <button class="release-panel settings-action settings-navigation" id="open-settings-lab" type="button">${settingsActionIcon('lab')}<span><strong>Лаборатория дизайна</strong><small>Тонкая настройка игрового баланса</small></span><b>›</b></button>
+          <button class="release-panel settings-action settings-navigation" id="open-settings-lab" type="button">${settingsActionIcon('lab')}<span><strong>${tr('lab')}</strong><small>${tr('labHint')}</small></span><b>›</b></button>
           </nav>
         </div>
-        ${releaseFooterMarkup({ confirm: 'Confirm', back: 'Back', reset: 'Reset settings' })}
+        ${releaseFooterMarkup({ confirm: 'confirm', back: 'back', reset: 'reset' })}
       </main>
     `;
     this.root.querySelector('#settings-back')?.addEventListener('click', () => this.navigateBack());
@@ -572,7 +578,7 @@ export class BricksWarApp {
       const [width = 1280, height = 720] = resolution.split('x').map(Number);
       const fullscreen = this.root.querySelector<HTMLSelectElement>('#desktop-window-mode')?.value === 'fullscreen';
       void this.previewDisplay({ width, height, fullscreen, auto: resolution === 'auto' })
-        .catch(() => { const status = this.root.querySelector('#desktop-display-status'); if (status) status.textContent = 'Не удалось изменить параметры экрана'; });
+        .catch(() => { const status = this.root.querySelector('#desktop-display-status'); if (status) status.textContent = localeText('displayFailed'); });
     };
     this.root.querySelector('#desktop-resolution')?.addEventListener('change', applyDesktopDisplay);
     this.root.querySelector('#desktop-window-mode')?.addEventListener('change', applyDesktopDisplay);
@@ -580,7 +586,7 @@ export class BricksWarApp {
       const operation = document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
       void operation.then(() => this.renderSettings()).catch(() => {
         const status = this.root.querySelector<HTMLOutputElement>('#fullscreen-status');
-        if (status) status.textContent = 'Браузер не разрешил изменить полноэкранный режим';
+        if (status) status.textContent = localeText('fullscreenFailed');
       });
     });
     this.root.querySelector<HTMLInputElement>('#calm-effects')?.addEventListener('change', (event) => {
@@ -592,6 +598,7 @@ export class BricksWarApp {
     this.bindAudioToggle();
     this.bindVolumeControl();
     this.bindPreferenceExtras();
+    this.bindLanguageSelector();
     this.activateMenuFocus('settings');
   }
 
@@ -606,8 +613,33 @@ export class BricksWarApp {
   private renderControls(): void {
     this.destroyGame();
     if (isMobilePlayViewport()) {
-      this.router.open('settings');
-      this.renderSettings();
+      this.audio.enterMenu();
+      this.root.innerHTML = `
+        <main class="release-screen premium-surface phone-controls-screen" data-screen="controls" data-phone-controls-help>
+          <header class="release-heading phone-controls-heading">
+            <button class="screen-back" id="controls-back" type="button">← ${tr('back')}</button>
+            <div><p class="eyebrow">${tr('phoneControlsEyebrow')}</p><h1>${tr('phoneControlsTitle')}</h1></div>
+          </header>
+          <p class="phone-controls-intro">${tr('phoneControlsIntro')}</p>
+          <div class="phone-controls-content">
+            <figure class="phone-controls-figure">
+              <div class="phone-controls-diagram" role="img" aria-label="${tr('phoneControlsDiagram')}" data-bottom-zone-fraction="${MOBILE_TOUCH_BUTTON_ZONE_FRACTION}">
+                <div class="phone-controls-rotate-area"><span aria-hidden="true">↻</span><strong>${tr('phoneControlsRotate')}</strong><small>${tr('phoneControlsRotateArea')}</small></div>
+                <div class="phone-controls-directions" aria-hidden="true">
+                  <div class="phone-controls-direction"><b>←</b><span>${tr('phoneControlsLeft')}</span></div>
+                  <div class="phone-controls-direction"><b>↓</b><span>${tr('phoneControlsDown')}</span></div>
+                  <div class="phone-controls-direction"><b>→</b><span>${tr('phoneControlsRight')}</span></div>
+                </div>
+              </div>
+              <figcaption class="phone-controls-hold-hint">${tr('phoneControlsHold')}</figcaption>
+            </figure>
+            <aside class="phone-controls-pause"><span aria-hidden="true">Ⅱ</span><div><h2>${tr('phoneControlsPauseTitle')}</h2><p>${tr('phoneControlsPauseHint')}</p></div></aside>
+          </div>
+          ${releaseFooterMarkup({})}
+        </main>
+      `;
+      this.root.querySelector('#controls-back')?.addEventListener('click', () => this.navigateBack());
+      this.activateMenuFocus('controls');
       return;
     }
     this.root.innerHTML = `
@@ -623,7 +655,7 @@ export class BricksWarApp {
             <article class="release-panel"><h2>Клавиатура 2</h2><div class="keyboard-cluster arrows"><kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd></div><ul class="key-actions"><li class="action-rotate">↑ повернуть</li><li class="action-move">← → двигать</li><li class="action-drop">↓ ускорить</li></ul></article>
           </section>
         </div>
-        ${releaseFooterMarkup({ back: 'Back' })}
+        ${releaseFooterMarkup({ back: 'back' })}
       </main>
     `;
     this.root.querySelector('#controls-back')?.addEventListener('click', () => this.navigateBack());
@@ -641,7 +673,7 @@ export class BricksWarApp {
     const mobile = isMobilePlayViewport();
     const title = mode === 'survival' ? 'Выживание' : mode === 'team-battle' ? 'Командный бой' : 'Битва';
     const subtitle = mobile ? (mode === 'survival' ? 'Играйте в одиночку и побейте рекорд' : 'Вы против 1–3 ИИ') : mode === 'survival'
-      ? 'Продержитесь как можно дольше и попадите в локальный топ-10'
+      ? 'Продержитесь как можно дольше и попадите в рейтинг'
       : mode === 'team-battle' ? 'Две команды по два игрока' : 'От двух до четырёх игроков — каждый за себя';
     const records = mode === 'survival' ? loadSoloRecords() : [];
     const lobby = mobile
@@ -663,7 +695,7 @@ export class BricksWarApp {
         ${mode === 'survival' || mobile ? '' : this.modeSettingsMarkup()}
         <p class="setup-error" id="setup-error" role="alert" aria-live="polite"></p>
         </div>
-        ${releaseFooterMarkup({ ai: !mobile && mode !== 'survival' ? 'Добавить ИИ' : undefined, roster: mobile ? undefined : 'Войти / сменить место', confirm: mobile ? undefined : 'Выбрать', back: 'Назад', start: 'Начать матч' })}
+        ${releaseFooterMarkup({ ai: !mobile && mode !== 'survival' ? 'addAi' : undefined, roster: mobile ? undefined : 'join', confirm: mobile ? undefined : 'select', back: 'back', start: 'start' })}
       </main>
     `;
 
@@ -687,6 +719,7 @@ export class BricksWarApp {
       input.addEventListener('change', () => {
         const index = Number(input.dataset.playerName);
         input.value = this.playerNameForSlot(index);
+        this.ratings.namesChanged();
         this.gamepadProfiles.rememberName(input.value);
         this.fitPlayerNameInput(input);
       });
@@ -728,6 +761,11 @@ export class BricksWarApp {
     this.renderAiDifficultyChoice();
     this.activateMenuFocus(this.router.current());
     this.setupPlayerNameFitting();
+    if (mode === 'survival') {
+      const panel = this.root.querySelector<HTMLElement>('.survival-records');
+      if (panel) this.ratings.mount(panel, () => isMobilePlayViewport() ? [this.playerNameForSlot(0)]
+        : this.slots.flatMap((slot, i) => isManualSlot(slot) ? [this.playerNameForSlot(i)] : []));
+    }
   }
 
   private disconnectPlayerNameResizeObserver(): void {
@@ -805,7 +843,7 @@ export class BricksWarApp {
     if (mode === 'team-battle') return this.mobileSetupMarkup('battle', records);
     const player = `<label><small>Имя игрока</small><input data-player-name="0" aria-label="Имя игрока 1" value="${escapeHtml(this.playerNameForSlot(0))}" maxlength="20" /></label>`;
     const recordsMarkup = records.length ? `<ol>${records.map((record, index) => `<li><b>${index + 1}</b><span class="record-identity"><strong>${escapeHtml(record.name)}</strong>${recordDateMarkup(record.finishedAt)}</span><span class="record-metrics"><time>${record.lineScore.toLocaleString('ru-RU')}</time><small class="record-duration" aria-label="Время выживания ${formatDuration(record.elapsedMs).slice(0, -2)}">◷ ${formatDuration(record.elapsedMs).slice(0, -2)}</small></span></li>`).join('')}</ol>` : '<p>Сыграйте первую партию — рекорд появится здесь.</p>';
-    if (mode === 'survival') return `<div class="mobile-solo-setup"><section class="release-panel mobile-setup-card"><p class="eyebrow">СОЛО</p><h2>Выживание</h2><p>Атак нет. Рекорд — по очкам. С 3:00 серые ряды учащаются: пауза от 15 до 5 секунд.</p>${player}<div class="mobile-control-hint">Сверху — поворот. Снизу: ← → сдвиг, ↓ ускорение.</div></section><section class="release-panel survival-records mobile-survival-records"><header><div><p class="eyebrow">ЛОКАЛЬНЫЙ ТОП-10</p><h2>Лучшие результаты</h2></div><span aria-hidden="true">♛</span></header>${recordsMarkup}</section></div>`;
+    if (mode === 'survival') return `<div class="mobile-solo-setup"><section class="release-panel mobile-setup-card"><p class="eyebrow">СОЛО</p><h2>Выживание</h2><p>Атак нет. Рекорд — по очкам. С 3:00 серые ряды учащаются: пауза от 15 до 5 секунд.</p>${player}<div class="mobile-control-hint">Сверху — поворот. Снизу: ← → сдвиг, ↓ ускорение.</div></section><section class="release-panel survival-records mobile-survival-records"><header><div><p class="eyebrow">РЕЙТИНГ</p><h2>Лучшие результаты</h2></div><span aria-hidden="true">♛</span></header>${recordsMarkup}</section></div>`;
     const difficulty = this.pacing.battleDifficulty;
     const attackMode = this.pacing.conflictEnabled ? this.pacing.conflictTargeting : 'off';
     return `<section class="release-panel mobile-solo-setup mobile-setup-card"><p class="eyebrow">СОЛО</p><h2>Битва с ИИ</h2><p class="mobile-mode-rule">${this.pacing.battleTimeMode === 'until-victory' ? 'До последнего выжившего; одновременно — по очкам. С 3:00 серые ряды учащаются.' : 'Последний выживший побеждает. По таймеру — очки; в финале растут серые ряды.'}</p>${player}<label><small>Соперники</small><select data-mobile-setting="aiCount"><option value="1" ${this.mobileSettings.aiCount === 1 ? 'selected' : ''}>1 ИИ</option><option value="2" ${this.mobileSettings.aiCount === 2 ? 'selected' : ''}>2 ИИ</option><option value="3" ${this.mobileSettings.aiCount === 3 ? 'selected' : ''}>3 ИИ</option></select></label><label><small>Сложность ИИ</small><select data-mobile-setting="aiDifficulty">${(['easy','medium','hard','expert'] as const).map((value) => `<option value="${value}" ${this.mobileSettings.aiDifficulty === value ? 'selected' : ''}>${({ easy: 'Лёгкая', medium: 'Средняя', hard: 'Сложная', expert: 'Эксперт' })[value]}</option>`).join('')}</select></label><label><small>Темп битвы</small><select id="battle-difficulty" aria-label="Темп битвы">${battleDifficultyOptionsMarkup(difficulty)}</select></label><label><small>Режим атаки</small><select id="attack-mode" aria-label="Режим атаки"><option value="off" ${attackMode === 'off' ? 'selected' : ''}>Выключены</option><option value="hunt-leader" ${attackMode === 'hunt-leader' ? 'selected' : ''}>Только лидеру</option><option value="all-opponents" ${attackMode === 'all-opponents' ? 'selected' : ''}>Всем соперникам</option></select></label><label><small>Длительность</small><select id="match-duration" aria-label="Длительность матча">${this.durationOptionsMarkup()}</select></label><div class="mobile-control-hint">Коснитесь верхней части экрана для поворота. Внизу: ← → сдвиг, ↓ ускорение.</div></section>`;
@@ -1495,7 +1533,7 @@ export class BricksWarApp {
             <section id="pause-settings-panel" class="pause-panel pause-settings-panel" hidden>
               <span>Настройки</span>
               ${this.setupAudioMarkup()}
-              ${mobileMatch ? '' : `<button class="settings-action" id="pause-toggle-fullscreen" type="button"><span><strong>Полноэкранный режим</strong></span><b>${document.fullscreenElement ? 'Вкл' : 'Выкл'}</b></button>`}
+              ${mobileMatch ? '' : `<button class="settings-action" id="pause-toggle-fullscreen" type="button"><span><strong>Полноэкранный режим</strong></span><b>${document.fullscreenElement ? tr('on') : tr('off')}</b></button>`}
               <label class="settings-action"><span><strong>Спокойные эффекты</strong><small>Меньше движения и вспышек</small></span><input id="pause-calm-effects" type="checkbox" ${this.releaseSettings.calmEffects ? 'checked' : ''} /></label>
               <output id="pause-settings-status" class="settings-status" role="status"></output>
               <button id="pause-settings-back" type="button">← Назад к паузе</button>
@@ -1564,10 +1602,10 @@ export class BricksWarApp {
       const operation = document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
       void operation.then(() => {
         const state = this.root.querySelector<HTMLElement>('#pause-toggle-fullscreen b');
-        if (state) state.textContent = document.fullscreenElement ? 'Вкл' : 'Выкл';
+        if (state) state.textContent = document.fullscreenElement ? tr('on') : tr('off');
       }).catch(() => {
         const status = this.root.querySelector<HTMLOutputElement>('#pause-settings-status');
-        if (status) status.textContent = 'Браузер не разрешил изменить полноэкранный режим';
+        if (status) status.textContent = localeText('fullscreenFailed');
       });
     });
     this.root.querySelector<HTMLInputElement>('#pause-calm-effects')?.addEventListener('change', (event) => {
@@ -1965,6 +2003,11 @@ export class BricksWarApp {
       finishedAt,
       placedPieces: participant.placedPieces,
     }))) : null;
+    if (survival) {
+      this.ratings.outbox.enqueue(state.participants.map(participant => ({ name: participant.config.label,
+        lineScore: participant.score, elapsedMs: Math.round(participant.survivalMs), finishedAt })));
+      void this.ratings.outbox.flush().catch(() => undefined);
+    }
     const currentRecordIds = new Set(survivalResult?.rankedIds ?? []);
     const teamSummary = state.options.matchVariant === 'teams'
       ? teamScores(state.participants.map((participant, index) => ({ id: participant.config.id, score: participant.score, alive: participant.board.alive, teamId: teamIdForSlot(index) ?? undefined })))
@@ -1992,6 +2035,8 @@ export class BricksWarApp {
         <div class="results-actions" style="visibility:hidden" aria-hidden="true"><button disabled id="play-again" class="primary-button" type="button"><span>Повторить</span><b>↻</b></button><button disabled id="results-main-menu" type="button">Главное меню</button></div>
       </section>
     `;
+    const ratingPanel = layer.querySelector<HTMLElement>('.survival-local-records');
+    if (ratingPanel) this.ratings.mount(ratingPanel, () => state.participants.map(p => p.config.label), () => this.menuFocus.resultsInputReady());
     layer.querySelector('#play-again')?.addEventListener('click', () => {
       if (!this.menuFocus.resultsInputReady()) return;
       this.audio.playUiSelect();
@@ -2039,7 +2084,7 @@ export class BricksWarApp {
     if (!desktop || this.root.querySelector('[data-display-confirm]')) return;
     this.desktopDisplay = await desktop.setDisplay(value);
     const backdrop = document.createElement('div'); backdrop.className = 'profile-choice-backdrop';
-    backdrop.innerHTML = `<section class="release-panel profile-choice" data-display-confirm role="dialog" aria-modal="true"><h2>Сохранить режим экрана?</h2><p>Без подтверждения прежний режим вернётся через 15 секунд.</p><button data-display-yes type="button" data-ui-focus>Сохранить</button><button data-display-no type="button" data-ui-focus>Вернуть прежний</button></section>`;
+    backdrop.innerHTML = `<section class="release-panel profile-choice" data-display-confirm role="dialog" aria-modal="true"><h2>${tr('keepDisplay')}</h2><p>${tr('keepDisplayHint')}</p><button data-display-yes type="button" data-ui-focus>${tr('keep')}</button><button data-display-no type="button" data-ui-focus>${tr('revert')}</button></section>`;
     this.root.append(backdrop);
     let finished = false;
     const finish = async (confirm: boolean) => {
@@ -2069,32 +2114,48 @@ export class BricksWarApp {
 
   private renderPausePreferences(panel = this.root.querySelector<HTMLElement>('#pause-settings-panel'), onBack = () => this.navigateBack()): void {
     if (!panel) return;
-    panel.innerHTML = `<h2>Настройки</h2><div class="pause-preferences-scroll">${this.setupAudioMarkup()}
-      ${desktop ? `<label class="settings-action"><span>Разрешение окна</span><select data-pause-resolution><option value="auto" ${this.desktopDisplay.auto ? 'selected' : ''}>Auto — по экрану</option>${(this.desktopDisplay.resolutions ?? [[1280,720]]).map(([w,h]) => `<option value="${w}x${h}" ${!this.desktopDisplay.auto && w === this.desktopDisplay.width && h === this.desktopDisplay.height ? 'selected' : ''}>${w} × ${h}</option>`).join('')}</select></label><label class="settings-action"><span>Режим экрана</span><select data-pause-window><option value="windowed" ${!this.desktopDisplay.fullscreen ? 'selected' : ''}>Оконный</option><option value="fullscreen" ${this.desktopDisplay.fullscreen ? 'selected' : ''}>Полный экран</option></select></label>` : `<button type="button" data-pause-fullscreen>Полноэкранный режим</button>`}
-      <label class="settings-action"><span>Спокойные эффекты</span><input data-pause-calm type="checkbox" ${this.releaseSettings.calmEffects ? 'checked' : ''} /></label>${this.preferenceExtrasMarkup()}</div><button id="pause-settings-back" ${panel.hasAttribute('data-network-preferences') ? 'data-network-prefs-back' : ''} type="button">← Назад к паузе</button><footer class="preferences-guidance-footer">${gamepadFooterHintsMarkup(true)}</footer>`;
+    panel.innerHTML = `<h2>${tr('settings')}</h2><div class="pause-preferences-scroll">${languageSettingsMarkup()}${this.setupAudioMarkup()}
+      ${desktop ? `<label class="settings-action"><span>${tr('resolution')}</span><select data-pause-resolution><option value="auto" ${this.desktopDisplay.auto ? 'selected' : ''}>${tr('resolutionAuto')}</option>${(this.desktopDisplay.resolutions ?? [[1280,720]]).map(([w,h]) => `<option value="${w}x${h}" ${!this.desktopDisplay.auto && w === this.desktopDisplay.width && h === this.desktopDisplay.height ? 'selected' : ''}>${w} × ${h}</option>`).join('')}</select></label><label class="settings-action"><span>${tr('windowMode')}</span><select data-pause-window><option value="windowed" ${!this.desktopDisplay.fullscreen ? 'selected' : ''}>${tr('windowed')}</option><option value="fullscreen" ${this.desktopDisplay.fullscreen ? 'selected' : ''}>${tr('fullscreen')}</option></select></label>` : `<button type="button" data-pause-fullscreen>${tr('fullscreen')}</button>`}
+      <label class="settings-action"><span>${tr('calm')}</span><input data-pause-calm type="checkbox" ${this.releaseSettings.calmEffects ? 'checked' : ''} /></label>${this.preferenceExtrasMarkup()}</div><button id="pause-settings-back" ${panel.hasAttribute('data-network-preferences') ? 'data-network-prefs-back' : ''} type="button">← ${tr('backPause')}</button><footer class="preferences-guidance-footer">${gamepadFooterHintsMarkup(true)}</footer>`;
     panel.querySelector('#pause-settings-back')?.addEventListener('click', onBack);
     panel.querySelector('[data-pause-calm]')?.addEventListener('change', event => { this.releaseSettings.calmEffects = (event.target as HTMLInputElement).checked; document.body.classList.toggle('calm-effects', this.releaseSettings.calmEffects); this.persistPreferences(); });
-    panel.querySelector('[data-pause-fullscreen]')?.addEventListener('click', () => { void (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch(() => { const status = panel.querySelector('[data-preferences-status]'); if (status) status.textContent = 'Не удалось изменить режим экрана'; }); });
+    panel.querySelector('[data-pause-fullscreen]')?.addEventListener('click', () => { void (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch(() => { const status = panel.querySelector('[data-preferences-status]'); if (status) status.textContent = localeText('displayFailed'); }); });
     const change = () => { const resolution = panel.querySelector<HTMLSelectElement>('[data-pause-resolution]')?.value ?? 'auto'; const [width = 1280,height = 720] = resolution.split('x').map(Number); void this.previewDisplay({ width,height, auto: resolution === 'auto', fullscreen: panel.querySelector<HTMLSelectElement>('[data-pause-window]')?.value === 'fullscreen' }); };
     panel.querySelector('[data-pause-resolution]')?.addEventListener('change', change); panel.querySelector('[data-pause-window]')?.addEventListener('change', change);
-    this.bindVolumeControl(); this.bindPreferenceExtras(); enhanceMenuSelects(panel); if (!panel.hasAttribute('data-network-preferences')) this.activateMenuFocus('settings'); else panel.querySelectorAll<HTMLElement>('button,input,select').forEach(el=>{if(!el.hidden)el.dataset.uiFocus='';});
+    this.bindVolumeControl(); this.bindPreferenceExtras(); this.bindLanguageSelector(); enhanceMenuSelects(panel); if (!panel.hasAttribute('data-network-preferences')) this.activateMenuFocus('settings'); else panel.querySelectorAll<HTMLElement>('button,input,select').forEach(el=>{if(!el.hidden)el.dataset.uiFocus='';});
+  }
+
+  private bindLanguageSelector(): void {
+    this.root.querySelectorAll<HTMLSelectElement>('[data-language]').forEach(select => select.addEventListener('change', () => {
+      if (!LOCALES.includes(select.value as Locale)) return;
+      if (!this.game && !this.root.querySelector('[data-network-preferences]')) {
+        const trigger = this.root.querySelector<HTMLElement>('.settings-language-section [data-menu-select-trigger]');
+        const items = Array.from(this.root.querySelectorAll<HTMLElement>('[data-ui-focus]:not([disabled])')).filter(item => item.getClientRects().length > 0 && !item.hidden && !item.closest('[hidden]') && item.getAttribute('aria-hidden') !== 'true');
+        this.router.rememberSelection('settings', Math.max(0, items.indexOf(trigger!)));
+      }
+      const saved = setLocale(select.value as Locale);
+      this.refreshPreferenceScreen();
+      const status = this.root.querySelector<HTMLOutputElement>('[data-language-status]');
+      if (status) status.textContent = saved ? '' : localeText('saveFailed');
+      this.root.querySelector<HTMLElement>('.settings-language-section [data-menu-select-trigger]')?.focus({ preventScroll: true });
+    }));
   }
 
   private persistPreferences(): boolean {
     const saved = saveReleaseSettings(this.releaseSettings);
     const status = this.root.querySelector<HTMLOutputElement>('[data-preferences-status]');
-    if (status) status.textContent = saved ? '' : 'Не удалось сохранить настройки на устройстве. Изменения действуют до закрытия игры; повторите изменение.';
+    if (status) status.textContent = saved ? '' : localeText('saveFailed');
     return saved;
   }
 
   private displayPreferencesMarkup(): string {
-    return `<label class="settings-action"><span><strong>Сглаживание</strong><small>В следующем матче</small></span><input data-preference-aa type="checkbox" ${this.releaseSettings.antialias ? 'checked' : ''} /></label><label class="settings-action settings-fps"><span><strong>Ограничение кадров</strong><small>В следующем матче, в пределах частоты экрана</small></span><select data-preference-fps>${[0,30,60,120].map(value => `<option value="${value}" ${this.releaseSettings.fpsLimit === value ? 'selected' : ''}>${value ? value + ' кадр/с' : 'Без ограничения'}</option>`).join('')}</select></label>`;
+    return `<label class="settings-action"><span><strong>${tr('aa')}</strong><small>${tr('nextMatch')}</small></span><input data-preference-aa type="checkbox" ${this.releaseSettings.antialias ? 'checked' : ''} /></label><label class="settings-action settings-fps"><span><strong>${tr('fps')}</strong><small>${tr('fpsHint')}</small></span><select data-preference-fps>${[0,30,60,120].map(value => `<option value="${value}" ${this.releaseSettings.fpsLimit === value ? 'selected' : ''}>${value ? tr('fpsValue', { value }) : tr('unlimited')}</option>`).join('')}</select></label>`;
   }
 
   private stickPreferencesMarkup(showHelp = false): string {
-    return `<section class="release-panel settings-section settings-stick-section preference-inputs"><header><span class="settings-icon settings-icon-gamepad" aria-hidden="true">🎮</span><div><p class="eyebrow">УПРАВЛЕНИЕ</p><h2>Стик геймпада</h2></div></header><p class="settings-section-note">D-pad работает без изменений</p>
-      <label class="volume-control"><span>Чувствительность</span><input data-stick="stickSensitivity" type="range" min="50" max="200" step="5" value="${Math.round(this.releaseSettings.stickSensitivity * 100)}" /><output>${Math.round(this.releaseSettings.stickSensitivity * 100)}%</output></label>
-      <label class="volume-control"><span>Мёртвая зона</span><input data-stick="stickDeadzone" type="range" min="0" max="50" step="1" value="${Math.round(this.releaseSettings.stickDeadzone * 100)}" /><output>${Math.round(this.releaseSettings.stickDeadzone * 100)}%</output></label>${showHelp ? `<button id="open-controls" class="settings-controls-help" type="button">${settingsActionIcon('controls')}<span>Подробнее об управлении</span><b aria-hidden="true">›</b></button>` : ''}</section>`;
+    return `<section class="release-panel settings-section settings-stick-section preference-inputs"><header><span class="settings-icon settings-icon-gamepad" aria-hidden="true">🎮</span><div><p class="eyebrow">${tr('controls')}</p><h2>${tr('stick')}</h2></div></header><p class="settings-section-note">${tr('dpadHint')}</p>
+      <label class="volume-control"><span>${tr('sensitivity')}</span><input data-stick="stickSensitivity" type="range" min="50" max="200" step="5" value="${Math.round(this.releaseSettings.stickSensitivity * 100)}" /><output>${Math.round(this.releaseSettings.stickSensitivity * 100)}%</output></label>
+      <label class="volume-control"><span>${tr('deadzone')}</span><input data-stick="stickDeadzone" type="range" min="0" max="50" step="1" value="${Math.round(this.releaseSettings.stickDeadzone * 100)}" /><output>${Math.round(this.releaseSettings.stickDeadzone * 100)}%</output></label>${showHelp ? `<button id="open-controls" class="settings-controls-help" type="button">${settingsActionIcon('controls')}<span>${tr('controlsHelp')}</span><b aria-hidden="true">›</b></button>` : ''}</section>`;
   }
 
   private preferenceExtrasMarkup(): string {
@@ -2136,15 +2197,15 @@ export class BricksWarApp {
     const effects = Math.round(this.audio.getEffectsVolume() * 100);
     return `
       <div class="setup-audio-controls">
-        <label class="volume-control" for="master-volume"><span>Общая</span><input id="master-volume" type="range" min="0" max="100" step="1" value="${master}" aria-label="Общая громкость" /><output id="master-volume-value">${master}%</output></label>
+        <label class="volume-control" for="master-volume"><span>${tr('master')}</span><input id="master-volume" type="range" min="0" max="100" step="1" value="${master}" aria-label="${tr('masterAria')}" /><output id="master-volume-value">${master}%</output></label>
         <label class="volume-control" for="music-volume">
-          <span>Музыка</span>
-          <input id="music-volume" type="range" min="0" max="100" step="1" value="${music}" aria-label="Громкость музыки" />
+          <span>${tr('music')}</span>
+          <input id="music-volume" type="range" min="0" max="100" step="1" value="${music}" aria-label="${tr('musicAria')}" />
           <output id="music-volume-value" for="music-volume">${music}%</output>
         </label>
         <label class="volume-control" for="effects-volume">
-          <span>Эффекты</span>
-          <input id="effects-volume" type="range" min="0" max="100" step="1" value="${effects}" aria-label="Громкость эффектов" />
+          <span>${tr('effects')}</span>
+          <input id="effects-volume" type="range" min="0" max="100" step="1" value="${effects}" aria-label="${tr('effectsAria')}" />
           <output id="effects-volume-value" for="effects-volume">${effects}%</output>
         </label>
       </div>
@@ -2241,8 +2302,8 @@ export class BricksWarApp {
   private refreshAudioButtons(): void {
     const enabled = !this.audio.isMuted();
     this.root.querySelectorAll<HTMLButtonElement>('.audio-toggle').forEach((button) => {
-      button.textContent = `♪ ЗВУК ${enabled ? 'ВКЛ' : 'ВЫКЛ'}`;
-      button.setAttribute('aria-label', enabled ? 'Отключить звук' : 'Включить звук');
+      button.textContent = `♪ ${localeText('sound')} ${enabled ? localeText('on') : localeText('off')}`;
+      button.setAttribute('aria-label', enabled ? localeText('mute') : localeText('unmute'));
       button.setAttribute('aria-pressed', String(enabled));
     });
   }

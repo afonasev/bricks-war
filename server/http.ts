@@ -4,6 +4,8 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { RoomService, RoomError, type Room, type Seat } from './rooms';
 import { SnapshotPublisher } from './publication';
 import { MAX_INPUT_BYTES, MAX_SNAPSHOT_BYTES, type ClientCommand } from '../src/network/protocol';
+import { GlobalRatingStore } from './globalRating';
+import { isRatingAttempt } from '../src/domain/globalRating';
 
 interface Link { socket: WebSocket; room: Room; seat: Seat; epoch: number; revision: number; snapshotAcks: boolean; outstanding: string[]; coalesced: boolean }
 export interface CycleMetrics {durationMs:number;publicationMs:number;wireBytes:number;maxBufferedBytes:number;schedulerLagMs:number}
@@ -14,7 +16,7 @@ export function networkClientAddress(request: Pick<IncomingMessage, 'headers'> &
   const loopback = peer === '127.0.0.1' || peer === '::1' || peer === '::ffff:127.0.0.1';
   return trustProxy && loopback && typeof forwarded === 'string' && isIP(forwarded) ? forwarded : peer;
 }
-export function createNetworkServer(service = new RoomService(), allowedOrigins: readonly string[] = [], observe?: (metrics:CycleMetrics)=>void, trustProxy = false) {
+export function createNetworkServer(service = new RoomService(), allowedOrigins: readonly string[] = [], observe?: (metrics:CycleMetrics)=>void, trustProxy = false, rating = new GlobalRatingStore()) {
   const links = new Set<Link>();
   const rate = new Map<string, {start: number; count: number}>();
   const allow = (request: IncomingMessage) => request.headers.origin === `http://${request.headers.host}`
@@ -38,6 +40,12 @@ export function createNetworkServer(service = new RoomService(), allowedOrigins:
       if (request.method === 'GET' && url.pathname === '/api/network/lobbies') {
         response.end(JSON.stringify(service.list(Number(url.searchParams.get('offset') ?? 0)))); return;
       }
+      if (request.method === 'GET' && url.pathname === '/api/network/rating') {
+        const names = url.searchParams.getAll('name');
+        if (names.length > 4 || names.some(n => n.length > 80)) throw new RoomError('rating', 'Некорректные имена.');
+        const result = await rating.read(names).catch(() => { throw new RoomError('rating-storage', 'Рейтинг временно недоступен.'); });
+        response.end(JSON.stringify(result)); return;
+      }
       if (!allow(request)) throw new RoomError('origin', 'Недопустимый источник запроса.');
       if (request.method !== 'POST') throw new RoomError('method', 'Ожидается POST.');
       let body = ''; let size = 0;
@@ -48,6 +56,13 @@ export function createNetworkServer(service = new RoomService(), allowedOrigins:
         response.end(JSON.stringify(service.snapshot(room, seat))); return;
       }
       throttle(`write:${networkClientAddress(request, trustProxy)}`, 30);
+      if (url.pathname === '/api/network/rating-submit') {
+        if (!Array.isArray(payload?.attempts) || payload.attempts.length < 1 || payload.attempts.length > 4 || !payload.attempts.every(isRatingAttempt)) {
+          throw new RoomError('rating', 'Некорректный результат.');
+        }
+        await rating.submit(payload.attempts).catch(() => { throw new RoomError('rating-storage', 'Не удалось сохранить результат. Повторите позже.'); });
+        response.end(JSON.stringify({ ok: true })); return;
+      }
       const credential = url.pathname === '/api/network/create'
         ? await service.create(payload.roomName, payload.name, payload.password ?? '', {rules:payload.rules, profile:payload.profile, bots:payload.bots})
         : url.pathname === '/api/network/join'
@@ -55,7 +70,8 @@ export function createNetworkServer(service = new RoomService(), allowedOrigins:
       if (!credential) throw new RoomError('endpoint', 'Неизвестный запрос.');
       response.end(JSON.stringify({credential}));
     } catch (error) {
-      response.statusCode = error instanceof RoomError && error.code === 'rate' ? 429 : 400;
+      response.statusCode = error instanceof RoomError && error.code === 'rate' ? 429
+        : error instanceof RoomError && error.code === 'rating-storage' ? 503 : 400;
       response.end(JSON.stringify({error: error instanceof Error ? error.message : 'Некорректный запрос.', code: error instanceof RoomError ? error.code : 'message'}));
     }
   });

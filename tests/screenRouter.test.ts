@@ -22,8 +22,12 @@ describe('production screen routing', () => {
     router.open('battle');
     expect(router.back()).toBe('main-menu');
     router.open('settings');
+    router.rememberSelection('settings', 3);
     router.open('controls');
+    expect(router.current()).toBe('controls');
     expect(router.back()).toBe('settings');
+    expect(router.selectionFor('settings', 5)).toBe(3);
+    expect(router.back()).toBe('main-menu');
   });
 
   it('supports Pause-owned Settings and restores a remembered selection safely', () => {

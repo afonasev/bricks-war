@@ -316,6 +316,125 @@ test('persists independent release settings and opens the controls reference', a
   expect(narrowContainment.ratio).toBeCloseTo(1000 / 720, 2);
 });
 
+test('opens localized phone Controls help, returns to Settings, and preserves preferences across viewports', async ({ page }) => {
+  const screenshotDir = process.env.BRICKS_RECORD_SCREENSHOTS;
+  const capture = async (name: string, fullPage = false) => {
+    if (screenshotDir) await page.screenshot({ path: `${screenshotDir}/${name}.png`, fullPage });
+  };
+  const expectReadablePhoneHelp = async () => {
+    const result = await page.locator('[data-phone-controls-help]').evaluate((screen) => {
+      const selectors = [
+        '.phone-controls-heading', '.phone-controls-intro', '.phone-controls-figure', '.phone-controls-pause',
+        '.phone-controls-screen > .release-guidance-footer',
+      ];
+      const queriedBlocks = selectors.map((selector) => screen.querySelector<HTMLElement>(selector));
+      const blocks = queriedBlocks.filter((node): node is HTMLElement => Boolean(node));
+      const rect = (node: Element) => {
+        const box = node.getBoundingClientRect();
+        return { left: box.left, right: box.right, top: box.top, bottom: box.bottom };
+      };
+      const overlaps = (nodes: Element[]) => nodes.flatMap((node, index) => nodes.slice(index + 1).flatMap((other) => {
+        const a = rect(node); const b = rect(other);
+        return Math.min(a.right, b.right) - Math.max(a.left, b.left) > 1 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 1
+          ? [`${node.className} / ${other.className}`] : [];
+      }));
+      const diagram = screen.querySelector<HTMLElement>('.phone-controls-diagram')!;
+      const textNodes = Array.from(screen.querySelectorAll<HTMLElement>('h1,h2,p,small,strong,button,.phone-controls-direction span'))
+        .filter((node) => node.getClientRects().length > 0);
+      const clipped = textNodes.filter((node) => {
+        const range = document.createRange();
+        range.selectNodeContents(node);
+        const clippingBounds = [] as DOMRect[];
+        for (let ancestor = node.parentElement; ancestor && screen.contains(ancestor); ancestor = ancestor.parentElement) {
+          const style = getComputedStyle(ancestor);
+          if (/(hidden|clip|auto|scroll)/.test(`${style.overflowX} ${style.overflowY}`)) clippingBounds.push(ancestor.getBoundingClientRect());
+        }
+        return Array.from(range.getClientRects()).some((line) => line.width > 0 && line.height > 0 && clippingBounds.some((bounds) => (
+          line.left < bounds.left - 1 || line.right > bounds.right + 1 || line.top < bounds.top - 1 || line.bottom > bounds.bottom + 1
+        )));
+      }).map((node) => node.textContent?.trim() ?? node.tagName);
+      const horizontalTextOverflow = textNodes.filter((node) => node.scrollWidth > node.clientWidth + 1).map((node) => node.textContent?.trim() ?? node.tagName);
+      const heading = screen.querySelector<HTMLElement>('.phone-controls-heading')!;
+      return {
+        missingBlocks: selectors.filter((_, index) => !queriedBlocks[index]),
+        overlaps: [...overlaps(blocks), ...overlaps(Array.from(screen.querySelector('.phone-controls-figure')!.children)), ...overlaps(Array.from(diagram.children)), ...overlaps(Array.from(screen.querySelector('.phone-controls-directions')!.children)), ...overlaps(Array.from(heading.children))],
+        clipped,
+        horizontalTextOverflow,
+        horizontalOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
+        bottomFraction: diagram.dataset.bottomZoneFraction,
+      };
+    });
+    expect(result.missingBlocks).toEqual([]);
+    expect(result.overlaps).toEqual([]);
+    expect(result.clipped).toEqual([]);
+    expect(result.horizontalTextOverflow).toEqual([]);
+    expect(result.horizontalOverflow).toBe(false);
+    expect(result.bottomFraction).toBe('0.21875');
+  };
+  const openPhoneSettings = async (locale: string) => {
+    await page.evaluate((value) => localStorage.setItem('bricks-war:language:v1', value), locale);
+    await page.reload();
+    await page.locator('[data-destination="settings"]').click();
+    await expect(page.locator('[data-screen="settings"]')).toBeVisible();
+    await expect(page.locator('[data-language]')).toHaveValue(locale);
+  };
+  const openPhoneHelp = async (locale: string) => {
+    await openPhoneSettings(locale);
+    await page.locator('#open-controls').click();
+    await expect(page.locator('[data-phone-controls-help]')).toBeVisible();
+    await expect(page.locator('html')).toHaveAttribute('lang', locale);
+  };
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openPhoneSettings('de');
+  await page.locator('#music-volume').fill('61');
+  await page.locator('#effects-volume').fill('34');
+  await page.locator('#calm-effects').check();
+  await page.locator('#open-controls').click();
+  await expect(page.locator('[data-phone-controls-help]')).toBeVisible();
+  await expect(page.locator('.phone-controls-heading')).toContainText('Mit Berührung spielen');
+  await expect(page.locator('.phone-controls-pause')).toContainText('Eine Pause nötig?');
+  await expectReadablePhoneHelp();
+  await capture('phone-controls-de-390x844');
+
+  for (const viewport of [{ width: 844, height: 390 }, { width: 320, height: 568 }]) {
+    await page.setViewportSize(viewport);
+    await expectReadablePhoneHelp();
+    await capture(`phone-controls-de-${viewport.width}x${viewport.height}`, true);
+  }
+
+  for (const locale of ['ru', 'en', 'fr', 'de', 'es', 'zh-Hans', 'ja']) {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await openPhoneHelp(locale);
+    await expectReadablePhoneHelp();
+    const localeSlug = locale === 'zh-Hans' ? 'zh-hans' : locale;
+    await capture(`phone-controls-${localeSlug}-390x844`);
+    if (['fr', 'es', 'zh-Hans', 'ja'].includes(locale)) {
+      for (const viewport of [{ width: 844, height: 390 }, { width: 320, height: 568 }]) {
+        await page.setViewportSize(viewport);
+        await expectReadablePhoneHelp();
+        await capture(`phone-controls-${localeSlug}-${viewport.width}x${viewport.height}`, true);
+      }
+      await page.setViewportSize({ width: 390, height: 844 });
+    }
+    await page.locator('#controls-back').click();
+    await expect(page.locator('[data-screen="settings"]')).toBeVisible();
+    await expect(page.locator('[data-language]')).toHaveValue(locale);
+    await expect(page.locator('#music-volume')).toHaveValue('61');
+    await expect(page.locator('#effects-volume')).toHaveValue('34');
+    await expect(page.locator('#calm-effects')).toBeChecked();
+  }
+
+  await page.setViewportSize({ width: 1440, height: 960 });
+  await page.reload();
+  await page.locator('[data-destination="settings"]').click();
+  await page.locator('#open-controls').click();
+  await expect(page.locator('[data-phone-controls-help]')).toHaveCount(0);
+  await expect(page.locator('.approved-gamepad-artwork')).toBeVisible();
+  await expect(page.locator('.keyboard-cluster')).toHaveCount(2);
+  if (screenshotDir) await page.screenshot({ path: `${screenshotDir}/desktop-controls-1440x960.png` });
+});
+
 test('keeps the audio prototype gallery behind its local review flag', async ({ page }) => {
   await page.goto('/?muted=1&audio-prototypes=1');
   await page.getByRole('button', { name: /Настройки/ }).click();

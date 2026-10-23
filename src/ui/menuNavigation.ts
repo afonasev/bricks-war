@@ -138,7 +138,8 @@ export class MenuFocusController {
       this.resultsTimer = null;
       if (this.screen !== 'results') return;
       onReady();
-      this.select(0, true);
+      const repeat = this.items().findIndex(item => item.id === 'play-again');
+      this.select(Math.max(0, repeat), true);
     }, RESULTS_INPUT_DELAY_MS);
   }
 

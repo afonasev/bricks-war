@@ -22,6 +22,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 if (process.platform === 'win32') app.setAppUserModelId('tech.afonasev.brickswar');
 if (process.env.BRICKS_DESKTOP_QA_PROFILE) app.setPath('userData', process.env.BRICKS_DESKTOP_QA_PROFILE);
 const API = new Map([['/api/network/health', 'GET'], ['/api/network/lobbies', 'GET'],
+  ['/api/network/rating', 'GET'], ['/api/network/rating-submit', 'POST'],
   ['/api/network/create', 'POST'], ['/api/network/join', 'POST'], ['/api/network/current', 'POST']]);
 const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png',
   '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/manifest+json',

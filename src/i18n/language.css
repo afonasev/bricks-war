@@ -1,0 +1,30 @@
+/* Approved V2: independent desktop stacks, language below display. */
+.settings-columns { display:flex; flex-direction:column; gap:12px; min-width:0; }
+#app .settings-screen[data-screen="settings"] .settings-list { align-items:start; grid-template-rows:auto; }
+#app .settings-screen[data-screen="settings"] .settings-columns .settings-section { margin:0; flex:0 0 auto; }
+#app .settings-screen[data-screen="settings"] .settings-language-section { width:100%; margin:0; padding:8px 16px; box-sizing:border-box; position:relative; z-index:8; border-radius:14px; box-shadow:0 3px 0 #cbbd9960; }
+.settings-language-section .settings-action { padding:8px 0; border:0; display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.settings-language-section .settings-action > span { flex:1 1 40%; min-width:0; }
+.settings-language-section .menu-select { width:auto; flex:1 1 60%; min-width:0; }
+.settings-language-section .menu-select-trigger,.settings-language-section .menu-select-option { font-family:system-ui,sans-serif; }
+/* Local CJK font fallbacks preserve glyphs without an extra startup download. */
+:lang(zh), :lang(ja) { font-family:"Trebuchet MS","Avenir Next",system-ui,"PingFang SC","Hiragino Sans","Microsoft YaHei","Yu Gothic",sans-serif; line-break:auto; word-break:normal; }
+@media(min-width:761px) {
+ #app[data-layout="desktop"] .settings-screen[data-screen="settings"] .settings-list { padding-bottom:4px; }
+ #app .settings-screen[data-screen="settings"] .settings-columns .settings-section { padding:12px; }
+ #app .settings-screen[data-screen="settings"] .settings-columns .settings-section > header { margin-bottom:6px; }
+ #app .settings-screen[data-screen="settings"] .settings-left-column { gap:8px; }
+ #app .settings-screen[data-screen="settings"] .settings-columns .settings-controls-help { min-height:36px; margin-top:4px; }
+}
+#app[data-layout="mobile"] .settings-columns { display:contents; }
+#app[data-layout="mobile"] .settings-language-section { order:-1; }
+#app[data-layout="mobile"] .settings-language-section .settings-action { flex-wrap:wrap; }
+#app[data-layout="mobile"] .settings-language-section .settings-action > span,
+#app[data-layout="mobile"] .settings-language-section .menu-select { flex-basis:100%; width:100%; }
+.pause-settings-panel .settings-language-section { margin-bottom:12px; }
+#app .settings-screen[data-screen="settings"] .release-heading h1 { line-height:1.2; }
+#app .settings-screen[data-screen="settings"] .settings-utility .settings-navigation { flex:0 0 auto; }
+#app .settings-screen[data-screen="settings"] .settings-utility .settings-navigation > span { min-width:0; }
+#app[data-layout="mobile"] .settings-screen[data-screen="settings"] .settings-audio-section { order:0; }
+#app[data-layout="mobile"] .settings-screen[data-screen="settings"] .settings-display-section { order:1; }
+#app[data-layout="mobile"] .settings-screen[data-screen="settings"] .settings-stick-section { order:2; }

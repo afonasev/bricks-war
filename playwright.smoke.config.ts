@@ -15,6 +15,7 @@ export default defineConfig({
   workers: 1,
   retries: 0,
   use: {
+    locale: 'ru-RU', // Existing Russian-copy scenarios now declare their system preference explicitly.
     baseURL: origin,
     viewport: { width: 1440, height: 960 },
     channel: 'chrome',

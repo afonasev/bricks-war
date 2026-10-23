@@ -1,3 +1,4 @@
+import { text } from '../i18n/locale';
 export type MenuSelectCommand = 'open' | 'previous' | 'next' | 'commit' | 'cancel' | null;
 
 export const MENU_SELECT_COMMAND_EVENT = 'menu-select-command';
@@ -37,7 +38,7 @@ function selectLabel(select: HTMLSelectElement): string {
   if (explicit) return explicit;
   const label = select.closest('label');
   const caption = label?.querySelector(':scope > span, :scope > small')?.textContent?.trim();
-  return caption || 'Выбор';
+  return caption || text('choice');
 }
 
 export function enhanceMenuSelects(root: HTMLElement): void {
@@ -84,6 +85,7 @@ export function enhanceMenuSelects(root: HTMLElement): void {
     const options = Array.from(select.options).map((option, index) => {
       const item = document.createElement('button');
       item.type = 'button';
+      if (option.lang) item.lang = option.lang;
       item.className = 'menu-select-option';
       item.id = `${id}-option-${index}`;
       item.dataset.menuSelectOption = String(index);
@@ -91,6 +93,7 @@ export function enhanceMenuSelects(root: HTMLElement): void {
       item.tabIndex = -1;
       item.disabled = option.disabled;
       const name = option.textContent ?? option.label;
+      item.setAttribute('aria-label', name); // Keep the decorative selected check out of the accessible name.
       const description = option.dataset.menuSelectDescription?.trim();
       const copy = document.createElement('span');
       copy.className = 'menu-select-option-copy';
@@ -122,8 +125,8 @@ export function enhanceMenuSelects(root: HTMLElement): void {
     const nextPage = document.createElement('button');
     const pageLabel = document.createElement('output');
     previousPage.type = nextPage.type = 'button';
-    previousPage.textContent = '← Предыдущие';
-    nextPage.textContent = 'Следующие →';
+    previousPage.textContent = text('previous');
+    nextPage.textContent = text('next');
     pager.append(previousPage, pageLabel, nextPage);
     if (!compact) listbox.append(pager);
     const disabled = Array.from(select.options, (option) => option.disabled);
@@ -222,7 +225,7 @@ export function enhanceMenuSelects(root: HTMLElement): void {
         heading.textContent = label;
         const hint = document.createElement('p');
         hint.className = 'menu-select-modal-hint';
-        hint.textContent = 'Нажмите снаружи, чтобы отменить';
+        hint.textContent = text('cancelHint');
         mobileDialog.append(heading, listbox, hint);
         root.append(mobileDialog);
         mobileDialog.addEventListener('cancel', (event) => { event.preventDefault(); close(); });

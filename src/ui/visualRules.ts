@@ -1,3 +1,4 @@
+import { html as tr } from '../i18n/locale';
 import { gamepadFooterHintsMarkup } from './gamepadFooterHints';
 import { releaseMetadataMarkup } from './releaseMetadata';
 import { RULE_EXAMPLES as E, SCORE_EXAMPLES, RISING_EXAMPLE } from './visualRulesExamples';
@@ -46,7 +47,7 @@ export const RULE_CARDS: readonly RuleCard[] = [
   panel(10,'ОТКУДА ОНИ','Атака соперника','или время',text(374,66,'⚔ / ◷',35,gold,'middle')+text(481,65,'→ +1',28,gold)+board(276,102,['##########'],28))+
   step(181,'ДО','Твоё поле','',RISING_EXAMPLE.before)+down(347)+step(352,'ПОСЛЕ','Всё поднялось','на 1 клетку',RISING_EXAMPLE.after,[],false,text(548,408,'↑',33,gold))
  ),alt:'Два источника: атака соперника или давление времени. Показано одно и то же поле до и после: снизу вставлен серый ряд, вся фиолетовая постройка поднялась ровно на клетку.'},
- {topic:'Атака',mode:'БИТВА · ПРИ ВКЛЮЧЁННЫХ АТАКАХ',title:'Очищай ряды — атакуй',lead:'Закрой два ряда за раз — отправь сопернику один серый.',notes:['3 ряда → 3 серых. 4 ряда → 4 серых.'],art:scene(
+ {topic:'Атака',mode:'БИТВА · ПРИ ВКЛЮЧЁННЫХ АТАКАХ',title:'Очищай ряды — атакуй',lead:'Закрой два ряда за раз — отправь сопернику один серый.',notes:['2 ряда → 1 серый. 3 ряда → 2 серых. 4 ряда → 3 серых. При 5 и больше — серых рядов на 1 меньше, чем очищенных.'],art:scene(
   step(10,'1 · ТВОЁ ПОЛЕ','Квадрат закрыл','сразу 2 ряда',E.attack.locked,[2,3])+down(176)+
   panel(181,'2 · АТАКА ЛЕТИТ','2 ряда исчезли','Сопернику +1',text(277,240,'ТЫ',25,cyan)+text(357,246,'→',44,gold)+text(437,240,'СОПЕРНИК',21)+board(296,276,['##########'],25))+
   step(352,'3 · У СОПЕРНИКА','Серый ряд','поднял его поле',RISING_EXAMPLE.after)
@@ -77,7 +78,7 @@ export const RULE_CARDS: readonly RuleCard[] = [
 ];
 
 export function rulesScreenMarkup(): string {
-  return `<main class="rules-screen" data-screen="rules"><header class="rules-heading"><button class="screen-back" id="rules-back" type="button">← Настройки</button><div><p class="eyebrow">BRICKS WAR · ИЛЛЮСТРИРОВАННЫЙ ГИД</p><h1>Правила игры</h1></div><output id="rules-progress" aria-label="Номер карточки"></output></header><article id="rules-card" class="rules-card" aria-live="polite" aria-atomic="true"></article><nav class="rules-topics" aria-label="Темы правил">${RULE_CARDS.map((card,index)=>`<button type="button" data-rule-topic="${index}" aria-label="${index+1}. ${card.topic}">${index+1}</button>`).join('')}</nav><footer class="rules-footer"><nav class="rules-navigation"><button id="rules-prev" type="button" aria-label="Previous tip">← Back</button><button id="rules-next" type="button" aria-label="Next tip">Next →</button></nav>${gamepadFooterHintsMarkup()}${releaseMetadataMarkup()}</footer></main>`;
+  return `<main class="rules-screen" data-screen="rules"><header class="rules-heading"><button class="screen-back" id="rules-back" type="button">← Настройки</button><div><p class="eyebrow">BRICKS WAR · ИЛЛЮСТРИРОВАННЫЙ ГИД</p><h1>Правила игры</h1></div><output id="rules-progress" aria-label="Номер карточки"></output></header><article id="rules-card" class="rules-card" aria-live="polite" aria-atomic="true"></article><nav class="rules-topics" aria-label="Темы правил">${RULE_CARDS.map((card,index)=>`<button type="button" data-rule-topic="${index}" aria-label="${index+1}. ${card.topic}">${index+1}</button>`).join('')}</nav><footer class="rules-footer"><nav class="rules-navigation"><button id="rules-prev" type="button" aria-label="${tr('previous')}">← ${tr('back')}</button><button id="rules-next" type="button" aria-label="${tr('next')}">${tr('next')}</button></nav>${gamepadFooterHintsMarkup()}${releaseMetadataMarkup()}</footer></main>`;
 }
 
 export function bindRulesScreen(screen: HTMLElement, back: () => void): () => void {

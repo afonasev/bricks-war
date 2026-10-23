@@ -763,6 +763,130 @@ body.calm-effects .shield-slot.is-burning { filter: drop-shadow(0 0 8px #ff7626)
   overflow: visible;
   padding-bottom: calc(var(--release-footer-reserve) + clamp(22px, 4vw, 56px));
 }
+.release-screen.premium-surface.phone-controls-screen {
+  min-height: 100svh;
+  height: auto;
+  overflow: visible;
+  align-items: center;
+  gap: 0;
+  padding: 20px 18px calc(var(--release-footer-reserve) + 22px);
+}
+.phone-controls-screen .phone-controls-heading {
+  width: min(660px, 100%);
+  min-height: 72px;
+  margin: 0 auto 8px;
+  gap: 14px;
+}
+.phone-controls-screen .phone-controls-heading .eyebrow { margin: 0 0 4px; color: #4e7898; font-size: .7rem; letter-spacing: .12em; }
+.phone-controls-screen .phone-controls-heading h1 {
+  color: #123564;
+  font-family: inherit;
+  font-size: clamp(1.65rem, 6vw, 2.5rem);
+  font-weight: 950;
+  line-height: 1.08;
+  letter-spacing: -.035em;
+  text-transform: none;
+  text-shadow: none;
+}
+.phone-controls-screen .phone-controls-intro {
+  width: min(660px, 100%);
+  margin: 0 auto 14px;
+  color: #526b84;
+  font-size: .95rem;
+  font-weight: 800;
+  line-height: 1.35;
+  text-align: center;
+}
+.phone-controls-content { width: min(540px, 100%); display: grid; gap: 14px; margin: 0 auto 18px; }
+.phone-controls-figure {
+  width: 100%;
+  margin: 0;
+  padding: 10px;
+  border: 2px solid #b8c9d7;
+  border-radius: 18px;
+  background: rgba(255,255,255,.84);
+  box-shadow: 0 8px 20px rgba(31,71,116,.08), inset 0 1px #fff;
+}
+.phone-controls-diagram {
+  box-sizing: border-box;
+  width: 100%;
+  height: clamp(265px, 40dvh, 360px);
+  display: grid;
+  grid-template-rows: minmax(0, 25fr) minmax(0, 7fr);
+  gap: 5px;
+  padding: 8px;
+  border: 2px solid #d5e0e8;
+  border-radius: 13px;
+  background: #fbfdff;
+}
+.phone-controls-rotate-area {
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 5px;
+  padding: 8px;
+  border: 1px dashed #84a9c1;
+  border-radius: 9px;
+  background: #edf8fb;
+  color: #31577f;
+  text-align: center;
+}
+.phone-controls-rotate-area > span { color: #4685b3; font-size: clamp(2.15rem, 8vw, 3rem); font-weight: 950; line-height: .9; }
+.phone-controls-rotate-area strong { font-size: clamp(.92rem, 3.8vw, 1.12rem); line-height: 1.2; }
+.phone-controls-rotate-area small { color: #607895; font-size: .78rem; font-weight: 750; line-height: 1.2; }
+.phone-controls-directions { min-width: 0; min-height: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
+.phone-controls-direction {
+  min-width: 0;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 2px;
+  padding: 3px;
+  border: 1.5px solid #a8c0d2;
+  border-radius: 8px;
+  background: #e9f5fc;
+  color: #31577f;
+  text-align: center;
+}
+.phone-controls-direction b { font-size: clamp(1.2rem, 5vw, 1.7rem); line-height: .95; }
+.phone-controls-direction span { font-size: clamp(.62rem, 2.8vw, .78rem); font-weight: 850; line-height: 1.12; overflow-wrap: anywhere; }
+.phone-controls-hold-hint { margin: 9px 2px 0; color: #354d65; font-size: .84rem; font-weight: 800; line-height: 1.35; text-align: center; }
+.phone-controls-pause {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 15px;
+  border: 2px solid #d8cda7;
+  border-radius: 13px;
+  background: #fffdf5;
+  color: #354d65;
+  box-shadow: inset 0 1px #fff;
+}
+.phone-controls-pause > span { flex: 0 0 auto; color: #31577f; font-size: 1.45rem; font-weight: 950; line-height: 1; }
+.phone-controls-pause h2 { margin: 0 0 3px; color: #203e62; font-size: .95rem; font-weight: 950; line-height: 1.2; }
+.phone-controls-pause p { margin: 0; color: #526b84; font-size: .84rem; font-weight: 750; line-height: 1.3; }
+.phone-controls-screen .release-footer { width: 100%; margin-top: auto; }
+@media (orientation: landscape) and (max-height: 560px) {
+  .release-screen.premium-surface.phone-controls-screen { min-height: 100svh; padding: 10px 20px 14px; }
+  .phone-controls-screen .phone-controls-heading { min-height: 58px; margin-bottom: 4px; }
+  .phone-controls-screen .phone-controls-intro { margin-bottom: 8px; font-size: .86rem; }
+  .phone-controls-content { width: min(760px, 100%); grid-template-columns: minmax(0, 1.45fr) minmax(210px, .75fr); align-items: center; gap: 14px; margin-bottom: 8px; }
+  .phone-controls-diagram { height: min(42dvh, 220px); }
+  .phone-controls-screen .release-metadata { font-size: 9px; }
+}
+@media (max-width: 360px) {
+  .release-screen.premium-surface.phone-controls-screen { padding-inline: 12px; }
+  .phone-controls-screen .phone-controls-heading { gap: 8px; }
+  .phone-controls-screen .phone-controls-heading .screen-back { padding-inline: 10px; }
+  .phone-controls-content { gap: 10px; }
+  .phone-controls-figure { padding: 7px; }
+  .phone-controls-diagram { height: 265px; gap: 4px; padding: 6px; }
+  .phone-controls-direction { padding-inline: 1px; }
+  .phone-controls-direction span { font-size: .61rem; }
+}
 .settings-screen.premium-surface, .debug-lab-screen.premium-surface { height: auto; overflow: visible; }
 .premium-surface:not(.main-menu-screen) .release-heading {
   width: min(1260px, 100%);
@@ -1929,3 +2053,55 @@ html:has(.settings-screen), body:has(.settings-screen) { height:100dvh; overflow
 #app dialog.menu-select-modal .menu-select-option::after { content: none; }
 #app dialog.menu-select-modal .menu-select-option.is-highlighted,
 #app dialog.menu-select-modal .menu-select-option:not(:disabled):hover { box-shadow: inset 2px 0 #247cf0; }
+
+/* Keep the localized phone help title inside its own responsive header. */
+#app .release-screen.premium-surface.phone-controls-screen .phone-controls-heading {
+  width: min(660px, 100%);
+  min-height: 72px;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 14px;
+  margin: 0 auto 8px;
+}
+#app .release-screen.premium-surface.phone-controls-screen {
+  min-height: 100svh;
+  height: auto;
+  overflow: visible;
+}
+#app .release-screen.premium-surface.phone-controls-screen > .release-guidance-footer {
+  position: relative;
+  inset: auto;
+  flex: 0 0 auto;
+  width: 100%;
+  margin: 12px 0 0;
+}
+#app .release-screen.premium-surface.phone-controls-screen .phone-controls-heading > div { flex: 1 1 auto; min-width: 0; }
+#app .release-screen.premium-surface.phone-controls-screen .phone-controls-heading h1 {
+  margin: 0;
+  font-family: inherit;
+  font-size: clamp(1.4rem, 5.5vw, 2.1rem);
+  font-weight: 950;
+  line-height: 1.08;
+  letter-spacing: -.035em;
+  text-transform: none;
+  text-shadow: none;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 360px) {
+  #app .release-screen.premium-surface.phone-controls-screen .phone-controls-heading { gap: 8px; }
+}
+@media (orientation: landscape) and (max-height: 560px) {
+  #app .release-screen.premium-surface.phone-controls-screen { padding: 8px 18px; }
+  #app .release-screen.premium-surface.phone-controls-screen .phone-controls-heading { min-height: 56px; margin-bottom: 4px; }
+  #app .release-screen.premium-surface.phone-controls-screen .phone-controls-intro { margin-bottom: 6px; font-size: .82rem; }
+  #app .release-screen.premium-surface.phone-controls-screen .phone-controls-content { margin-bottom: 4px; }
+  #app .release-screen.premium-surface.phone-controls-screen .phone-controls-figure { padding: 6px; }
+  #app .release-screen.premium-surface.phone-controls-screen .phone-controls-diagram { height: min(54dvh, 215px); }
+  #app .release-screen.premium-surface.phone-controls-screen .phone-controls-direction { gap: 1px; padding: 1px; }
+  #app .release-screen.premium-surface.phone-controls-screen .phone-controls-direction b { font-size: 1.05rem; }
+  #app .release-screen.premium-surface.phone-controls-screen .phone-controls-direction span { font-size: .65rem; }
+  #app .release-screen.premium-surface.phone-controls-screen .phone-controls-hold-hint { margin-top: 5px; font-size: .76rem; }
+  #app .release-screen.premium-surface.phone-controls-screen .phone-controls-pause { padding: 8px 10px; }
+  #app .release-screen.premium-surface.phone-controls-screen .release-footer { min-height: 48px; padding: 3px; font-size: .6rem; }
+  #app .release-screen.premium-surface.phone-controls-screen .release-metadata { font-size: 8px; line-height: 1.15; }
+}

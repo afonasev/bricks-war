@@ -10,5 +10,13 @@
     "strict": true,
     "noEmit": true
   },
-  "include": ["vite.config.ts", "playwright.config.ts", "vite-node-shim.d.ts", "src/domain/gameTuning.ts", "src/domain/types.ts", "src/runtime/compat.ts"]
+  "include": [
+    "vite.config.ts",
+    "playwright.config.ts",
+    "vite-node-shim.d.ts",
+    "src/domain/gameTuning.ts",
+    "src/domain/types.ts",
+    "src/runtime/compat.ts",
+    "src/i18n/**/*.ts"
+  ]
 }

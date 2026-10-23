@@ -27,7 +27,7 @@ test('keeps the supported phone release flow touch-accessible', async ({ page })
   expect(mainMenuMetrics.overflow).toBe('hidden');
   expect(mainMenuMetrics.footerHeight).toBeLessThanOrEqual(90);
   expect(mainMenuMetrics.footerBottom).toBeLessThanOrEqual(mainMenuMetrics.clientHeight);
-  await expect(page.locator('.release-build-info')).toHaveText(/^Version \d+\.\d+\.\d+(?:-dev)?(?: · .+)?$/);
+  await expect(page.locator('.release-build-info')).toHaveText(/^Версия \d+\.\d+\.\d+(?:-dev)?(?: · .+)?$/);
 
   const menu = page.getByRole('navigation', { name: 'Главное меню' });
   await expect(menu.getByRole('button')).toHaveCount(4);
@@ -85,7 +85,15 @@ test('keeps the supported phone release flow touch-accessible', async ({ page })
 test('explains phone controls and omits desktop-only fullscreen settings', async ({ page }) => {
   await page.getByRole('button', { name: /^Настройки/ }).click();
   await expect(page.getByRole('button', { name: /Полноэкранный режим/ })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: /Управление/ })).toHaveCount(0);
+  await expect(page.locator('#open-controls')).toBeVisible();
+  await page.locator('#open-controls').click();
+  await expect(page.locator('[data-phone-controls-help]')).toBeVisible();
+  await expect(page.locator('.phone-controls-diagram')).toHaveAttribute('data-bottom-zone-fraction', '0.21875');
+  await expect(page.locator('.phone-controls-rotate-area')).toContainText('Коснитесь — повернуть');
+  await expect(page.locator('.phone-controls-pause')).toContainText('Нажмите кнопку паузы в матче.');
+  await page.locator('#controls-back').click();
+  await expect(page.locator('[data-screen="settings"]')).toBeVisible();
+  await expect(page.locator('#open-controls')).toBeVisible();
   await expect(page.locator('.mobile-controls-reference')).toHaveCount(0);
 });
 

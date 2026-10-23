@@ -27,7 +27,7 @@ async function finishBattle(page: Page): Promise<void> {
   await page.getByRole('button', { name: /^Битва/ }).click();
   await page.getByRole('combobox', { name: 'Длительность матча', exact: true }).click();
   await page.getByRole('option', { name: '2 мин', exact: true }).click();
-  await page.getByRole('button', { name: /^Start/ }).click();
+  await page.locator('#start-match').click();
   await page.keyboard.down('Enter');
   await expect(page.locator('.results-panel')).toBeVisible({ timeout: 36000 });
 }

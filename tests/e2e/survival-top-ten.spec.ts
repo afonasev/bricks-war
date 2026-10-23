@@ -8,7 +8,7 @@ async function expectTenFit(page: Page, results = false) {
   if (results) {
     await expect(page.getByRole('heading', { name: 'Итоги', exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Этот матч', exact: true })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Рекорды', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Локальный рейтинг', exact: true })).toBeVisible();
     await expect(page.locator('.results-panel')).not.toContainText('До 3');
     const surfaces = await page.locator('.survival-results-columns > section').evaluateAll(elements => elements.map(el => ({ background: getComputedStyle(el).backgroundColor, border: getComputedStyle(el).borderTopWidth, rect: el.getBoundingClientRect().toJSON() })));
     expect(surfaces).toHaveLength(2);

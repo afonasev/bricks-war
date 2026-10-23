@@ -6,13 +6,14 @@ export default defineConfig({
   testDir: './tests/e2e',
   workers: process.env.BRICKS_QA_WORKERS ? Number(process.env.BRICKS_QA_WORKERS) : undefined,
   use: {
+    locale: 'ru-RU', // Existing Russian-copy scenarios now declare their system preference explicitly.
     baseURL: `http://127.0.0.1:${localQaPort}`,
     viewport: { width: 1440, height: 960 },
     channel: 'chrome',
     launchOptions: { args: ['--mute-audio'] },
   },
   webServer: {
-    command: `npm run preview -- --host 127.0.0.1 --port ${localQaPort}`,
+    command: `npm run preview -- --host 127.0.0.1 --port ${localQaPort} --strictPort`,
     port: localQaPort,
     reuseExistingServer: false,
   },
