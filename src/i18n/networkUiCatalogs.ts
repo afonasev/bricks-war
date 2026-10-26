@@ -1,5 +1,17 @@
 /** Network journey interface copy, separate from shared game wording. */
 export const networkUiEn = {
+  "roomsHeading": "Rooms",
+  "roomOpen": "Open room",
+  "roomProtected": "Password required",
+  "roomFullLabel": "Room full",
+  "configurePlayer": "Configure your player",
+  "youReady": "You are ready",
+  "cancelReadyHint": "Press to cancel",
+  "waitReady": "Waiting for ready players: {names}",
+  "startReady": "Ready to start",
+  "rulesOwner": "Only the creator changes shared rules",
+  "freeSeat": "Free place for an online player",
+
   "networkMark": "BRICKS WAR · ONLINE",
   "modeList": "Survival, Battle and Team battle",
   "previousPage": "Previous page",
@@ -96,6 +108,18 @@ export const networkUiEn = {
 } as const;
 export type NetworkUiKey = keyof typeof networkUiEn;
 export const networkUiRu: Record<NetworkUiKey, string> = {
+  "roomsHeading": "Комнаты",
+  "roomOpen": "Открытая комната",
+  "roomProtected": "Вход по паролю",
+  "roomFullLabel": "Комната заполнена",
+  "configurePlayer": "Настроить своего игрока",
+  "youReady": "Вы готовы",
+  "cancelReadyHint": "Нажмите, чтобы отменить",
+  "waitReady": "Ждём готовности: {names}",
+  "startReady": "Всё готово к старту",
+  "rulesOwner": "Общие правила меняет создатель",
+  "freeSeat": "Свободное место для игрока из сети",
+
   "networkMark": "BRICKS WAR · СЕТЬ",
   "modeList": "Выживание, Битва и Командный бой",
   "previousPage": "Предыдущая страница",
@@ -191,6 +215,18 @@ export const networkUiRu: Record<NetworkUiKey, string> = {
   "tiltEnabled": "Наклон включён. Держите устройство удобно.",
 };
 export const networkUiFr: Record<NetworkUiKey, string> = {
+  "roomsHeading": "Salons",
+  "roomOpen": "Salon ouvert",
+  "roomProtected": "Mot de passe requis",
+  "roomFullLabel": "Salon complet",
+  "configurePlayer": "Configurer votre joueur",
+  "youReady": "Vous êtes prêt",
+  "cancelReadyHint": "Appuyez pour annuler",
+  "waitReady": "En attente des joueurs : {names}",
+  "startReady": "Prêt à démarrer",
+  "rulesOwner": "Seul le créateur modifie les règles communes",
+  "freeSeat": "Place libre pour un joueur en ligne",
+
   "networkMark": "BRICKS WAR · EN LIGNE",
   "modeList": "Survie, Combat et Combat en équipe",
   "previousPage": "Page précédente",
@@ -286,6 +322,18 @@ export const networkUiFr: Record<NetworkUiKey, string> = {
   "tiltEnabled": "Inclinaison activée. Tenez l’appareil confortablement.",
 };
 export const networkUiDe: Record<NetworkUiKey, string> = {
+  "roomsHeading": "Räume",
+  "roomOpen": "Offener Raum",
+  "roomProtected": "Passwort erforderlich",
+  "roomFullLabel": "Raum voll",
+  "configurePlayer": "Eigenen Spieler einstellen",
+  "youReady": "Du bist bereit",
+  "cancelReadyHint": "Zum Abbrechen drücken",
+  "waitReady": "Warte auf Bereitschaft: {names}",
+  "startReady": "Bereit zum Start",
+  "rulesOwner": "Nur der Ersteller ändert die gemeinsamen Regeln",
+  "freeSeat": "Freier Platz für einen Online-Spieler",
+
   "networkMark": "BRICKS WAR · ONLINE",
   "modeList": "Überleben, Kampf und Teamkampf",
   "previousPage": "Vorherige Seite",
@@ -381,6 +429,18 @@ export const networkUiDe: Record<NetworkUiKey, string> = {
   "tiltEnabled": "Neigung aktiviert. Halte das Gerät bequem.",
 };
 export const networkUiEs: Record<NetworkUiKey, string> = {
+  "roomsHeading": "Salas",
+  "roomOpen": "Sala abierta",
+  "roomProtected": "Se requiere contraseña",
+  "roomFullLabel": "Sala llena",
+  "configurePlayer": "Configurar tu jugador",
+  "youReady": "Estás listo",
+  "cancelReadyHint": "Pulsa para cancelar",
+  "waitReady": "Esperando jugadores listos: {names}",
+  "startReady": "Todo listo para empezar",
+  "rulesOwner": "Solo el creador cambia las reglas comunes",
+  "freeSeat": "Plaza libre para un jugador en línea",
+
   "networkMark": "BRICKS WAR · EN LÍNEA",
   "modeList": "Supervivencia, Batalla y Batalla por equipos",
   "previousPage": "Página anterior",
@@ -476,6 +536,18 @@ export const networkUiEs: Record<NetworkUiKey, string> = {
   "tiltEnabled": "Inclinación activada. Sujeta el dispositivo cómodamente.",
 };
 export const networkUiJa: Record<NetworkUiKey, string> = {
+  "roomsHeading": "ルーム",
+  "roomOpen": "公開ルーム",
+  "roomProtected": "パスワードが必要",
+  "roomFullLabel": "満員",
+  "configurePlayer": "自分のプレイヤーを設定",
+  "youReady": "準備完了",
+  "cancelReadyHint": "押すと取り消します",
+  "waitReady": "準備を待っています：{names}",
+  "startReady": "開始できます",
+  "rulesOwner": "共通ルールを変更できるのは作成者だけです",
+  "freeSeat": "オンラインプレイヤー用の空席",
+
   "networkMark": "BRICKS WAR · オンライン",
   "modeList": "サバイバル、バトル、チームバトル",
   "previousPage": "前のページ",
@@ -571,6 +643,18 @@ export const networkUiJa: Record<NetworkUiKey, string> = {
   "tiltEnabled": "傾きを有効にしました。端末を持ちやすく構えてください。",
 };
 export const networkUiZhHans: Record<NetworkUiKey, string> = {
+  "roomsHeading": "房间",
+  "roomOpen": "公开房间",
+  "roomProtected": "需要密码",
+  "roomFullLabel": "房间已满",
+  "configurePlayer": "设置自己的玩家",
+  "youReady": "你已准备好",
+  "cancelReadyHint": "点击取消",
+  "waitReady": "等待玩家准备：{names}",
+  "startReady": "可以开始",
+  "rulesOwner": "只有创建者可以更改公共规则",
+  "freeSeat": "为在线玩家预留的空位",
+
   "networkMark": "BRICKS WAR · 在线",
   "modeList": "生存、对战和团队对战",
   "previousPage": "上一页",

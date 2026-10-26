@@ -1,3 +1,4 @@
+import {openNetworkProfile} from './menuHelpers';
 import {test,expect} from '@playwright/test';
 import {delayRelay} from './delayRelay';
 import {mkdir,writeFile} from 'node:fs/promises';
@@ -20,7 +21,7 @@ for(const oneWay of [[50,100],[175,225]] as const)test(`continuous own lifecycle
     await guest!.locator('.network-lobby').filter({hasText:room}).getByRole('button',{name:'Войти'}).click();await guest!.getByLabel('Ваше имя',{exact:true}).fill('Guest');await guest!.getByRole('button',{name:'Войти',exact:true}).click();
     for(const page of [host!,guest!]){
       await expect(page.getByRole('heading',{name:room})).toBeVisible();await expect(page.locator('.network-seat-state').filter({hasText:'Возвращается'})).toHaveCount(0);
-      if(await page.locator('#network-controls').inputValue()!=='keyboard'){await page.getByRole('combobox',{name:'Управление на этом устройстве'}).click();await page.getByRole('option',{name:'WASD',exact:true}).click();}
+      await openNetworkProfile(page);if(await page.locator('#network-controls').inputValue()!=='keyboard'){await page.getByRole('combobox',{name:'Управление на этом устройстве'}).click();await page.getByRole('option',{name:'WASD',exact:true}).click();}
       await expect(page.locator('#network-controls')).toHaveValue('keyboard');
     }
     // Finish all local dropdowns before ready snapshots rebuild the other lobby.

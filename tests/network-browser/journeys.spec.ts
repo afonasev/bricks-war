@@ -1,3 +1,4 @@
+import {openNetworkProfile} from './menuHelpers';
 import {test,expect,type Page} from '@playwright/test';
 const name=(i:number)=>['Александр Екатеринбург','Екатерина Санкт-Петербург','Михаил Нижний Новгород','Елизавета Петропавловск','Константин Новосибирск','Виктория Владивосток','Анастасия Красноярск','Дмитрий Калининград'][i]!;
 async function enter(page:Page){await page.goto('/?muted=1');await page.getByRole('button',{name:/^Сетевая игра/}).click();}
@@ -45,6 +46,7 @@ for(const count of [2,4,8])test(`${count} independent contexts create join own-s
     await readableLobby(host);await readableLobby(pages[count-1]!);
     if(count===8) {
       const phone=pages[count-1]!;
+      await phone.locator('.network-personal-panel summary').click();
       await phone.getByRole('combobox',{name:'Вид фигур',exact:true}).click();
       await phone.getByRole('option',{name:'Каменная крепость',exact:true}).click();
       await phone.getByRole('button',{name:'Сохранить имя и фигуры'}).click();
@@ -60,7 +62,7 @@ for(const count of [2,4,8])test(`${count} independent contexts create join own-s
     await host.getByRole('button',{name:'Применить правила'}).click();
     await expect.poll(()=>rulesFrames.some(frame=>{const command=frame as {type:string;rules:{mode:string;battleDifficulty:string;softDrop:string;conflictEnabled:boolean;matchVariant:string}};return command.type==='rules'&&command.rules.mode==='survival'&&command.rules.battleDifficulty==='sport'&&command.rules.softDrop==='slow'&&command.rules.conflictEnabled===false&&command.rules.matchVariant==='free-for-all';})).toBe(true);
     for(const page of pages.slice(1)){await expect(page.getByRole('combobox',{name:'Темп битвы',exact:true})).toBeDisabled();await expect(page.getByRole('combobox',{name:'Темп битвы',exact:true})).toContainText('Спортивный');}
-    for(const page of pages){await page.getByRole('combobox',{name:'Управление на этом устройстве'}).click();await page.getByRole('option',{name:'WASD'}).click();await page.getByRole('button',{name:'Готов',exact:true}).click();}
+    for(const page of pages){await openNetworkProfile(page);await page.getByRole('combobox',{name:'Управление на этом устройстве'}).click();await page.getByRole('option',{name:'WASD'}).click();await page.getByRole('button',{name:'Готов',exact:true}).click();}
     await expect(host.getByRole('button',{name:'Начать',exact:true})).toBeEnabled();await host.getByRole('button',{name:'Начать',exact:true}).click();
     for(const page of pages){await expect(page.locator('.network-arena')).toHaveAttribute('data-total',String(count));}
     const own=pages[count-1]!;
@@ -72,6 +74,7 @@ for(const count of [2,4,8])test(`${count} independent contexts create join own-s
     for(const page of pages)await expect(page.getByRole('heading',{name:'Матч на паузе'})).toBeVisible();
     await expect(host.getByRole('button',{name:'Продолжить',exact:true})).toBeVisible();
     if(count>2)await expect(pages[1]!.getByRole('button',{name:'Продолжить',exact:true})).toHaveCount(0);
+    if(process.env.BRICKS_NETWORK_JOURNEY_SHOTS)await host.screenshot({path:`${process.env.BRICKS_NETWORK_JOURNEY_SHOTS}/pause-${count}.png`});
     await host.getByRole('button',{name:'Продолжить',exact:true}).click();
     await expect(host.locator('.network-arena')).toHaveAttribute('data-phase','playing');
     await pauser.getByRole('button',{name:'Пауза',exact:true}).click();
@@ -89,6 +92,7 @@ for(const count of [2,4,8])test(`${count} independent contexts create join own-s
       await new Promise(resolve=>setTimeout(resolve,1000));
     }
     for(const page of pages){await expect(page.getByRole('heading',{name:'Результаты',exact:true})).toBeVisible({timeout:45000});await expect(page.locator('.network-roster li')).toHaveCount(count);}
+    if(process.env.BRICKS_NETWORK_JOURNEY_SHOTS)for(const [width,height] of [[1440,960],[390,844]]){await host.setViewportSize({width:width!,height:height!});await host.screenshot({path:`${process.env.BRICKS_NETWORK_JOURNEY_SHOTS}/results-${count}-${width}.png`});}
     await host.getByRole('button',{name:'В лобби',exact:true}).click();await expect(host.getByRole('heading',{name:roomName})).toBeVisible();
     expect(errors).toEqual([]);
   }finally{for(const context of contexts)await context.close();}

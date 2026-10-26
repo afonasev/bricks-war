@@ -33,6 +33,9 @@ import { html as tr, text as localeText, getLocale } from '../i18n/locale';
 import { localizedNetworkMessage, networkText, networkUiText, networkAiName, networkAiDifficulty } from './presentationCopy';
 import type { NetworkUiKey } from '../i18n/networkUiCatalogs';
 import './lobbyRoster.css';
+import './workshopMenus.css';
+import logo from '../assets/brand/concept-logo.webp';
+import { MAIN_MENU_PREVIEWS } from '../ui/mainMenuPreview';
 const escape=(v:string)=>v.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));
 const u=(key:NetworkUiKey,values?:Record<string,string|number>)=>networkUiText(key,getLocale(),values);
 const h=(key:NetworkUiKey,values?:Record<string,string|number>)=>escape(u(key,values));
@@ -80,7 +83,7 @@ export class NetworkApp {
   }
   private button(label:string,action:string,disabled=false):string {return `<button type="button" data-net-action="${action}" ${disabled?'disabled':''}>${escape(label)}</button>`;}
   private shell(title:string,body:string):void {
-    this.root.innerHTML=`<main class="network-screen release-screen premium-surface mode-setup-screen" data-network-view="${this.view}"><header class="network-heading release-heading"><button type="button" class="screen-back" data-net-action="menu" aria-label="${tr('menu')}">← ${tr('menu')}</button><div><p class="eyebrow">${h('networkMark')}</p><h1>${title}</h1></div></header><output class="network-status" role="status" id="network-status"></output><div class="network-content">${body}</div><footer class="menu-metadata-footer">${gamepadFooterHintsMarkup()}</footer></main>`;
+    this.root.innerHTML=`<main class="network-screen network-workshop release-screen premium-surface mode-setup-screen" data-network-view="${this.view}"><header class="network-heading release-heading"><button type="button" class="screen-back" data-net-action="${this.view==='list'?'menu':'list'}" aria-label="${this.view==='list'?tr('menu'):escape(networkText('backToRooms'))}">← ${this.view==='list'?tr('menu'):escape(networkText('backToRooms'))}</button><img class="network-brand" src="${logo}" alt="Bricks War"><div><p class="eyebrow">${h('networkMark')}</p><h1>${title}</h1></div></header><output class="network-status" role="status" id="network-status"></output><div class="network-content">${body}</div><footer class="menu-metadata-footer">${gamepadFooterHintsMarkup()}</footer></main>`;
     this.bind();
   }
   private bind():void {
@@ -132,7 +135,7 @@ export class NetworkApp {
       for(const source of this.sources.keys())this.blocked.add(source);this.sources.clear();
     }
     this.session?.dispose();this.session=null;this.view='list';this.renderKey='';
-    this.shell(networkText('online'),`<p>${h('modeList')} · ${networkText('minTwo')} · ${networkText('upToEight')} ${networkText('withAi')} · ${networkText('oneDevice')}</p><section id="network-current"></section><div class="network-actions">${this.button(networkText('createRoom'),'create')}${this.button(networkText('networkSettings'),'preferences')}${this.button(networkText('refresh'),'retry')}</div><section id="network-lobbies" aria-label="${escape(networkText('lobbyList'))}"></section>`);
+    this.shell(networkText('online'),`<section id="network-current"></section><section class="network-list-toolbar release-panel"><div><h2>${h('roomsHeading')}</h2><p>${h('modeList')} · ${networkText('upToEight')}</p></div><div class="network-actions">${this.button(networkText('createRoom'),'create')}${this.button(networkText('refresh'),'retry')}${this.button(networkText('networkSettings'),'preferences')}</div></section><section id="network-lobbies" aria-label="${escape(networkText('lobbyList'))}"></section>`);
     await this.refreshList();
   }
   private async refreshList():Promise<void> {
@@ -140,26 +143,50 @@ export class NetworkApp {
     try {
       const list=await networkRequest<{rooms:LobbySummary[];next:number|null}>(`lobbies?offset=${this.listOffset}`);
       if(this.view!=='list'||this.destroyed)return;
-      const container=this.root.querySelector('#network-lobbies')!;
-      container.innerHTML=list.rooms.length?list.rooms.map(room=>`<article class="network-lobby"><div><h2>${escape(room.name)} ${room.protected?'🔒':''}</h2><p>${localeText(modeLabels[room.mode??'survival'])} · ${room.count}/8 · ${networkText(phaseLabels[room.phase])}</p></div>${this.button(networkText('networkJoin'),`join:${room.id}`,room.phase!=='waiting'||room.count>=8||!!this.credential)}</article>`).join(''):`<p>${escape(networkText('noRooms'))}</p>`;
-      container.innerHTML+=`<div class="network-actions">${this.listOffset?this.button(u('previousPage'),`page:${Math.max(0,this.listOffset-50)}`):''}${list.next!==null?this.button(u('nextPage'),`page:${list.next}`):''}</div>`;
-      const current=this.root.querySelector('#network-current')!;
+      const container=this.root.querySelector<HTMLElement>('#network-lobbies')!;
+      const roomsMarkup=(list.rooms.length?list.rooms.map(room=>this.roomRow(room)).join(''):`<p class="network-empty release-panel">${escape(networkText('noRooms'))}</p>`)
+        +`<div class="network-actions network-pagination">${this.listOffset?this.button(u('previousPage'),`page:${Math.max(0,this.listOffset-50)}`):''}${list.next!==null?this.button(u('nextPage'),`page:${list.next}`):''}</div>`;
+      // Do not detach the focused room button on an unchanged polling response.
+      if(container.dataset.markup!==roomsMarkup){container.innerHTML=roomsMarkup;container.dataset.markup=roomsMarkup;this.bind();}
+      const current=this.root.querySelector<HTMLElement>('#network-current')!;
       if(this.credential) {
         try {
           const snapshot=await networkRequest<ClientSnapshot>('current',{credential:this.credential});
           if(this.view!=='list')return;
           if(!snapshot.state||snapshot.state.phase==='results'||this.arenaIdentity!==this.matchIdentity(snapshot))this.destroyArena();
           const own=snapshot.seats.find(s=>s.id===this.credential?.participantId);
-          current.innerHTML=`<article class="network-current"><h2>${escape(networkText('statusCurrent'))}</h2><p>${escape(snapshot.room.name)} · ${networkText(phaseLabels[snapshot.room.phase])}${own?.absence?` · ${h('returnCountdown',{seconds:Math.ceil(own.absence.remainingMs/1000)})}`:''}</p>${this.button(u('returnButton'),'return')}</article>`;
+          this.currentRoomMarkup(current,`<article class="network-current"><h2>${escape(networkText('statusCurrent'))}</h2><p>${escape(snapshot.room.name)} · ${networkText(phaseLabels[snapshot.room.phase])}${own?.absence?` · ${h('returnCountdown',{seconds:Math.ceil(own.absence.remainingMs/1000)})}`:''}</p>${this.button(u('returnButton'),'return')}</article>`);
         } catch(error) {
-          if(['auth','ended'].includes((error as {code?:string}).code??'')){this.destroyArena();this.credential=null;storeCredential(null);setNetworkParticipation(false);current.innerHTML=`<p>${escape(networkText('returnExpired'))}</p>`;this.bind();return;}
-          current.innerHTML=`<article class="network-current"><h2>${escape(networkText('statusCurrent'))}</h2><p>${escape(networkText('returnPending'))}</p>${this.button(networkText('retryReturn'),'return')}</article>`;
+          if(['auth','ended'].includes((error as {code?:string}).code??'')){this.destroyArena();this.credential=null;storeCredential(null);setNetworkParticipation(false);this.currentRoomMarkup(current,`<p>${escape(networkText('returnExpired'))}</p>`);this.bind();return;}
+          this.currentRoomMarkup(current,`<article class="network-current"><h2>${escape(networkText('statusCurrent'))}</h2><p>${escape(networkText('returnPending'))}</p>${this.button(networkText('retryReturn'),'return')}</article>`);
           this.status(error instanceof Error?error.message:networkText('noConnection'));
         }
-      } else current.innerHTML='';
-      this.bind();this.status(networkText('listUpdated'));
-    }catch{if(this.view==='list'){this.root.querySelector('#network-lobbies')!.innerHTML='';this.status(networkText('serviceUnavailable'));}}
+      } else this.currentRoomMarkup(current,'');
+      this.status(networkText('listUpdated'));
+    }catch{if(this.view==='list'){const rooms=this.root.querySelector<HTMLElement>('#network-lobbies')!;rooms.innerHTML='';delete rooms.dataset.markup;this.status(networkText('serviceUnavailable'));}}
     finally{this.listBusy=false;}
+  }
+  private currentRoomMarkup(element:HTMLElement,markup:string):void {
+    if(element.dataset.markup===markup)return;
+    const focused=element.contains(document.activeElement);
+    element.innerHTML=markup;element.dataset.markup=markup;
+    element.querySelectorAll<HTMLButtonElement>('[data-net-action]').forEach(button=>{
+      button.dataset.uiFocus='';button.onclick=()=>void this.action(button.dataset.netAction!);
+    });
+    if(focused)element.querySelector<HTMLButtonElement>('button')?.focus({preventScroll:true});
+  }
+  private roomRow(room:LobbySummary):string {
+    const mode=room.mode??'survival';
+    const unavailable=room.phase!=='waiting'||room.count>=room.capacity;
+    const state=room.phase!=='waiting'?networkText(phaseLabels[room.phase]):room.count>=room.capacity?u('roomFullLabel'):networkText('waiting');
+    return `<article class="network-lobby"><div class="network-mode-art" style="--network-mode-art:url('${MAIN_MENU_PREVIEWS[mode].image}')" aria-hidden="true"><span>${localeText(modeLabels[mode])}</span></div><div class="network-room-copy"><h2>${escape(room.name)}</h2><p>${room.protected?h('roomProtected'):h('roomOpen')}</p></div><div class="network-room-state"><b>${escape(state)}</b><span>${room.count}/${room.capacity}</span></div><button type="button" data-net-action="join:${room.id}" ${unavailable||!!this.credential?'disabled':''}>${escape(unavailable?state:networkText('networkJoin'))}</button></article>`;
+  }
+  private piecePreview(style:TileStyleSelection):string {
+    const texture=WORKSHOP_THEME_TEXTURES[style==='random'?'classic':style];
+    return `<div class="network-piece-well" aria-hidden="true"><span class="network-piece" style="--network-atlas:url('${texture.url}')">${[0,1,2,4].map((i,n)=>`<i style="left:${i%3*33.333}%;top:${Math.floor(i/3)*50}%;background-position:${[0,100,0,50][n]}% ${[0,0,50,50][n]}%"></i>`).join('')}${style==='random'?'<b>?</b>':''}</span></div><p class="network-piece-label">${localeText(tileStyleKeys[style])}</p>`;
+  }
+  private personalFields(own:PublicSeat,rules:ResolvedRoomRules):string {
+    return `<details class="network-personal-panel"><summary>${h('configurePlayer')}</summary><form id="network-profile"><label>${escape(networkText('yourName'))}<textarea aria-label="${escape(networkText('yourName'))}" name="name" maxlength="32" rows="2" required>${escape(own.name)}</textarea></label><label>${h('pieceStyle')}<select data-menu-select-layout="style-list" aria-label="${h('pieceStyle')}" name="tileStyle">${styleOptions(own.tileStyle)}</select></label><label>${h('deviceControls')}<select aria-label="${h('deviceControls')}" id="network-controls"><option value="keyboard">WASD</option><option value="arrows">${h('arrows')}</option><option value="touch">${h('touch')}</option><option value="gamepad">${h('gamepad',{number:1})}</option><option value="gamepad-2">${h('gamepad',{number:2})}</option><option value="gamepad-3">${h('gamepad',{number:3})}</option><option value="tilt">${h('tiltTouch')}</option></select></label>${rules.mode==='team-battle'?`<div id="network-team">${this.teamSelect(own.teamId??'team-1','ownTeam')}</div>`:''}<button type="submit">${h('saveProfile')}</button></form></details>`;
   }
   private rulesFields(rules:ResolvedRoomRules, disabled=false):string {
     const select=(name:string,label:string,choices:readonly (readonly [string,string])[],value:string)=>`<label>${escape(label)}<select aria-label="${escape(label)}" name="${name}" ${disabled?'disabled':''}>${choices.map(([v,l])=>`<option value="${v}" ${v===value?'selected':''}>${escape(l)}</option>`).join('')}</select></label>`;
@@ -230,12 +257,19 @@ export class NetworkApp {
   private seatState(seat:PublicSeat):string {
     return seat.kind==='ai'?u('autoReady'):`${seat.connected?seat.ready?u('ready'):u('notReady'):u('returning')}${seat.absence?` · ${h('seconds',{seconds:Math.ceil(seat.absence.remainingMs/1000)})}`:''}`;
   }
-  private rosterSeat(seat:PublicSeat,index:number,snapshot:ClientSnapshot,creator:boolean):string {
-    const ai=seat.kind==='ai';
-    const roles=ai?`${tr('aiLabel')} · ${escape(aiLabels()[seat.difficulty!])}`:[seat.id===snapshot.ownId?u('you'):'',seat.id===snapshot.creatorId?u('creator'):''].filter(Boolean).join(' · ');
-    const state=this.seatState(seat);
-    const editor=ai&&creator?`<details class="network-ai-editor"><summary>${h('configureAi')}</summary><form data-network-ai="${seat.id}"><label>${h('aiDifficulty')}<select aria-label="${h('aiDifficulty')}" name="difficulty">${Object.entries(aiLabels()).map(([v,l])=>`<option value="${v}" ${v===seat.difficulty?'selected':''}>${escape(l)}</option>`).join('')}</select></label><label>${h('aiStyle')}<select data-menu-select-layout="style-list" aria-label="${h('aiStyle')}" name="tileStyle">${styleOptions(seat.tileStyle)}</select></label>${roomRules(snapshot.rules).mode==='team-battle'?this.teamSelect(seat.teamId??'team-1','teamId'):''}<div class="network-ai-actions"><button type="submit">${h('saveAi')}</button>${this.button(u('removeAi'),`ai-remove:${seat.id}`)}</div></form></details>`:'';
-    return `<li data-seat-id="${seat.id}" data-kind="${seat.kind}" data-ready="${ai||seat.ready&&seat.connected}"><span class="network-seat-number" aria-hidden="true">${index+1}</span><div class="network-seat-copy"><strong>${escape(seatName(seat))}</strong><small>${roles}${roomRules(snapshot.rules).mode==='team-battle'?` · ${h('teamNumber',{number:seat.teamId==='team-2'?2:1})}`:''}</small><span class="network-seat-state">${state}</span></div>${editor}</li>`;
+  private rosterSeat(s:PublicSeat,index:number,snapshot:ClientSnapshot,creator:boolean):string {
+    const ai=s.kind==='ai';
+    const roles=ai?`${tr('aiLabel')} · ${escape(aiLabels()[s.difficulty!])}`:[s.id===snapshot.ownId?u('you'):'',s.id===snapshot.creatorId?u('creator'):''].filter(Boolean).join(' · ');
+    const state=this.seatState(s);
+    const editor=ai&&creator?`<details class="network-ai-editor"><summary>${h('configureAi')}</summary><form data-network-ai="${s.id}"><label>${h('aiDifficulty')}<select aria-label="${h('aiDifficulty')}" name="difficulty">${Object.entries(aiLabels()).map(([v,l])=>`<option value="${v}" ${v===s.difficulty?'selected':''}>${escape(l)}</option>`).join('')}</select></label><label>${h('aiStyle')}<select data-menu-select-layout="style-list" aria-label="${h('aiStyle')}" name="tileStyle">${styleOptions(s.tileStyle)}</select></label>${roomRules(snapshot.rules).mode==='team-battle'?this.teamSelect(s.teamId??'team-1','teamId'):''}<div class="network-ai-actions"><button type="submit">${h('saveAi')}</button>${this.button(u('removeAi'),`ai-remove:${s.id}`)}</div></form></details>`:'';
+    const own=s.id===snapshot.ownId;
+    return `<li data-seat-id="${s.id}" data-kind="${s.kind}" data-own="${own}" data-team="${s.teamId??''}" data-ready="${ai||s.ready&&s.connected}"><div class="network-seat-heading"><span class="network-seat-number" aria-hidden="true">${index+1}</span><span>${ai?tr('aiLabel'):own?h('you'):''}</span></div><div class="network-seat-copy"><strong>${escape(seatName(s))}</strong><small>${[roles,roomRules(snapshot.rules).mode==='team-battle'?h('teamNumber',{number:s.teamId==='team-2'?2:1}):''].filter(Boolean).join(' · ')}</small><span class="network-seat-state">${state}</span></div>${own?`<button type="button" class="network-card-ready" data-net-action="ready" aria-pressed="${s.ready}" aria-label="${s.ready?h('unready'):h('ready')}" ${!s.connected?'disabled':''}>${s.ready?'✓ '+h('youReady'):h('ready')}${s.ready?`<small>${h('cancelReadyHint')}</small>`:''}</button>`:''}${this.piecePreview(s.tileStyle)}${own?this.personalFields(s,roomRules(snapshot.rules)):''}${editor}</li>`;
+
+  }
+  private rosterMarkup(seats:PublicSeat[],snapshot:ClientSnapshot,creator:boolean,rules:ResolvedRoomRules):string {
+    const list=(group:PublicSeat[])=>`<ul class="network-roster" data-mode="${rules.mode}">${group.map(s=>this.rosterSeat(s,seats.indexOf(s),snapshot,creator)).join('')}</ul>`;
+    const roster=rules.mode==='team-battle'?['team-1','team-2'].map((id,i)=>`<section class="network-team-group" data-team="${id}"><h3>${h('teamNumber',{number:i+1})}</h3>${list(seats.filter(s=>s.teamId===id))}</section>`).join(''):list(seats);
+    return `<div class="network-roster-area" data-teams="${rules.mode==='team-battle'}">${roster}${creator?`<div class="network-empty-seat"><span aria-hidden="true">＋</span>${this.button(u('addAi'),'ai-add',seats.length>=8||seats.filter(s=>s.kind==='ai').length>=6)}<p>${h('freeSeat')}</p></div>`:''}</div>`;
   }
   private renderSession():void {
     const session=this.session;const snapshot=session?.snapshot;
@@ -267,20 +301,19 @@ export class NetworkApp {
       this.status(session.status);return;
     }
     this.renderKey=key;
+    const lobbyPresentation=this.view==='lobby'?{profileOpen:this.root.querySelector('.network-personal-panel')?.hasAttribute('open')??false,scrollTop:this.root.querySelector('.network-content')?.scrollTop??0}:null;
     if(snapshot.state?.phase==='results') {
       this.view='results';
       this.shell(networkText('networkResults'),`${snapshot.state.options.matchVariant==='teams'?`<p>${teamScores(snapshot.state.participants.map(p=>({id:p.config.id,score:p.score,alive:p.board.alive,teamId:p.config.teamId}))).map(t=>`${h('teamNumber',{number:t.teamId==='team-2'?2:1})}: ${h('points',{count:t.score})}`).join(' · ')}</p>`:''}<ol class="network-roster">${[...snapshot.state.participants].sort((a,b)=>a.placement!-b.placement!||b.score-a.score).map(p=>`<li><strong>${p.placement}. ${escape(networkAiName(p.config.controller==='ai'?'ai':'human',p.config.label,p.config.difficulty))}${p.config.controller==='ai'?` · ${tr('aiLabel')}`:''}${p.config.teamId?` · ${h('teamNumber',{number:p.config.teamId==='team-2'?2:1})}`:''}${snapshot.state!.winnerIds.includes(p.config.id)?` · ${h('victory')}`:''}</strong><span>${h('points',{count:p.score})} · ${formatClock(p.survivalMs)}</span></li>`).join('')}</ol><div class="network-actions">${this.button(u('toLobby'),'lobby')}${this.button(networkText('leave'),'leave')}</div>`);
     } else {
-      this.view='lobby';const own=snapshot.seats.find(s=>s.id===snapshot.ownId)!;
+      this.view='lobby';
       const creator=snapshot.creatorId===snapshot.ownId;
       const seats=snapshot.seats.filter(s=>s.retained);const humans=seats.filter(s=>s.kind==='human');const bots=seats.filter(s=>s.kind==='ai');
       const rules=roomRules(snapshot.rules);
       const canStart=(rules.mode!=='team-battle'||balancedNetworkTeams(seats))&&humans.length>=2&&seats.length<=8&&humans.every(s=>s.ready&&s.connected&&!s.absence);
-      this.shell(escape(snapshot.room.name),`<p class="network-intro">${localeText(modeLabels[rules.mode])} · ${networkText('minTwo')} · ${networkText('upToEight')}${rules.mode==='team-battle'?` · ${h('equalTeams')}`:''}</p><div class="network-room-grid"><section class="network-roster-panel release-panel"><p class="eyebrow">${h('sharedRoom')}</p><h2>${h('participants',{count:seats.length})}</h2><p class="network-roster-hint">${h('rosterHint',{humans:humans.length,bots:bots.length})}</p><ul class="network-roster">${seats.map((s,i)=>this.rosterSeat(s,i,snapshot,creator)).join('')}</ul>${creator?`<div class="network-actions">${this.button(u('addAi'),'ai-add',seats.length>=8||bots.length>=6)}</div>`:''}</section><div class="network-settings-column"><section class="network-personal-panel release-panel"><p class="eyebrow">${h('thisDevice')}</p><h2>${h('yourPlayer')}</h2>
-      <form id="network-profile"><label>${escape(networkText('yourName'))}<textarea aria-label="${escape(networkText('yourName'))}" name="name" maxlength="32" rows="2" required>${escape(own.name)}</textarea></label><label>${h('pieceStyle')}<select data-menu-select-layout="style-list" aria-label="${h('pieceStyle')}" name="tileStyle">${styleOptions(own.tileStyle)}</select></label>
-      <label>${h('deviceControls')}<select aria-label="${h('deviceControls')}" id="network-controls"><option value="keyboard">WASD</option><option value="arrows">${h('arrows')}</option><option value="touch">${h('touch')}</option><option value="gamepad">${h('gamepad',{number:1})}</option><option value="gamepad-2">${h('gamepad',{number:2})}</option><option value="gamepad-3">${h('gamepad',{number:3})}</option><option value="tilt">${h('tiltTouch')}</option></select></label>${rules.mode==='team-battle'?`<div id="network-team">${this.teamSelect(own.teamId??'team-1','ownTeam')}</div>`:''}<button type="submit">${h('saveProfile')}</button></form>
-      </section><section class="network-rules-panel release-panel"><p class="eyebrow">${h('allParticipants')}</p><h2>${h('matchRules')}</h2><form id="network-rules">${this.rulesFields(rules,!creator)}${creator?`<button type="submit">${h('applyRules')}</button>`:''}</form></section></div></div>
-      <div class="network-actions">${this.button(own.ready?u('unready'):u('ready'),'ready',!own.connected)}${creator?this.button(u('start'),'start',!canStart):''}${this.button(networkText('leave'),'leave')}</div>`);
+      const pending=humans.filter(s=>!s.ready||!s.connected||s.absence);
+      const startReason=humans.length<2?networkText('minTwo'):rules.mode==='team-battle'&&!balancedNetworkTeams(seats)?u('equalTeams'):pending.length?u('waitReady',{names:pending.map(s=>s.name).join(', ')}):u('startReady');
+      this.shell(escape(snapshot.room.name),`<section class="network-rules-panel release-panel"><div class="network-mode-art" style="--network-mode-art:url('${MAIN_MENU_PREVIEWS[rules.mode].image}')" aria-hidden="true"><span>${localeText(modeLabels[rules.mode])}</span></div><div class="network-shared-rules"><p class="eyebrow">${h('allParticipants')}</p><form id="network-rules">${this.rulesFields(rules,!creator)}${creator?`<button type="submit">${h('applyRules')}</button>`:''}</form><p class="network-rules-owner">${h('rulesOwner')}</p></div></section><div class="network-roster-heading"><h2>${h('participants',{count:seats.length})}</h2><p>${h('rosterHint',{humans:humans.length,bots:bots.length})}</p></div>${this.rosterMarkup(seats,snapshot,creator,rules)}<footer class="network-lobby-footer"><p class="network-start-reason" role="status">${escape(startReason)}</p><div class="network-actions">${this.button(networkText('leave'),'leave')}${creator?this.button(u('start'),'start',!canStart):''}</div></footer>`);
       this.root.querySelector<HTMLFormElement>('#network-profile')!.onsubmit=e=>{e.preventDefault();const v=Object.fromEntries(new FormData(e.currentTarget as HTMLFormElement));savePersonal({name:String(v.name),tileStyle:v.tileStyle as TileStyleSelection});session.send({type:'profile',name:String(v.name),tileStyle:v.tileStyle as TileStyleSelection});};
       this.root.querySelectorAll<HTMLFormElement>('[data-network-ai]').forEach(form=>form.onsubmit=e=>{e.preventDefault();const values=Object.fromEntries(new FormData(form));session.send({type:'ai-update',participantId:form.dataset.networkAi!,...values} as ClientCommand);});
       const style=this.root.querySelector<HTMLSelectElement>('#network-profile select[name="tileStyle"]')!;
@@ -297,7 +330,13 @@ export class NetworkApp {
       const control=this.root.querySelector<HTMLSelectElement>('#network-controls')!;control.value=this.controls;
       control.onchange=()=>{this.controls=control.value as Controls;savePersonal({controls:this.controls});if(this.controls==='tilt')void this.enableTilt();};
     }
-    if(this.view==='lobby')enhanceMenuSelects(this.root.querySelector<HTMLElement>('.network-screen')!);
+    if(this.view==='lobby'){
+      const profile=this.root.querySelector<HTMLDetailsElement>('.network-personal-panel');
+      if(profile&&lobbyPresentation?.profileOpen)profile.open=true;
+      enhanceMenuSelects(this.root.querySelector<HTMLElement>('.network-screen')!);
+      const content=this.root.querySelector('.network-content');
+      if(content&&lobbyPresentation)content.scrollTop=lobbyPresentation.scrollTop;
+    }
     this.status(session.status);
   }
   private arena():void {

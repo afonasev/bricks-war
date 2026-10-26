@@ -1,0 +1,207 @@
+/* Network journey: same maple, cream panels and player palette as UnifiedLobby.
+   Scope excludes the live arena and all local menus. */
+#app.network-root .network-screen.network-workshop {
+  --release-ink:#193f70; --release-muted:#836c50; --release-line:#ba8956;
+  --release-shadow:#75461620;
+  width:100%; max-width:none; height:100dvh; min-height:0; padding:22px clamp(16px,4vw,58px) 0;
+  color:#193f70; font-family:'Trebuchet MS',sans-serif;
+  background:linear-gradient(#fff5ddbc,#fff5dd65 55%,#d9903c30),url('../assets/workshop/maple.webp') center/cover;
+  border-radius:0; box-shadow:none; overflow:hidden;
+}
+#app.network-root .network-workshop::before,#app.network-root .network-workshop::after {content:none}
+#app.network-root .network-workshop :is(h1,h2,h3,p) {letter-spacing:normal;text-transform:none;font-family:inherit;text-shadow:none}
+#app.network-root .network-workshop .network-heading.release-heading {width:100%; min-height:64px; margin:0 0 12px;gap:22px;flex-wrap:nowrap}
+#app.network-root .network-workshop .network-brand {width:126px;height:64px;object-fit:contain;flex:none}
+#app.network-root .network-workshop .network-heading h1 {font-size:clamp(25px,2.7vw,38px);line-height:1.2;color:#193f70;margin:0}
+#app.network-root .network-workshop .eyebrow {font-size:11px;letter-spacing:1px;color:#987348;margin:0 0 6px}
+#app.network-root .network-workshop > .network-status {width:100%;margin:0;min-height:24px;padding:0 0 10px;color:#796246;flex:none;line-height:1.4}
+#app.network-root .network-workshop > .network-status:empty {display:none}
+#app.network-root .network-workshop .network-content {width:100%;max-width:none;flex:1;min-height:0;overflow:auto;padding:0 4px 20px;margin:0;scroll-padding:12px}
+#app.network-root .network-workshop .menu-metadata-footer {flex:none;margin:0;padding:10px 0;background:none;border:0;color:#193f70}
+#app.network-root .network-workshop :is(.release-panel,.network-lobby,.network-current,#network-form) {
+  border:1px solid #ba8956;border-bottom:5px solid #af7941;border-radius:18px;
+  background:linear-gradient(#fff8e9f5,#fff1d9ee);box-shadow:inset 0 2px #fff,0 6px 14px #75461620;
+}
+#app.network-root .network-workshop :is(button,input,select,textarea) {font-family:inherit;letter-spacing:normal}
+#app.network-root .network-workshop button {
+  min-height:44px;max-width:100%;padding:10px 14px;border:1px solid #c49a64;border-bottom:3px solid #b08049;
+  border-radius:10px;background:#fff4df;color:#193f70;box-shadow:none;font-weight:700;font-size:15px;line-height:1.3;
+  white-space:normal;overflow-wrap:anywhere;transform:none;text-shadow:none;
+}
+#app.network-root .network-workshop button:disabled {opacity:1;color:#8b806c;background:#e9dfcc;border-color:#cdbb9f;cursor:default}
+#app.network-root .network-workshop button:is([data-net-action="create"],[data-net-action="return"],.network-card-ready),
+#app.network-root .network-workshop #network-form button[type="submit"] {background:#8bd4f6;border-color:#85b8c9;border-bottom-color:#528eaa;color:#193f70}
+#app.network-root[data-input-mode="pointer"] .network-workshop button:not(:disabled):hover {background:var(--menu-hover-fill)}
+#app.network-root .network-workshop :is(input,textarea,select) {border:1px solid #c49a64;border-bottom:2px solid #b59670;border-radius:9px;background:#fffaf0;color:#193f70;min-height:44px;padding:9px 11px;line-height:1.35;font-size:16px}
+#app.network-root .network-workshop textarea {resize:vertical;max-width:100%}
+#app.network-root .network-workshop label {font-size:12px;color:#8b6744;font-weight:700;gap:7px;min-width:0}
+#app.network-root .network-workshop form {background:none;margin:0;padding:0;min-width:0;border:0}
+#app.network-root .network-workshop .network-actions {display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin:0}
+#app.network-root .network-workshop h2 {color:#193f70;font-size:22px;margin:0 0 10px;overflow-wrap:anywhere;line-height:1.25}
+/* Room browser */
+#app.network-root .network-workshop .network-list-toolbar {display:flex;gap:20px;justify-content:space-between;align-items:center;padding:20px;margin-bottom:18px}
+#app.network-root .network-workshop .network-list-toolbar p {margin:0;font-size:14px;color:#836c50}
+#app.network-root .network-workshop #network-lobbies {display:grid;gap:14px}
+#app.network-root .network-workshop .network-lobby {display:grid;grid-template-columns:160px minmax(0,1fr) minmax(90px,130px) minmax(100px,150px);align-items:center;gap:20px;padding:14px 18px;margin:0}
+#app.network-root .network-workshop .network-lobby > div {min-width:0;flex:initial}
+#app.network-root .network-workshop .network-lobby h2 {font-size:21px;margin:0 0 7px}
+#app.network-root .network-workshop .network-lobby p {font-size:14px;margin:0;color:#836c50}
+#app.network-root .network-workshop .network-room-state {display:grid;gap:8px;color:#627444;font-size:14px}
+#app.network-root .network-workshop .network-room-state span {color:#836c50}
+#app.network-root .network-workshop .network-mode-art {position:relative;min-height:110px;border:1px solid #ba8956;border-bottom:4px solid #af7941;border-radius:12px;background:var(--network-mode-art) center 48%/cover;overflow:hidden}
+#app.network-root .network-workshop .network-mode-art span {position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,#fff4d9 35%);padding:20px 12px 8px;color:#193f70;font-size:16px;font-weight:bold}
+#app.network-root .network-workshop .network-current {margin:0 0 16px;padding:18px;background:linear-gradient(#f9ffe9,#edf5d4)}
+#app.network-root .network-workshop .network-current p {color:#6a6c50;overflow-wrap:anywhere}
+#app.network-root .network-workshop .network-empty {padding:24px;margin:0}
+#app.network-root .network-workshop .network-pagination:empty {display:none}
+/* Creation and entry use a compact cream form, never the whole viewport. */
+#app.network-root .network-workshop #network-form {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));max-width:1050px;padding:22px;gap:18px;align-items:start}
+#app.network-root .network-workshop #network-create-rules {grid-column:1/-1;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;padding-top:18px;border-top:1px solid #ba895640;min-width:0}
+#app.network-root .network-workshop #network-form > .network-actions {grid-column:1/-1}
+/* Shared rules above cards, matching ordinary lobby hierarchy. */
+#app.network-root .network-workshop .network-rules-panel {display:grid;grid-template-columns:220px minmax(0,1fr);gap:24px;padding:16px 20px;margin-bottom:22px;align-items:center}
+#app.network-root .network-workshop .network-rules-panel > .network-mode-art {height:150px}
+#app.network-root .network-workshop .network-shared-rules {min-width:0}
+#app.network-root .network-workshop #network-rules {display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px 18px;align-items:end}
+#app.network-root .network-workshop #network-rules > :is(label,button) {grid-column:auto}
+#app.network-root .network-workshop #network-rules button[type="submit"] {font-size:13px;min-height:42px}
+#app.network-root .network-workshop .network-rules-owner {font-size:12px;color:#92744f;margin:10px 0 0}
+#app.network-root .network-workshop .network-roster-heading {display:flex;align-items:baseline;justify-content:space-between;gap:14px;margin:0 0 16px}
+#app.network-root .network-workshop .network-roster-heading h2 {font-size:20px;margin:0;flex:none}
+#app.network-root .network-workshop .network-roster-heading p {font-size:12px;color:#836c50;margin:0;line-height:1.4}
+#app.network-root .network-workshop .network-roster-area {display:grid;grid-template-columns:repeat(4,minmax(0,1fr));align-items:start;gap:20px}
+#app.network-root .network-workshop .network-roster-area > .network-roster {display:contents}
+#app.network-root .network-workshop .network-roster > li {--seat-surface:#edf5cf;--seat-line:#83a32f;--seat-depth:#648021;display:flex;flex-direction:column;align-items:stretch;gap:0;min-height:330px;padding:18px;border:2px solid var(--seat-line);border-bottom:6px solid var(--seat-depth);border-radius:17px;background:linear-gradient(145deg,#fffff5,var(--seat-surface));box-shadow:inset 0 2px #fff,0 5px 8px #67451e26;color:#193f70;min-width:0;overflow-wrap:anywhere}
+#app.network-root .network-workshop .network-roster > li:nth-child(4n+2) {--seat-surface:#dceff9;--seat-line:#168fca;--seat-depth:#176c9c}
+#app.network-root .network-workshop .network-roster > li:nth-child(4n+3) {--seat-surface:#f0e2fa;--seat-line:#a16bd0;--seat-depth:#794a9f}
+#app.network-root .network-workshop .network-roster > li:nth-child(4n+4) {--seat-surface:#ffebd2;--seat-line:#ef8050;--seat-depth:#b85833}
+#app.network-root .network-workshop .network-seat-heading {display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:10px;color:var(--seat-depth);margin-bottom:12px}
+#app.network-root .network-workshop .network-seat-number {width:24px;height:24px;border:1px solid var(--seat-line);border-radius:7px;font-size:12px;background:#ffffff66;color:var(--seat-depth);flex:none}
+#app.network-root .network-workshop .network-seat-copy {display:grid;gap:6px;min-width:0}
+#app.network-root .network-workshop .network-seat-copy > strong {font-size:23px;line-height:1.2;color:#204875;overflow-wrap:anywhere;max-width:100%}
+#app.network-root .network-workshop .network-seat-copy > small {font-size:12px;color:#736a56;overflow-wrap:anywhere}
+#app.network-root .network-workshop .network-seat-state {font-size:13px;color:#8c692f;line-height:1.4;max-width:100%;overflow-wrap:anywhere}
+#app.network-root .network-workshop [data-ready="true"] .network-seat-state {color:#52702e}
+#app.network-root .network-workshop .network-card-ready {margin:12px 0 0;text-align:left;display:grid;gap:3px;align-content:center}
+#app.network-root .network-workshop .network-card-ready small {font-size:11px;font-weight:400;color:inherit}
+#app.network-root .network-workshop .network-piece-well {height:120px;display:grid;place-items:center;border:1px solid #cdbd9466;border-radius:12px;margin:16px 0 0;background:linear-gradient(90deg,#a2875220 1px,transparent 1px),linear-gradient(#a2875220 1px,transparent 1px),#fff8e6a0;background-size:24px 24px;box-shadow:inset 0 3px 8px #70502715}
+#app.network-root .network-workshop .network-piece {position:relative;width:108px;height:72px;display:block;filter:drop-shadow(0 4px 2px #56392233)}
+#app.network-root .network-workshop .network-piece i {position:absolute;width:33.333%;height:50%;background:var(--network-atlas) 50% 50%/300% 300%}
+#app.network-root .network-workshop .network-piece b {position:absolute;left:46px;top:10px;color:#fff;font-size:23px;text-shadow:0 2px 2px #174e80}
+#app.network-root .network-workshop .network-piece-label {font-size:12px;text-align:center;color:#677078;margin:9px 0 12px}
+#app.network-root .network-workshop :is(.network-personal-panel,.network-ai-editor) {width:100%;margin:6px 0 0;padding:0;border:0;background:none;box-shadow:none}
+#app.network-root .network-workshop summary {display:block;cursor:pointer;color:#285d80;font-size:13px;font-weight:bold;padding:10px 8px;border:1px solid #b99c6d70;border-radius:8px;background:#fff8e6;line-height:1.4;overflow-wrap:anywhere}
+#app.network-root .network-workshop summary::after {content:' ▾'}
+#app.network-root .network-workshop :is(.network-personal-panel,.network-ai-editor)[open] > summary {margin-bottom:12px}
+#app.network-root .network-workshop :is(#network-profile,[data-network-ai]) {display:grid;grid-template-columns:minmax(0,1fr);gap:12px;min-width:0;align-items:start}
+#app.network-root .network-workshop :is(#network-profile,[data-network-ai]) > :is(label,button) {grid-column:auto}
+#app.network-root .network-workshop .network-ai-actions {display:flex;flex-wrap:wrap;gap:8px;margin:0}
+#app.network-root .network-workshop .network-empty-seat {display:grid;align-content:center;justify-items:center;gap:18px;min-height:330px;padding:20px;border:2px dashed #b48b5e;border-radius:17px;background:linear-gradient(#fffdf2aa,#fff0d780);min-width:0}
+#app.network-root .network-workshop .network-empty-seat > span {font-size:56px;color:#c17a42}
+#app.network-root .network-workshop .network-empty-seat > p {font-size:13px;color:#856e50;text-align:center;margin:0}
+#app.network-root .network-workshop .network-lobby-footer {margin-top:24px;padding-top:12px}
+#app.network-root .network-workshop .network-start-reason {font-size:14px;line-height:1.4;color:#795d39;text-align:right;margin:0 0 12px;overflow-wrap:anywhere}
+#app.network-root .network-workshop .network-lobby-footer .network-actions {display:flex;justify-content:space-between}
+#app.network-root .network-workshop [data-net-action="start"] {width:240px;min-height:54px;font-size:20px;grid-column:auto;grid-row:auto;background:#fff4df;border-color:#c49a64;color:#193f70}
+#app.network-root .network-workshop [data-net-action="start"]:disabled {background:#e9dfcc;color:#8b806c;border-color:#cdbb9f}
+/* Results retain their ordered ranking instead of the lobby's participant grid. */
+#app.network-root .network-workshop[data-network-view="results"] .network-roster {grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:0 0 20px}
+#app.network-root .network-workshop[data-network-view="results"] .network-roster > li {min-height:0;padding:20px;gap:12px}
+#app.network-root .network-workshop[data-network-view="results"] .network-roster strong {font-size:20px}
+#app.network-root .network-workshop .menu-select-trigger {background:#fff6e5;border:1px solid #c49a64;border-bottom:2px solid #b59670;border-radius:9px;box-shadow:none;text-align:left;min-height:42px;font-size:14px;padding:8px 10px;grid-template-columns:minmax(0,1fr) 16px}
+#app.network-root .network-workshop .menu-select-value {white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere}
+#app.network-root .network-workshop .menu-select-list {background:#fff5e1;border:1px solid #bd935f;border-radius:12px;box-shadow:0 6px 18px #6f4a2d33}
+#app.network-root .network-workshop .menu-select-option {font-size:14px;border:1px solid transparent;border-radius:7px;box-shadow:none;background:transparent;padding:9px;min-height:40px}
+#app.network-root .network-workshop .menu-select-option.is-highlighted {background:#8bd4f6;border-color:transparent}
+/* Pause gets the same material without changing arena layout or pause ownership. */
+#app.network-root .network-pause-panel {font-family:'Trebuchet MS',sans-serif;color:#193f70;background:linear-gradient(#fff8e9,#fff1d9);border:1px solid #ba8956;border-bottom:5px solid #af7941;box-shadow:inset 0 2px #fff,0 8px 24px #75461640}
+#app.network-root .network-pause-panel button {background:#fff4df;color:#193f70;border:1px solid #c49a64;border-bottom:3px solid #b08049;box-shadow:none}
+@media(max-width:1100px) {
+  #app.network-root .network-workshop .network-rules-panel {grid-template-columns:170px minmax(0,1fr);gap:16px}
+  #app.network-root .network-workshop #network-rules {grid-template-columns:repeat(3,minmax(0,1fr))}
+  #app.network-root .network-workshop .network-roster-area {grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+  #app.network-root .network-workshop .network-lobby {grid-template-columns:120px minmax(0,1fr) 90px 120px;gap:14px}
+}
+@media(max-width:760px),(max-width:900px) and (max-height:600px) {
+  #app.network-root .network-screen.network-workshop {padding:16px 12px 0}
+  #app.network-root .network-workshop .network-heading.release-heading {gap:12px;flex-wrap:wrap;min-height:0;margin-bottom:12px}
+  #app.network-root .network-workshop .network-heading > .screen-back {order:3;font-size:13px;min-height:40px;padding:8px 10px}
+  #app.network-root .network-workshop .network-brand {width:88px;height:44px}
+  #app.network-root .network-workshop .network-heading > div {flex:1 1 180px;min-width:0}
+  #app.network-root .network-workshop .network-heading h1 {font-size:25px}
+  #app.network-root .network-workshop .eyebrow {font-size:10px}
+  #app.network-root .network-workshop .network-list-toolbar {display:grid;padding:15px;gap:14px}
+  #app.network-root .network-workshop .network-list-toolbar .network-actions {gap:8px}
+  #app.network-root .network-workshop .network-actions > button {flex:0 1 auto}
+  #app.network-root .network-workshop .network-lobby {grid-template-columns:85px minmax(0,1fr);padding:12px;gap:12px}
+  #app.network-root .network-workshop .network-lobby .network-mode-art {min-height:90px}
+  #app.network-root .network-workshop .network-lobby .network-mode-art span {font-size:12px;padding-inline:7px}
+  #app.network-root .network-workshop .network-lobby h2 {font-size:18px}
+  #app.network-root .network-workshop .network-lobby p {font-size:12px}
+  #app.network-root .network-workshop .network-room-state {grid-column:1/-1;display:flex;justify-content:space-between}
+  #app.network-root .network-workshop .network-lobby > button {grid-column:1/-1;width:100%}
+  #app.network-root .network-workshop #network-form {padding:16px;grid-template-columns:minmax(0,1fr)}
+  #app.network-root .network-workshop #network-create-rules {grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+  #app.network-root .network-workshop .network-rules-panel {grid-template-columns:minmax(0,1fr);gap:14px;padding:13px}
+  #app.network-root .network-workshop .network-rules-panel > .network-mode-art {height:120px}
+  #app.network-root .network-workshop #network-rules {grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+  #app.network-root .network-workshop .network-roster-heading {flex-direction:column;gap:8px}
+  #app.network-root .network-workshop .network-roster-area {grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+  #app.network-root .network-workshop .network-roster > li {padding:14px;min-height:310px}
+  #app.network-root .network-workshop .network-seat-copy > strong {font-size:21px}
+  #app.network-root .network-workshop .network-empty-seat {min-height:260px;padding:16px}
+  #app.network-root .network-workshop .network-start-reason {text-align:left;font-size:13px}
+  #app.network-root .network-workshop [data-net-action="start"] {width:auto;min-width:160px;min-height:48px;font-size:18px}
+  #app.network-root .network-workshop[data-network-view="results"] .network-roster {grid-template-columns:minmax(0,1fr)}
+  #app.network-root .network-workshop .menu-metadata-footer {padding:8px 0}
+}
+@media(max-width:520px) {
+  #app.network-root .network-workshop .network-roster-area {grid-template-columns:minmax(0,1fr)}
+  #app.network-root .network-workshop .network-piece-well {height:110px}
+  #app.network-root .network-workshop .network-roster > li {min-height:0}
+  #app.network-root .network-workshop .network-empty-seat {min-height:210px}
+  #app.network-root .network-workshop [data-net-action="start"] {width:100%}
+}
+@media(max-height:600px) and (min-width:901px) {
+  #app.network-root .network-screen.network-workshop {padding-top:10px}
+  #app.network-root .network-workshop .network-heading.release-heading {min-height:44px;margin-bottom:6px}
+  #app.network-root .network-workshop .network-brand {width:88px;height:44px}
+  #app.network-root .network-workshop .network-heading h1 {font-size:26px}
+  #app.network-root .network-workshop .menu-metadata-footer {padding:6px 0}
+}
+/* Explicitly suppress closed editor forms: legacy form display rules otherwise
+   give hidden details descendants layout rectangles and overlapping hit areas. */
+#app.network-root .network-workshop details:not([open]) > form {display:none}
+/* Match form IDs contribute specificity through :is(); match that specificity
+   when closing details, so hidden editors do not retain layout/hit rectangles. */
+#app.network-root .network-screen.network-workshop details:not([open]) > :is(#network-profile,[data-network-ai]) {display:none}
+#app.network-root .network-workshop [data-own="true"] .network-seat-state {display:none}
+#app.network-root .network-workshop .network-roster-area {align-items:stretch}
+#app.network-root .network-workshop .network-roster > li {padding:16px;min-height:330px}
+#app.network-root .network-workshop .network-piece-well {height:90px;margin-top:12px}
+#app.network-root .network-workshop .network-seat-heading {margin-bottom:8px}
+#app.network-root .network-workshop .network-piece-label {margin-bottom:8px}
+#app.network-root .network-workshop .network-team-group {min-width:0;padding:14px;border:1px solid #a67746;border-bottom:5px solid #9f6b37;border-radius:20px;background:#c0e9f67d}
+#app.network-root .network-workshop .network-team-group[data-team="team-2"] {background:#ffc49e8c}
+#app.network-root .network-workshop .network-team-group > h3 {font-size:18px;text-align:center;margin:0 0 14px}
+#app.network-root .network-workshop .network-roster-area[data-teams="true"] {grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}
+#app.network-root .network-workshop .network-team-group > .network-roster {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:0}
+#app.network-root .network-workshop .network-roster-area[data-teams="true"] > .network-empty-seat {min-height:0;padding:12px;grid-column:1/-1;display:flex;justify-content:center;gap:16px}
+#app.network-root .network-workshop .network-roster-area[data-teams="true"] > .network-empty-seat > span {font-size:28px}
+@media(max-width:760px),(max-width:900px) and (max-height:600px) {
+  #app.network-root .network-workshop .network-roster-area[data-teams="true"] {grid-template-columns:minmax(0,1fr)}
+  #app.network-root .network-workshop .network-team-group > .network-roster {grid-template-columns:minmax(0,1fr)}
+}
+/* Network Settings is a shared dialog; only its network-owned material changes. */
+#app.network-root [data-network-preferences].pause-settings-panel {
+  --text:#193f70;--muted:#836c50;color:#193f70;font-family:'Trebuchet MS',sans-serif;
+  background:linear-gradient(#fff8e9,#fff1d9);border:1px solid #ba8956;border-bottom:5px solid #af7941;
+}
+#app.network-root [data-network-preferences].pause-preferences-grid :is(.settings-language-section,.pause-preferences-card,.settings-stick-section) {
+  background:#fff8e9;border:1px solid #c49a64;border-bottom:4px solid #b08049;
+}
+#app.network-root [data-network-preferences].pause-preferences-grid :is(button,.menu-select-trigger) {
+  background:#fff4df;color:#193f70;border:1px solid #c49a64;border-bottom:3px solid #b08049;box-shadow:none;
+}
+#app.network-root [data-network-preferences] input {accent-color:#2788b3}
+#app.network-root [data-network-preferences] .menu-select-list {background:#fff5e1;border-color:#bd935f}

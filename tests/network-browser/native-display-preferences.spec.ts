@@ -1,3 +1,4 @@
+import {openNetworkProfile} from './menuHelpers';
 import {test,expect,type Page} from '@playwright/test';
 import {catalogs} from '../../src/i18n/catalogs';
 import {mkdir,writeFile} from 'node:fs/promises';
@@ -13,9 +14,9 @@ for(const paused of [false,true])for(const [width,height] of [[1440,960],[1280,4
  try{
   await page.goto('/?muted=1');await page.locator('[data-network-entry]').click();
   if(paused){
-   const room=`Nested ${width} ${Date.now()}`;await page.locator('[data-net-action="create"]').click();await page.locator('[name="roomName"]').fill(room);await page.locator('#network-form button[type="submit"]').click();await expect(page.locator('#network-profile')).toBeVisible();
+   const room=`Nested ${width} ${Date.now()}`;await page.locator('[data-net-action="create"]').click();await page.locator('[name="roomName"]').fill(room);await page.locator('#network-form button[type="submit"]').click();await openNetworkProfile(page);await expect(page.locator('#network-profile')).toBeVisible();
    await guest.goto('/?muted=1');await guest.locator('[data-network-entry]').click();await guest.locator('.network-lobby').filter({hasText:room}).locator('[data-net-action^="join:"]').click();await guest.locator('#network-form button[type="submit"]').click();
-   for(const p of [page,guest]){await expect(p.locator('#network-profile')).toBeVisible();await p.locator('[data-net-action="ready"]').click();}
+   for(const p of [page,guest]){await openNetworkProfile(p);await expect(p.locator('#network-profile')).toBeVisible();await p.locator('[data-net-action="ready"]').click();}
    await page.locator('[data-net-action="start"]').click();await expect(page.locator('.network-arena')).toHaveAttribute('data-phase','playing',{timeout:15000});await expect(page.locator('.network-arena')).toHaveAttribute('data-preparation','0',{timeout:15000});await page.locator('[data-net-action="pause"]:visible').click();await expect(page.locator('#network-pause')).toBeVisible();
   }
   await page.locator('[data-net-action="preferences"]').click();const prefs=page.locator('[data-network-preferences]');await expect(prefs).toBeVisible();

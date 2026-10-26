@@ -1,6 +1,7 @@
 import { readFile, writeFile, mkdir, cp, readdir, rm } from 'node:fs/promises';
 import { execFileSync, spawn } from 'node:child_process';
 import { digest, validateManifest } from '../../electron/content.mjs';
+import { CONTENT_ABI } from '../../electron/compatibility.mjs';
 
 // Installer publication is explicit. Content-only publication reuses the existing installers.
 const installers = process.argv.includes('--installers');
@@ -11,7 +12,8 @@ const quote = value => `'${value.replaceAll("'", "'\\''")}'`;
 const ssh = command => execFileSync('ssh', ['-o', 'BatchMode=yes', host, command], { encoding: 'utf8' }).trim();
 const stage = 'build/desktop-publish';
 const current = JSON.parse(await readFile(`${stage}/game/latest.json`, 'utf8'));
-const sequence = validateManifest(current, await readFile('electron/content-public-key.pem', 'utf8'), 2).sequence;
+const shellRelease = JSON.parse(await readFile('package.json', 'utf8')).version;
+const sequence = validateManifest(current, await readFile('electron/content-public-key.pem', 'utf8'), CONTENT_ABI, shellRelease).sequence;
 // Discard previous local preparation payloads; publish exactly one current game release.
 for (const entry of await readdir(`${stage}/game`)) if (entry !== String(sequence) && entry !== 'latest.json') await rm(`${stage}/game/${entry}`, { recursive: true, force: true });
 if (installers) {

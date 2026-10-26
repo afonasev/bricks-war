@@ -1,3 +1,4 @@
+import {openNetworkProfile} from './menuHelpers';
 import {test,expect,type Page,type BrowserContext} from '@playwright/test';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {catalogs} from '../../src/i18n/catalogs';
@@ -35,20 +36,20 @@ for(const locale of locales)test(`real network language lifecycle ${locale}`,asy
   await host.locator('[data-net-action="create"]').click();
   await host.locator('[name="roomName"]').fill(room);await host.locator('[name="name"]').fill(name);await host.locator('[name="password"]').fill('local-test');
   await shotSizes(host,locale,'create');await host.setViewportSize({width:1440,height:960});
-  await host.locator('#network-form button[type="submit"]').click();await expect(host.locator('#network-profile')).toBeVisible();
+  await host.locator('#network-form button[type="submit"]').click();await openNetworkProfile(host);await expect(host.locator('#network-profile')).toBeVisible();
   await guest.locator('.network-lobby').filter({hasText:room}).locator('[data-net-action^="join:"]').click();
   await guest.locator('[name="name"]').fill(`Guest 中 ${locale}`);await guest.locator('[name="password"]').fill('wrong');await guest.locator('#network-form button[type="submit"]').click();
   await expect(guest.locator('#network-status')).not.toBeEmpty();
   await expect(guest.locator('#network-status')).toHaveText(localizedNetworkMessage('Неверный пароль.',guestLocale));
   await guest.screenshot({path:`${shots}/${guestLocale}-wrong-password-phone.png`,fullPage:true});
-  await guest.locator('[name="password"]').fill('local-test');await guest.locator('#network-form button[type="submit"]').click();await expect(guest.locator('#network-profile')).toBeVisible();
+  await guest.locator('[name="password"]').fill('local-test');await guest.locator('#network-form button[type="submit"]').click();await openNetworkProfile(guest);await expect(guest.locator('#network-profile')).toBeVisible();
   await expect(host.locator('.network-seat-copy strong').first()).toHaveText(name);
   await host.locator('[data-net-action="ai-add"]').click();await expect(host.locator('[data-kind="ai"]')).toHaveCount(1);
   await host.locator('.network-ai-editor summary').click();await shotSizes(host,locale,'lobby-ai');
   await host.locator('[data-net-action^="ai-remove:"]').click();await expect(host.locator('[data-kind="ai"]')).toHaveCount(0);
   for(const p of [host,guest]){
    // Use existing select value and its genuine change event; no internal session mutation.
-   await p.locator('#network-controls + .menu-select [role="combobox"]').click();await p.getByRole('option',{name:'WASD',exact:true}).click();
+   await openNetworkProfile(p);await p.locator('#network-controls + .menu-select [role="combobox"]').click();await p.getByRole('option',{name:'WASD',exact:true}).click();
    await p.locator('[data-net-action="ready"]').click();
   }
   await host.setViewportSize({width:1440,height:960});await expect(host.locator('[data-net-action="start"]')).toBeEnabled();await host.locator('[data-net-action="start"]').click();
@@ -75,7 +76,7 @@ for(const locale of locales)test(`real network language lifecycle ${locale}`,asy
    await new Promise(resolve=>setTimeout(resolve,1000));
   }
   for(const p of [host,guest]){await expect(p.locator('[data-network-view="results"]')).toBeVisible({timeout:45000});await expect(p.locator('.network-roster li')).toHaveCount(2);}
-  await shotSizes(host,locale,'results');await host.locator('[data-net-action="lobby"]').click();await expect(host.locator('#network-profile')).toBeVisible();
+  await shotSizes(host,locale,'results');await host.locator('[data-net-action="lobby"]').click();await openNetworkProfile(host);await expect(host.locator('#network-profile')).toBeVisible();
   expect(await host.locator('#network-profile [name="name"]').inputValue()).toBe(name);
   await expect(host.locator('html')).toHaveAttribute('lang',locale);await expect(guest.locator('html')).toHaveAttribute('lang',guestLocale);expect(errors).toEqual([]);
  }finally{await hostContext.close();await guestContext.close();}
@@ -86,9 +87,9 @@ for(const locale of locales)test(`network replacement and service failure copy $
  try{
   const first=await boot(context,locale);await first.locator('[data-net-action="create"]').click();
   await first.locator('[name="roomName"]').fill(`Replacement ${locale} ${Date.now()}`);await first.locator('[name="name"]').fill('Original <中>');
-  await first.locator('#network-form button[type="submit"]').click();await expect(first.locator('#network-profile')).toBeVisible();
+  await first.locator('#network-form button[type="submit"]').click();await openNetworkProfile(first);await expect(first.locator('#network-profile')).toBeVisible();
   const second=await context.newPage();await second.goto('/?muted=1');await second.locator('[data-network-entry]').click();await second.locator('[data-net-action="return"]').click();
-  await expect(second.locator('#network-profile')).toBeVisible();await expect(first.locator('[data-network-view="ended"]')).toBeVisible();
+  await openNetworkProfile(second);await expect(second.locator('#network-profile')).toBeVisible();await expect(first.locator('[data-network-view="ended"]')).toBeVisible();
   const ended=await first.locator('.network-content').innerText();if(locale!=='ru')expect(ended).not.toMatch(/[А-Яа-яЁё]/);
   expect(await second.evaluate(()=>Boolean(localStorage.getItem('bricks-network-seat-v1')))).toBe(true);
   await first.screenshot({path:`${shots}/${locale}-replacement-phone.png`,fullPage:true});
@@ -115,7 +116,7 @@ for(const locale of locales)test(`network Battle and team rule forms ${locale}`,
   await pickValue(page,'#network-create-rules [name="mode"]','battle');await pickValue(page,'#network-create-rules [name="battleTimeMode"]','timed');
   await pickValue(page,'#network-create-rules [name="durationMinutes"]','7');
   await shotSizes(page,locale,'battle-rules-create');
-  await page.locator('#network-form button[type="submit"]').click();await expect(page.locator('#network-profile')).toBeVisible();
+  await page.locator('#network-form button[type="submit"]').click();await openNetworkProfile(page);await expect(page.locator('#network-profile')).toBeVisible();
   await expect(page.locator('#network-rules [name="durationMinutes"]')).toHaveValue('7');
   await pickValue(page,'#network-rules [name="mode"]','team-battle');await expect(page.locator('#network-team')).toBeVisible();
   await page.locator('[data-net-action="ai-add"]').click();await expect(page.locator('[data-kind="ai"]')).toHaveCount(1);await page.locator('.network-ai-editor summary').click();
@@ -128,9 +129,9 @@ test('network preferences switch language without reconnecting or leaking keyboa
  try{
   const host=await boot(contexts[0]!,'en'),guest=await boot(contexts[1]!,'en');const inputs:{held:{right:boolean}}[]=[];let sockets=0;
   guest.on('websocket',socket=>{sockets++;socket.on('framesent',f=>{try{const v=JSON.parse(String(f.payload));if(v.type==='input')inputs.push(v);}catch{}});});
-  const room=`Language switch ${Date.now()}`;await host.locator('[data-net-action="create"]').click();await host.locator('[name="roomName"]').fill(room);await host.locator('[name="name"]').fill('Language host');await host.locator('#network-form button[type="submit"]').click();await expect(host.locator('#network-profile')).toBeVisible();
+  const room=`Language switch ${Date.now()}`;await host.locator('[data-net-action="create"]').click();await host.locator('[name="roomName"]').fill(room);await host.locator('[name="name"]').fill('Language host');await host.locator('#network-form button[type="submit"]').click();await openNetworkProfile(host);await expect(host.locator('#network-profile')).toBeVisible();
   await guest.locator('.network-lobby').filter({hasText:room}).locator('[data-net-action^="join:"]').click();await guest.locator('[name="name"]').fill('Language guest');await guest.locator('#network-form button[type="submit"]').click();
-  for(const p of [host,guest]){await expect(p.locator('#network-profile')).toBeVisible();await pickValue(p,'#network-controls','keyboard');await p.locator('[data-net-action="ready"]').click();}
+  for(const p of [host,guest]){await openNetworkProfile(p);await expect(p.locator('#network-profile')).toBeVisible();await pickValue(p,'#network-controls','keyboard');await p.locator('[data-net-action="ready"]').click();}
   await host.locator('[data-net-action="start"]').click();await expect(guest.locator('.network-arena')).toHaveAttribute('data-phase','playing');await expect(guest.locator('.network-arena')).toHaveAttribute('data-preparation','0',{timeout:15000});
   const credential=await guest.evaluate(()=>localStorage.getItem('bricks-network-seat-v1'));const matchId=await guest.locator('.network-arena').getAttribute('data-match-id');
   await guest.locator('[data-net-action="pause"]:visible').click();await expect(host.locator('#network-pause')).toBeVisible();await guest.locator('[data-net-action="preferences"]').click();

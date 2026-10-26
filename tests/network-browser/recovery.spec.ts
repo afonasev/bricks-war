@@ -1,3 +1,4 @@
+import {openNetworkProfile} from './menuHelpers';
 import {test,expect} from '@playwright/test';
 import {delayRelay} from './delayRelay';
 import {mkdir,writeFile} from 'node:fs/promises';
@@ -18,7 +19,7 @@ for(const profile of ['late','bandwidth'] as const)test(`guest ${profile} delive
     await host.getByRole('button',{name:'Создать лобби',exact:true}).click();await host.getByLabel('Название лобби').fill(room);await host.getByLabel('Ваше имя',{exact:true}).fill('Host');await host.getByRole('button',{name:'Создать',exact:true}).click();
     await expect(host.getByRole('heading',{name:room})).toBeVisible();
     await guest.locator('.network-lobby').filter({hasText:room}).getByRole('button',{name:'Войти'}).click();await guest.getByLabel('Ваше имя',{exact:true}).fill('Guest');await guest.getByRole('button',{name:'Войти',exact:true}).click();
-    for(const page of [host,guest]){await expect(page.getByRole('heading',{name:room})).toBeVisible();await expect(page.locator('.network-seat-state').filter({hasText:'Возвращается'})).toHaveCount(0);const control=page.getByRole('combobox',{name:'Управление на этом устройстве'});if(await page.locator('#network-controls').inputValue()!=='keyboard'){await control.click();await page.getByRole('option',{name:'WASD',exact:true}).click();}await expect(page.locator('#network-controls')).toHaveValue('keyboard');await expect(control).toContainText('WASD');}
+    for(const page of [host,guest]){await expect(page.getByRole('heading',{name:room})).toBeVisible();await expect(page.locator('.network-seat-state').filter({hasText:'Возвращается'})).toHaveCount(0);await openNetworkProfile(page);const control=page.getByRole('combobox',{name:'Управление на этом устройстве'});if(await page.locator('#network-controls').inputValue()!=='keyboard'){await control.click();await page.getByRole('option',{name:'WASD',exact:true}).click();}await expect(page.locator('#network-controls')).toHaveValue('keyboard');await expect(control).toContainText('WASD');}
     for(const page of [host,guest])await page.getByRole('button',{name:'Готов',exact:true}).click();
     await expect(host.getByRole('button',{name:'Начать',exact:true})).toBeEnabled({timeout:15000});await host.getByRole('button',{name:'Начать',exact:true}).click();
     await expect(guest.locator('.network-arena')).toHaveAttribute('data-phase','playing',{timeout:15000});

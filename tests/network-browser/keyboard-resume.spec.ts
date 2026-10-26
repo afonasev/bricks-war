@@ -1,3 +1,4 @@
+import {openNetworkProfile} from './menuHelpers';
 import {test,expect} from '@playwright/test';
 import {writeFile} from 'node:fs/promises';
 test('network resume releases menu navigation and restores authoritative keyboard movement',async({browser,baseURL})=>{
@@ -6,9 +7,9 @@ test('network resume releases menu navigation and restores authoritative keyboar
  host!.on('websocket',socket=>socket.on('framesent',frame=>{try{const m=JSON.parse(String(frame.payload));if(m.type==='input')frames.push(m);}catch{}}));
  try{
   for(const p of [host!,guest!]){await p.goto('/?muted=1');await p.locator('[data-network-entry]').click();}
-  const room=`Keyboard resume ${Date.now()}`;await host!.locator('[data-net-action="create"]').click();await host!.locator('[name="roomName"]').fill(room);await host!.locator('#network-form button[type="submit"]').click();await expect(host!.locator('#network-profile')).toBeVisible();
+  const room=`Keyboard resume ${Date.now()}`;await host!.locator('[data-net-action="create"]').click();await host!.locator('[name="roomName"]').fill(room);await host!.locator('#network-form button[type="submit"]').click();await openNetworkProfile(host!);await expect(host!.locator('#network-profile')).toBeVisible();
   await guest!.locator('.network-lobby').filter({hasText:room}).locator('[data-net-action^="join:"]').click();await guest!.locator('#network-form button[type="submit"]').click();
-  for(const p of [host!,guest!]){await expect(p.locator('#network-profile')).toBeVisible();await p.locator('#network-controls + .menu-select [role="combobox"]').click();await p.getByRole('option',{name:'WASD',exact:true}).click();await p.locator('[data-net-action="ready"]').click();}
+  for(const p of [host!,guest!]){await openNetworkProfile(p);await expect(p.locator('#network-profile')).toBeVisible();await p.locator('#network-controls + .menu-select [role="combobox"]').click();await p.getByRole('option',{name:'WASD',exact:true}).click();await p.locator('[data-net-action="ready"]').click();}
   await host!.locator('[data-net-action="start"]').click();const arena=host!.locator('.network-arena');await expect(arena).toHaveAttribute('data-phase','playing');await expect(arena).toHaveAttribute('data-preparation','0',{timeout:15000});
   await host!.keyboard.down('a');await expect.poll(()=>frames.some(f=>f.held.left)).toBe(true);await host!.keyboard.up('a');
   await host!.locator('[data-net-action="pause"]:visible').click();await expect(host!.locator('#network-pause')).toBeVisible();await host!.locator('[data-net-action="resume"]').click();await expect(arena).toHaveAttribute('data-phase','playing');

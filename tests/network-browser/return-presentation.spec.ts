@@ -1,15 +1,16 @@
+import {openNetworkProfile} from './menuHelpers';
 import {test,expect,type Page} from '@playwright/test';
 import {mkdir,writeFile} from 'node:fs/promises';
-async function enter(page:Page){await page.goto('/');await page.getByRole('button',{name:/^Сетевая игра/}).click();}
+async function enter(page:Page){await page.goto('/?muted=1');await page.getByRole('button',{name:/^Сетевая игра/}).click();}
 test('same-match return reuses renderer, clears held input and resizes after list orientation changes',async({browser,baseURL})=>{
-  const contexts=await Promise.all([{width:1440,height:960},{width:390,height:844}].map(viewport=>browser.newContext({baseURL,viewport})));
+  const contexts=await Promise.all([{width:1440,height:960},{width:390,height:844}].map(viewport=>browser.newContext({baseURL,viewport,locale:'ru-RU'})));
   const [host,guest]=await Promise.all(contexts.map(c=>c.newPage()));
   const errors:string[]=[];for(const page of [host!,guest!])page.on('pageerror',error=>errors.push(error.message));
   const room=`Retained ${Date.now()}`,evidence=process.env.BRICKS_NETWORK_RETURN_EVIDENCE_DIR??'evidence/fix-network-eight-player-gates/return';await mkdir(evidence,{recursive:true});
   try {
     await enter(host!);await host!.getByRole('button',{name:'Создать лобби',exact:true}).click();await host!.getByLabel('Название лобби').fill(room);await host!.getByLabel('Ваше имя',{exact:true}).fill('Возврат создателя');await host!.getByRole('button',{name:'Создать',exact:true}).click();
     await expect(host!.getByRole('heading',{name:room})).toBeVisible();await enter(guest!);await guest!.locator('.network-lobby').filter({hasText:room}).getByRole('button',{name:'Войти'}).click();await guest!.getByLabel('Ваше имя',{exact:true}).fill('Игрок после возврата');await guest!.getByRole('button',{name:'Войти',exact:true}).click();
-    for(const page of [host!,guest!]){await expect(page.getByRole('heading',{name:room})).toBeVisible();await page.getByRole('combobox',{name:'Управление на этом устройстве'}).click();await page.getByRole('option',{name:'WASD'}).click();await page.getByRole('button',{name:'Готов',exact:true}).click();}
+    for(const page of [host!,guest!]){await expect(page.getByRole('heading',{name:room})).toBeVisible();await openNetworkProfile(page);await page.getByRole('combobox',{name:'Управление на этом устройстве'}).click();await page.getByRole('option',{name:'WASD'}).click();await page.getByRole('button',{name:'Готов',exact:true}).click();}
     await host!.getByRole('button',{name:'Начать',exact:true}).click();await expect(guest!.locator('.network-arena')).toHaveAttribute('data-phase','playing');await expect(guest!.locator('.network-arena')).toHaveAttribute('data-preparation','0',{timeout:15000});
     await guest!.evaluate(()=>{(window as any).__returnCanvas=document.querySelector('#network-canvas canvas');});
     const credential=await guest!.evaluate(()=>JSON.parse(localStorage.getItem('bricks-network-seat-v1')!));let epoch=0;const results:unknown[]=[];
