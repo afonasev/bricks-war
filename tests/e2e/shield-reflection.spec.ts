@@ -1,8 +1,9 @@
+import { openLocalLobby } from '../helpers/localLobby';
 import { expect, test, type Page } from '@playwright/test';
 
 async function start(page: Page, rows: number, capture?: number) {
   await page.goto(`/?muted=1&playtest-shield-impact=1&playtest-shield-rows=${rows}${capture === undefined ? '' : `&playtest-shield-capture=${capture}`}`);
-  await page.getByRole('button', {name:/^Выживание/}).click();
+  await openLocalLobby(page,'survival');
   const remove = page.getByRole('button',{name:'Удалить Игрок 2'});
   if (await remove.count()) await remove.click();
   await page.locator('#start-match').click();

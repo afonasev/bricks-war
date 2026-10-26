@@ -97,3 +97,44 @@ test('explicit cancel revokes pending activation but a fresh consent may retry t
 test('cancel before content preflight cannot transfer a package',async t=>{
  const f=await fixture(t);let calls=0;f.options.download=async()=>{calls++;throw Error('unexpected');};const store=await new ContentStore(f.options).open();const preparing=store.prepare(envelope(2,f.b));store.cancel();await assert.rejects(preparing);assert.equal(calls,0);assert.equal(store.ready,null);
 });
+
+
+test('a complete staged future-shell game survives old startup without becoming active', async t => {
+  const f = await fixture(t);
+  const options = {...f.options,shellRelease:'1.0.0'};
+  const store = await new ContentStore(options).open();
+  const future = envelope(2,f.b,{minShellVersion:3,minShellRelease:'2.0.0'});
+  f.set(future,f.b);
+  await store.prepare(future,()=>{},{abi:3,version:'2.0.0'});
+  assert.equal(store.ready,null);assert.equal(store.manifest.sequence,1);assert.equal(await store.activate(),false);
+  const old = await new ContentStore(options).open();
+  assert.equal(old.ready,null);assert.equal(old.state.pending,'release-2');assert.equal(old.manifest.sequence,1);
+  const upgraded = await new ContentStore({...options,shellVersion:3,shellRelease:'2.0.0'}).open();
+  assert.equal(upgraded.ready.sequence,2);await upgraded.activate();assert.equal(upgraded.manifest.sequence,2);
+  await upgraded.healthy();
+  assert.equal((await new ContentStore({...options,shellVersion:3,shellRelease:'2.0.0'}).open()).manifest.sequence,2);
+});
+
+test('future-shell staging cannot bypass installed-shell activation and can be discarded', async t => {
+  const f=await fixture(t);const store=await new ContentStore(f.options).open();
+  const future=envelope(2,f.b,{minShellVersion:3});f.set(future,f.b);
+  await assert.rejects(store.prepare(future),{code:'INCOMPATIBLE'});
+  await store.prepare(future,()=>{},{abi:3,version:'2.0.0'});
+  store.ready=JSON.parse(future.payload);
+  await assert.rejects(store.activate(),{code:'INCOMPATIBLE'});assert.equal(store.manifest.sequence,1);
+  await store.discardPrepared(2);assert.equal(store.ready,null);assert.equal(store.state.pending,null);
+});
+
+test('minimum release checks are signed, validated and fail closed without installed identity',()=>{
+  const signed=envelope(2,Buffer.from('b'),{minShellVersion:1,minShellRelease:'1.10.0'});
+  for(const release of [undefined,'1.9.9'])assert.throws(()=>validateManifest(signed,keys.publicKey,3,release),{code:'INCOMPATIBLE'});
+  assert.equal(validateManifest(signed,keys.publicKey,3,'1.10.0').sequence,2);
+  assert.throws(()=>validateManifest(envelope(2,Buffer.from('b'),{minShellVersion:99,minShellRelease:'garbage'}),keys.publicKey,3,'1.10.0'),/stable version/);
+});
+
+
+test('corrupt prepared content is a visible recovery, never a completed update',async t=>{
+ const f=await fixture(t);const store=await new ContentStore(f.options).open();await store.check();
+ await writeFile(join(store.root,store.state.pending,'index.html'),'corrupt');
+ const restarted=await new ContentStore(f.options).open();assert.equal(restarted.recovered,true);assert.equal(restarted.ready,null);assert.equal(restarted.manifest.sequence,1);
+});

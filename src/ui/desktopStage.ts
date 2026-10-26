@@ -1,6 +1,6 @@
 /** Menus share one logical composition; the game canvas retains physical coordinates. */
 export function configureDesktopStage(root: HTMLElement): void {
-  const desktop = root.dataset.layout === 'desktop' && !root.classList.contains('network-root');
+  const desktop = root.dataset.layout === 'desktop' && !root.classList.contains('network-root') && !root.querySelector('.unified-lobby');
   const menu = root.querySelector('main:not(.arena-screen)');
   let stage = root.querySelector<HTMLElement>(':scope > .desktop-menu-stage');
   if (!desktop || !menu) {

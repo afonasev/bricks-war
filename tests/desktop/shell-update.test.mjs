@@ -1,13 +1,13 @@
-import {mkdtemp,rm,mkdir,writeFile} from 'node:fs/promises';
+import {mkdtemp,rm,mkdir,writeFile,readFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { sign,generateKeyPairSync } from 'node:crypto';
+import { sign,generateKeyPairSync,createHash } from 'node:crypto';
 import {ShellUpdate,validateShell} from '../../electron/shell-update.mjs';
 import {replaceApplication,applicationEnvironment,recordShellFailure,failedShellVersions} from '../../electron/shell-helper.mjs';
 const keys=generateKeyPairSync('ed25519');
-function envelope(overrides={}) { const payload=JSON.stringify({schema:1,game:'bricks-war',component:'shell',channel:'stable',updaterAbi:1,version:'2.0.0',files:[{name:'Bricks-War-2.0.0-mac-universal.zip',platform:'darwin',arch:'universal',minimumOS:'13.0.0',size:100,sha256:'a'.repeat(64)}],...overrides});return {payload,signature:sign(null,Buffer.from(payload),keys.privateKey).toString('base64')}; }
+function envelope(overrides={}) { const payload=JSON.stringify({schema:1,game:'bricks-war',component:'shell',channel:'stable',updaterAbi:1,contentSequence:1,version:'2.0.0',files:[{name:'Bricks-War-2.0.0-mac-universal.zip',platform:'darwin',arch:'universal',minimumOS:'13.0.0',size:100,sha256:'a'.repeat(64)}],...overrides});return {payload,signature:sign(null,Buffer.from(payload),keys.privateKey).toString('base64')}; }
 test('shell trust binds publisher, game, channel, version and architecture',()=>{
   assert.equal(validateShell(envelope(),keys.publicKey,'darwin','arm64','1.0.0').version,'2.0.0');
   for(const change of [{channel:'beta'},{game:'other'},{component:'content'},{version:'1.0.0'}])assert.throws(()=>validateShell(envelope(change),keys.publicKey,'darwin','arm64','1.0.0'));
@@ -52,4 +52,21 @@ test('multiple failed versions remain blocked across restarts rather than altern
 test('post-health partial backup cleanup failure never rolls back the healthy application',async()=>{
  const ops=operations();const original=ops.remove;ops.remove=async path=>{if(path.includes('.previous-')){ops.files.delete(path);throw Error('partial cleanup');}return original(path);};
  ops.cleanupFailure=async()=>{throw Error('log disk full');};assert.equal(await replaceApplication(plan,ops),true);assert.ok(ops.files.has('/Applications/Bricks War.app'));assert.ok(!ops.events.some(e=>Array.isArray(e)&&e[0]==='failed'));
+});
+
+
+test('coordinated shell preparation cannot advertise readiness until all content is verified',async t=>{
+ const root=await mkdtemp(join(tmpdir(),'bricks-shell-deferred-'));t.after(()=>rm(root,{recursive:true,force:true}));
+ const bytes=Buffer.from('signed installer fixture');
+ const file={name:'Bricks-War-2.0.0-win-x64.exe',platform:'win32',arch:'x64',minimumOS:'10.0.0',size:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex')};
+ const signed=envelope({contentAbi:3,files:[file]});const manifest=validateShell(signed,keys.publicKey,'win32','x64','1.0.0','10.0.0');
+ const shell=new ShellUpdate({root,platform:'win32'});shell.selected={release:{tag_name:'v2.0.0'},manifest,envelope:signed};shell.bytes=async()=>bytes;
+ const plan=await shell.prepare(()=>{},()=>{},{deferReady:true});
+ assert.equal(shell.ready,undefined);await assert.rejects(readFile(join(root,'ready.json')),{code:'ENOENT'});
+ await shell.commitPrepared(plan);assert.equal(shell.ready.version,'2.0.0');assert.equal(JSON.parse(await readFile(join(root,'ready.json'))).version,'2.0.0');
+});
+
+test('signed shell capability metadata cannot contain an invalid ABI',()=>{
+ for(const contentAbi of [0,-1,1.5,'3'])assert.throws(()=>validateShell(envelope({contentAbi}),keys.publicKey,'darwin','arm64','1.0.0'),/content ABI/);
+ assert.equal(validateShell(envelope({contentAbi:3}),keys.publicKey,'darwin','arm64','1.0.0').contentAbi,3);
 });

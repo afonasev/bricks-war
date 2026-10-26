@@ -23,3 +23,8 @@ it('download requires consent in a safe menu and does not recheck discovery', as
   expect(client.apply()).toBe(true); await Promise.resolve();
   expect(bridge.download).toHaveBeenCalledTimes(1); expect(bridge.apply).not.toHaveBeenCalled(); expect(bridge.check).toHaveBeenCalledTimes(1); client.dispose();
 });
+
+it('cannot download a target whose required application package is unavailable',async()=>{
+ const {bridge,client}=await setup();bridge.check.mockResolvedValue({available:true,error:false,applying:false,phase:'shell-required',requiresShell:true,version:'2.0.0'});
+ await client.check();expect(client.apply()).toBe(false);expect(bridge.download).not.toHaveBeenCalled();expect(bridge.apply).not.toHaveBeenCalled();expect(client.snapshot().phase).toBe('shell-required');client.dispose();
+});

@@ -50,3 +50,8 @@ test('ordinary quit starts no helper; repeated explicit activation shares the pe
 test('helper preparation failure releases quit guard and does not strand a rejected promise',async()=>{
  let failures=0;const activation=new ShellActivation({launchHelper:async()=>{throw Error('helper');}},()=>failures++);await assert.rejects(activation.start());assert.equal(activation.pending,false);assert.equal(activation.promise,null);assert.equal(failures,1);
 });
+
+test('history forwards optional locale through the existing activity barrier without discovery',async()=>{
+ const calls=[];const coordinator=new UpdateCoordinator({store:{manifest:{gameVersion:'1.0.0'}},gate:new TransferGate(),discover:async()=>{throw Error('must not discover');},history:async locale=>{calls.push(locale);return [];}});
+ await coordinator.getHistory('ja');assert.deepEqual(calls,['ja']);await coordinator.setActivity(false);await assert.rejects(coordinator.getHistory('de'),/match/);assert.deepEqual(calls,['ja']);
+});

@@ -23,3 +23,6 @@
 }
 /* The old 2.8rem arrow overflowed compact cards, including when invisible. */
 #app .main-menu-screen:has(.mode-exit) .mode-forward { height: auto; font-size: 28px; line-height: 1; }
+
+/* Preserve the idle logo/header height when a web update appears beside it. */
+#app[data-layout="desktop"] .main-menu-screen:not(:has(.desktop-release-history)) .main-menu-brand-row .concept-brand-heading { flex-shrink: 0; }

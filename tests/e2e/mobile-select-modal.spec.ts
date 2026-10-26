@@ -1,9 +1,10 @@
+import { openLocalLobby } from '../helpers/localLobby';
 import {test,expect} from '@playwright/test';
 
 test('mobile lists center, cancel outside without click-through, confirm and resize cleanly',async({page})=>{
   await page.setViewportSize({width:390,height:844});
   await page.goto('/?muted=1');
-  await page.getByRole('button',{name:/^Битва/}).click();
+  await openLocalLobby(page,'battle');
   const trigger=page.getByRole('combobox',{name:'Длительность матча',exact:true});
   const native=page.locator('#match-duration');
   const original=await native.inputValue();

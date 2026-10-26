@@ -1,4 +1,6 @@
+import { openLocalLobby } from '../helpers/localLobby';
 import { expect, test, type Page } from '@playwright/test';
+import { catalogs } from '../../src/i18n/catalogs';
 // @ts-expect-error Test-only Node fixture has no TS declaration.
 import { startClientUpdateServer } from '../helpers/clientUpdateServer.mjs';
 
@@ -32,7 +34,8 @@ for (const viewport of [{ width: 1440, height: 960 }, { width: 1280, height: 480
     await discover(page);
     const button = page.getByRole('button', { name: 'Обновить', exact: true });
     await expect(button).toBeVisible(); await expect(button).toBeEnabled();
-    await expect(page.locator('.client-update-announcement')).toHaveText('Вышла новая версия игры, готовы обновиться?');
+    const locale = await page.locator('html').getAttribute('lang') as keyof typeof catalogs;
+    await expect(page.locator('.client-update-announcement')).toHaveText(catalogs[locale].updateAnnouncement);
     await expect(page.locator('.client-update-announcement')).toBeVisible();
     if (viewport.width > 900) expect(await firstChoice.boundingBox()).toEqual(choiceBeforeUpdate);
     await expect(page.locator('meta[name="qa-release"]')).toHaveAttribute('content', 'A');
@@ -53,7 +56,7 @@ for (const viewport of [{ width: 1440, height: 960 }, { width: 1280, height: 480
       return { overlaps, clipped, textClipped };
     });
     expect(layout).toEqual({ overlaps: [], clipped: [], textClipped: [] });
-    await page.screenshot({ path: `evidence/add-client-update-button/menu-${viewport.width}x${viewport.height}.png` });
+    await page.screenshot({ path: `${process.env.BRICKS_CANDIDATE_EVIDENCE ?? 'evidence/add-client-update-button'}/menu-${viewport.width}x${viewport.height}.png` });
     await button.click();
     await expect(page.locator('meta[name="qa-release"]')).toHaveAttribute('content', 'B');
     expect(await page.evaluate(() => localStorage.getItem('qa-settings-preserved'))).toBe('yes');
@@ -66,9 +69,9 @@ for (const viewport of [{ width: 1440, height: 960 }, { width: 1280, height: 480
 
 test('other tab update never reloads a local match and offers refresh on return to menu', async ({ page, context }) => {
   await loadControlled(page);
-  const other = await context.newPage(); await loadControlled(other);
-  await other.getByRole('button', { name: /^Выживание/ }).click();
-  await other.getByRole('button', { name: /^Start/ }).click();
+  const other = await context.newPage(); await other.setViewportSize({ width: 390, height: 844 }); await loadControlled(other);
+  await openLocalLobby(other,'survival');
+  await other.locator('#start-match').click();
   await expect(other.locator('#game-stage')).toBeVisible();
   await discover(page); await page.getByRole('button', { name: 'Обновить', exact: true }).click();
   await expect(page.locator('meta[name="qa-release"]')).toHaveAttribute('content', 'B');
@@ -118,6 +121,6 @@ test('new header action preserves the existing keyboard selection', async ({ pag
   await discover(page);
   await expect(page.getByRole('button', { name: 'Обновить', exact: true })).toBeVisible();
   await page.keyboard.press('Enter');
-  await expect(page.getByRole('button', { name: /^Start/ })).toBeVisible();
+  await expect(page.locator('#start-match')).toBeVisible();
   await expect(page.locator('meta[name="qa-release"]')).toHaveAttribute('content', 'A');
 });

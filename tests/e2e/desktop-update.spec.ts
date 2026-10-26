@@ -21,12 +21,12 @@ for (const viewport of [{ width: 1440, height: 960 }, { width: 1280, height: 480
     });
     await page.goto('/?muted=1');
     const button = page.locator('.client-update-button');
-    await expect(button).toHaveText('Проверка недоступна'); await expect(button).toBeDisabled();
-    await expect(page.locator('.client-update-status')).toHaveText('Не удалось проверить обновления. Следующая проверка — при запуске игры.');
+    await expect(button.locator('strong')).toHaveText('Проверка недоступна'); await expect(button).toBeDisabled();
+    await expect(button.locator('small')).toHaveText('Не удалось проверить обновления. Следующая проверка — при запуске игры.');
     for (const phase of ['checking', 'downloading', 'check-error']) {
       await page.evaluate(phase => { (window as any).__desktopQA.state.phase = phase; }, phase);
-      await expect(button).toHaveText(phase === 'checking' ? 'Проверка…' : phase === 'downloading' ? 'Загрузка 0%' : 'Проверка недоступна');
-      await expect(button).toBeDisabled();
+      await expect(button.locator('strong')).toHaveText(phase === 'checking' ? 'Проверка…' : phase === 'downloading' ? 'Загрузка 0%' : 'Проверка недоступна');
+      if (phase === 'downloading') { await expect(button).toBeEnabled();await expect(button.locator('small')).toHaveText('Отменить'); } else await expect(button).toBeDisabled();
       const issues = await page.evaluate(() => {
         const nodes = [...document.querySelectorAll<HTMLElement>('.client-update-button, .client-update-status, .client-update-announcement')]
           .filter(e => !e.hidden && e.getClientRects().length);
@@ -48,11 +48,11 @@ for (const viewport of [{ width: 1440, height: 960 }, { width: 1280, height: 480
       });
       expect(issues).toEqual([]);
     }
-    await page.screenshot({ path: `evidence/align-game-template/error-${viewport.width}x${viewport.height}.png` });
+    await page.screenshot({ path: `${process.env.BRICKS_CANDIDATE_EVIDENCE ?? 'evidence/align-game-template'}/error-${viewport.width}x${viewport.height}.png` });
     await page.evaluate(()=>{(window as any).__desktopQA.state={available:true,applying:false,error:false,phase:'ready'};});
-    await expect(button).toHaveText('Перезапустить'); await expect(button).toBeEnabled();
+    await expect(button.locator('strong')).toHaveText('Перезапустить'); await expect(button).toBeEnabled();
     expect(await page.evaluate(() => (window as any).__desktopQA.applies)).toBe(0);
-    await page.screenshot({ path: `evidence/align-game-template/ready-${viewport.width}x${viewport.height}.png` });
+    await page.screenshot({ path: `${process.env.BRICKS_CANDIDATE_EVIDENCE ?? 'evidence/align-game-template'}/ready-${viewport.width}x${viewport.height}.png` });
     await button.click();
     await expect.poll(() => page.evaluate(() => (window as any).__desktopQA.applies)).toBe(1);
   });

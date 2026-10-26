@@ -1,3 +1,10 @@
+import { refreshFaceGlyphs } from './inputGlyph';
+import { refreshMenuActionHints } from './menuActionHints';
+import { spatialElementIndex } from './spatialNavigation';
+import { nameKeyboardRows } from './nameKeyboard';
+import { getLocale } from '../i18n/locale';
+import { text } from '../i18n/locale';
+import { suspendOtherDialogs } from './modalSemantics';
 import { gamepadFaceLabels } from './gamepadFooterHints';
 import { ResultsInputGuard, RESULTS_INPUT_DELAY_MS } from './resultsInputGuard';
 import type { AppScreen } from './screenRouter';
@@ -13,8 +20,10 @@ function pressed(gamepad: Gamepad, index: number): boolean {
 }
 
 export function keyboardMenuAction(key: string): MenuAction {
-  if (key === 'ArrowUp' || key === 'ArrowLeft' || key.toLowerCase() === 'w' || key.toLowerCase() === 'a') return 'previous';
-  if (key === 'ArrowDown' || key === 'ArrowRight' || key.toLowerCase() === 's' || key.toLowerCase() === 'd') return 'next';
+  if (key === 'ArrowUp' || key.toLowerCase() === 'w') return 'previous';
+  if (key === 'ArrowDown' || key.toLowerCase() === 's') return 'next';
+  if (key === 'ArrowLeft' || key.toLowerCase() === 'a') return 'decrease';
+  if (key === 'ArrowRight' || key.toLowerCase() === 'd') return 'increase';
   if (key === 'Enter' || key === ' ') return 'confirm';
   if (key === 'Escape') return 'back';
   return null;
@@ -117,6 +126,7 @@ export class MenuFocusController {
     root.ownerDocument.addEventListener('keyup', this.onDocumentKeyUp, true);
     root.addEventListener('keydown', this.onKeyDown);
     root.addEventListener('pointermove', this.onPointerMove);
+    root.addEventListener('pointerdown', this.onPointerDown, true);
     window.addEventListener('blur', this.onBlur);
     this.frame = window.requestAnimationFrame(this.pollGamepads);
   }
@@ -199,6 +209,7 @@ export class MenuFocusController {
     window.removeEventListener('blur', this.onBlur);
     this.root.removeEventListener('keydown', this.onKeyDown);
     this.root.removeEventListener('pointermove', this.onPointerMove);
+    this.root.removeEventListener('pointerdown', this.onPointerDown, true);
   }
 
   private items(): HTMLElement[] {
@@ -215,9 +226,18 @@ export class MenuFocusController {
           ?? this.root.querySelector<HTMLElement>(`[data-screen="${this.screen}"]`)
           ?? this.root.querySelector<HTMLElement>('.debug-lab-screen')
           ?? this.root) ?? this.root;
-    const activeScope = this.root.querySelector<HTMLElement>('[data-virtual-keyboard], [data-display-confirm], [data-release-history], [data-network-preferences]') ?? scope;
+    const exposed = (element: HTMLElement) => element.getClientRects().length > 0
+      && !element.closest('[hidden], [inert], [aria-hidden="true"]');
+    const activeScope = Array.from(this.root.querySelectorAll<HTMLElement>('[data-virtual-keyboard], [data-display-confirm], [data-release-history], [data-network-preferences]')).find(exposed)
+      ?? Array.from(this.root.querySelectorAll<HTMLElement>('#network-pause')).find(exposed) ?? scope;
     return Array.from(activeScope.querySelectorAll<HTMLElement>('[data-ui-focus]:not([disabled])'))
-      .filter((item) => item.getClientRects().length > 0 && !item.hidden && !item.closest('[hidden]') && item.getAttribute('aria-hidden') !== 'true');
+      .filter(exposed);
+  }
+
+  private setInputMode(mode: 'pointer' | 'keyboard' | 'gamepad'): void {
+    this.root.dataset.inputMode = mode;
+    if (mode === 'pointer' && isMobilePlayViewport()) this.clearSelection();
+    this.options.onInputMode?.(mode);
   }
 
   private clearSelection(): void {
@@ -242,14 +262,16 @@ export class MenuFocusController {
       selected?.focus({ preventScroll: true });
       selected?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     }
+    refreshMenuActionHints(this.root, selected ?? null);
     this.options.onSelectionChange?.(selected ?? null);
   }
 
   private perform(action: MenuAction, mode: 'keyboard' | 'gamepad'): void {
     if (!action || !this.screen || (this.screen === 'results' && !this.resultsGuard.ready())) return;
-    this.options.onInputMode?.(mode);
+    this.setInputMode(mode);
     const selected = this.items()[this.index] ?? null;
     if (mode === 'gamepad' && action === 'add-ai') {
+      if (this.root.querySelector('[data-virtual-keyboard]')) return;
       this.options.onGamepadAddAi?.();
       return;
     }
@@ -269,13 +291,15 @@ export class MenuFocusController {
       if (action === 'back') sendMenuSelectCommand(selected!, 'cancel');
       return;
     }
-    if (action === 'previous') this.select(this.index - 1);
-    if (action === 'next') this.select(this.index + 1);
+    if (selected?.matches('[data-history-scroll]') && ['decrease', 'increase'].includes(action)) {
+      selected.scrollBy({ top: (action === 'increase' ? 1 : -1) * selected.clientHeight * .8 }); return;
+    }
+    if (action === 'previous' || action === 'next') this.select(spatialElementIndex(this.items(), this.index, action));
     if (action === 'decrease' || action === 'increase') this.adjustOrMove(action === 'increase' ? 1 : -1);
     if (action === 'confirm') {
       if (mode !== 'gamepad' || !this.options.onGamepadConfirm?.(this.latch.lastGamepadIndex(), selected)) selected?.click();
     }
-    if (action === 'back') { const keyboard = this.root.querySelector('[data-virtual-keyboard]'); if (keyboard) { (Array.from(keyboard.querySelectorAll('button')).find(b => b.textContent === 'Отмена'))?.click(); } else this.options.onBack(); }
+    if (action === 'back') { const keyboard = this.root.querySelector('[data-virtual-keyboard]'); if (keyboard) { keyboard.querySelector<HTMLButtonElement>('[data-keyboard-action="cancel"]')?.click(); } else this.options.onBack(); }
     if (mode === 'gamepad' && (['previous', 'next', 'decrease', 'increase'].includes(action) || (action === 'confirm' && selected?.matches('[data-player-name]')))) {
       this.options.onGamepadSelection?.(this.latch.lastGamepadIndex(), this.items()[this.index] ?? null);
     }
@@ -307,20 +331,34 @@ export class MenuFocusController {
       }
       return;
     }
-    this.select(this.index + direction);
+    this.select(spatialElementIndex(this.items(), this.index, direction === 1 ? 'increase' : 'decrease'));
   }
 
   private readonly onDocumentKeyDown = (event: KeyboardEvent): void => {
-    if (event.key === 'Tab' && this.root.querySelector('[data-ai-choice]')) {
+    if (this.screen && event.key === 'Tab') {
+      this.setInputMode('keyboard');
+      this.clearSelection();
+    }
+    if (event.key === 'Tab' && this.screen && this.root.querySelector('[role="dialog"][aria-modal="true"]:not([hidden])')) {
       event.preventDefault();
       event.stopImmediatePropagation();
+      this.setInputMode('keyboard');
       this.select(this.index + (event.shiftKey ? -1 : 1));
       return;
     }
     this.heldKeys.add(event.code || event.key);
     if (this.transitionKeys.has(event.code || event.key) && ['Enter',' '].includes(event.key)) { event.preventDefault(); event.stopImmediatePropagation(); return; }
     const allowed = this.resultsGuard.keyDown(event.code || event.key, event.repeat);
-    if (this.screen !== 'results') return;
+    if (this.screen !== 'results') {
+      // Touch menus start without DOM focus. Preserve key/transition guards,
+      // then route the first navigation key while body still owns focus.
+      if (this.screen && keyboardMenuAction(event.key)
+        && event.target instanceof Node && !this.root.contains(event.target)) {
+        event.preventDefault();
+        this.perform(keyboardMenuAction(event.key), 'keyboard');
+      }
+      return;
+    }
     const action = keyboardMenuAction(event.key);
     if (!action && event.key !== 'Tab') return;
     if (event.key === 'Tab' && allowed) return;
@@ -338,6 +376,10 @@ export class MenuFocusController {
   };
 
   private readonly onKeyDown = (event: KeyboardEvent): void => {
+    if (this.screen) this.setInputMode('keyboard');
+    if (event.target instanceof HTMLElement && event.target.matches('[data-history-scroll]') && ['ArrowUp','ArrowDown','PageUp','PageDown','Home','End'].includes(event.key)) {
+      event.stopPropagation(); return; // Native keyboard scrolling belongs to the focused notes region.
+    }
     const action = keyboardMenuAction(event.key);
     if (!action || !this.screen || (event.repeat && ['confirm','back','start'].includes(action))) return;
     const target = event.target;
@@ -351,8 +393,12 @@ export class MenuFocusController {
     this.perform(action, 'keyboard');
   };
 
+  private readonly onPointerDown = (): void => {
+    this.setInputMode('pointer');
+  };
+
   private readonly onPointerMove = (event: PointerEvent): void => {
-    this.options.onInputMode?.('pointer');
+    this.setInputMode('pointer');
     if (!this.screen || (this.screen === 'results' && !this.resultsGuard.ready())) return;
     if (isMobilePlayViewport()) return;
     const target = event.target instanceof Element ? event.target.closest<HTMLElement>('[data-ui-focus]') : null;
@@ -362,22 +408,41 @@ export class MenuFocusController {
     this.select(index, true);
   };
 
-  private readonly onBlur = (): void => { this.options.onInputMode?.('pointer'); };
+  private readonly onBlur = (): void => { this.setInputMode('pointer'); };
 
   private openKeyboard(input: HTMLInputElement): void {
     if (this.root.querySelector('[data-virtual-keyboard]')) return;
     const backdrop = document.createElement('div'); backdrop.className = 'profile-choice-backdrop';
     const keyboard = document.createElement('section'); keyboard.className = 'release-panel virtual-keyboard'; keyboard.dataset.virtualKeyboard = ''; keyboard.setAttribute('role','dialog'); keyboard.setAttribute('aria-modal','true');
-    const title = document.createElement('h2'); title.textContent = 'Ввод имени'; keyboard.append(title);
+    const title = document.createElement('h2'); title.id = 'virtual-keyboard-title'; title.textContent = text('keyboardTitle'); keyboard.setAttribute('aria-labelledby', title.id); keyboard.append(title);
     const output = document.createElement('output'); output.textContent = input.value; keyboard.append(output);
     const keys = document.createElement('div'); keys.className = 'virtual-keyboard-keys'; keyboard.append(keys);
     const original = input.value;
     const write = (value: string) => { input.value = value.slice(0,input.maxLength > 0 ? input.maxLength : 64); input.dispatchEvent(new Event('input',{bubbles:true})); output.textContent = input.value; };
-    const close = () => { backdrop.remove(); this.select(Math.max(0,this.items().indexOf(input))); };
-    for (const key of [...'АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', 'Пробел', 'Стереть', 'Готово', 'Отмена']) {
-      const button = document.createElement('button'); button.type = 'button'; button.dataset.uiFocus = ''; button.textContent = key;
-      button.addEventListener('click', () => { if (key === 'Готово') { close(); return; } if (key === 'Отмена') { write(original); close(); return; } write(key === 'Стереть' ? input.value.slice(0,-1) : input.value + (key === 'Пробел' ? ' ' : key)); }); keys.append(button);
-    }
+    const restoreDialogs = suspendOtherDialogs(this.root, keyboard);
+    const close = () => { backdrop.remove(); restoreDialogs(); this.select(Math.max(0,this.items().indexOf(input))); input.focus({ preventScroll: true }); };
+    let numeric = false;
+    const renderKeys = () => {
+      keys.replaceChildren(); keys.classList.add('name-keyboard-layout');
+      const add = (parent: HTMLElement, label: string, click: () => void, action?: 'space' | 'delete' | 'done' | 'cancel') => {
+        const button = document.createElement('button'); button.type = 'button'; button.dataset.uiFocus = ''; button.textContent = label;
+        if (action) { button.dataset.keyboardAction = action; button.setAttribute('aria-label', text(({space:'keyboardSpace',delete:'keyboardDelete',done:'keyboardDone',cancel:'keyboardCancel'} as const)[action])); }
+        button.addEventListener('click', click); parent.append(button); return button;
+      };
+      for (const row of nameKeyboardRows(getLocale() === 'ru', numeric)) {
+        const line = document.createElement('div'); line.className = 'name-keyboard-row'; keys.append(line);
+        for (const letter of row) add(line, letter, () => write(input.value + letter));
+      }
+      const actions = document.createElement('div'); actions.className = 'name-keyboard-row'; keys.append(actions);
+      if (getLocale() === 'ru' && !numeric) add(actions, 'Ё', () => write(input.value + 'Ё'));
+      add(actions, numeric ? getLocale() === 'ru' ? 'АБВ' : 'ABC' : '123', () => { numeric = !numeric; renderKeys(); this.select(0); });
+      add(actions, text('keyboardSpace'), () => write(input.value + ' '), 'space').classList.add('name-keyboard-space');
+      add(actions, '⌫', () => write(input.value.slice(0,-1)), 'delete');
+      const footer = document.createElement('div'); footer.className = 'name-keyboard-row'; keys.append(footer);
+      add(footer, 'Y · ' + text('keyboardDone'), close, 'done');
+      add(footer, 'B · ' + text('keyboardCancel'), () => { write(original); close(); }, 'cancel');
+    };
+    renderKeys();
     backdrop.append(keyboard); this.root.append(backdrop); this.select(0);
   }
 
@@ -391,7 +456,9 @@ export class MenuFocusController {
       this.options.acceptsGamepad ?? (() => true),
       this.options.onIgnoredGamepadAction,
       index=>{
-        this.options.onInputMode?.('gamepad');
+        this.setInputMode('gamepad');
+        const keyboardDone = this.root.querySelector<HTMLButtonElement>('[data-virtual-keyboard] [data-keyboard-action="done"]');
+        if (keyboardDone) { if (this.options.acceptsGamepad?.(index) !== false) keyboardDone.click(); return; }
         const reset = this.root.querySelector<HTMLButtonElement>('.settings-screen[data-screen="settings"] [data-reset-preferences="all"], #pause-settings-panel:not([hidden]) [data-reset-preferences="all"], [data-network-preferences] [data-reset-preferences="all"]');
         if (reset?.getClientRects().length) {
           const active = this.root.ownerDocument.activeElement;
@@ -403,12 +470,14 @@ export class MenuFocusController {
     );
     const activePad = pads.find(pad => pad?.connected && pad.index === this.latch.lastGamepadIndex()) ?? pads.find(pad => pad?.connected);
     this.root.dataset.gamepadHints = activePad ? 'connected' : 'none';
-    if (this.screen !== null) {
-      const [confirm, back, ai, top] = gamepadFaceLabels(activePad?.id ?? '');
+    if (this.screen !== null && !this.root.querySelector('.unified-lobby')) {
+      refreshMenuActionHints(this.root, this.root.contains(this.root.ownerDocument.activeElement) ? this.root.ownerDocument.activeElement as HTMLElement : this.selectedItem);
+      const [confirm, back, ai, top] = gamepadFaceLabels(activePad?.id ?? 'Xbox');
       for (const [selector, glyph] of [['.input-confirm', confirm], ['.input-back', back], ['.input-ai', ai], ['.input-roster,.input-reset', top]] as const) {
         this.root.querySelectorAll<HTMLElement>(selector).forEach(hint => { if (hint.textContent !== glyph) hint.textContent = glyph; });
       }
     }
+    if (this.screen !== null && !this.root.querySelector('.unified-lobby')) refreshFaceGlyphs(this.root, activePad?.id ?? 'Xbox');
     if (action) this.perform(action, 'gamepad');
     this.frame = window.requestAnimationFrame(this.pollGamepads);
   };

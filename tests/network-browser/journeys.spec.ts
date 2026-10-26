@@ -1,6 +1,6 @@
 import {test,expect,type Page} from '@playwright/test';
 const name=(i:number)=>['Александр Екатеринбург','Екатерина Санкт-Петербург','Михаил Нижний Новгород','Елизавета Петропавловск','Константин Новосибирск','Виктория Владивосток','Анастасия Красноярск','Дмитрий Калининград'][i]!;
-async function enter(page:Page){await page.goto('/');await page.getByRole('button',{name:/^Сетевая игра/}).click();}
+async function enter(page:Page){await page.goto('/?muted=1');await page.getByRole('button',{name:/^Сетевая игра/}).click();}
 async function readable(page:Page) {
   const failures=await page.evaluate(()=>{
     const elements=[...document.querySelectorAll<HTMLElement>('.network-field-heading,strong,button,label,select')].filter(e=>e.getBoundingClientRect().height&&getComputedStyle(e).visibility!=='hidden');
@@ -26,7 +26,7 @@ async function readableLobby(page:Page) {
   });expect(failures).toEqual([]);
 }
 for(const count of [2,4,8])test(`${count} independent contexts create join own-seat pause return results`,async({browser,baseURL})=>{
-  const contexts=await Promise.all(Array.from({length:count},(_,i)=>browser.newContext({baseURL,viewport:i===count-1?{width:390,height:844}:{width:1600,height:900}})));
+  const contexts=await Promise.all(Array.from({length:count},(_,i)=>browser.newContext({baseURL,locale:'ru-RU',viewport:i===count-1?{width:390,height:844}:{width:1600,height:900}})));
   const pages=await Promise.all(contexts.map(c=>c.newPage()));const errors:string[]=[];
   for(const page of pages)page.on('pageerror',e=>errors.push(e.message));
   const host=pages[0]!;const roomName=`Independent ${count} ${Date.now()}`;

@@ -1,3 +1,4 @@
+import { openLocalLobby } from '../helpers/localLobby';
 import { expect, test } from '@playwright/test';
 
 for (const viewport of [{width:1440,height:960},{width:1280,height:480},{width:800,height:620},{width:390,height:844}]) {
@@ -6,7 +7,7 @@ for (const viewport of [{width:1440,height:960},{width:1280,height:480},{width:8
     const mobile = viewport.width < 700;
     for (const mode of mobile ? ['Выживание','Битва'] : ['Выживание','Битва','Командный бой']) {
       await page.goto('/?muted=1');
-      await page.getByRole('button',{name:new RegExp(`^${mode}`)}).click();
+      await openLocalLobby(page, mode);
       const start = page.locator('#start-match');
       await expect(start).toBeVisible();
       const geometry = await start.evaluate(el => {

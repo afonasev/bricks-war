@@ -1,0 +1,91 @@
+/* Cover the physical viewport, including the clock above the shorter game stage. */
+#app #pause-overlay { position: fixed; }
+/* Approved pause Settings A: independent cards, one spacing and control grid. */
+#app .pause-settings-panel.pause-preferences-grid {
+  --preferences-gap:16px;
+  display:flex; flex-direction:column; align-items:stretch; gap:12px;
+  width:min(900px,calc(100% - 24px)); height:min(760px,calc(100dvh - 24px));
+  max-height:760px; min-height:0; padding:20px; box-sizing:border-box;
+}
+#app .pause-settings-panel.pause-preferences-grid > h2 { flex:0 0 auto; margin:0; font-size:26px; line-height:1.2; }
+#app .pause-settings-panel.pause-preferences-grid .pause-preferences-scroll {
+  flex:1 1 auto; min-height:0; max-height:none; overflow:auto; overscroll-behavior:contain;
+  padding:4px; box-sizing:border-box; scrollbar-gutter:stable;
+}
+#app .pause-settings-panel.pause-preferences-grid .pause-preferences-columns { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--preferences-gap); align-items:start; }
+#app .pause-settings-panel.pause-preferences-grid .pause-preferences-column { display:grid; gap:var(--preferences-gap); min-width:0; }
+#app .pause-settings-panel.pause-preferences-grid :is(.settings-language-section,.pause-preferences-card,.settings-stick-section) {
+  margin:0; padding:16px; min-width:0; border:2px solid #c5d0d7; border-bottom-width:5px;
+  border-radius:18px; background:#fffdf8; box-shadow:none; box-sizing:border-box; text-align:left;
+}
+#app .pause-settings-panel.pause-preferences-grid :is(h3,.settings-stick-section h2) { font-size:17px; line-height:1.3; margin:0 0 14px; color:var(--text); }
+#app .pause-settings-panel.pause-preferences-grid .settings-stick-section > header { margin:0 0 12px; gap:0; }
+#app .pause-settings-panel.pause-preferences-grid .settings-stick-section h2 { margin:0; }
+#app .pause-settings-panel.pause-preferences-grid .settings-stick-section .settings-icon { display:none; }
+#app .pause-settings-panel.pause-preferences-grid .settings-section-note { margin:0 0 16px; font-size:12px; line-height:1.4; }
+#app .pause-settings-panel.pause-preferences-grid .setup-audio-controls { display:grid; gap:20px; margin:0; padding:0; }
+#app .pause-settings-panel.pause-preferences-grid .volume-control {
+  display:grid; grid-template-columns:minmax(0,1fr) 52px; gap:8px; padding:0; margin:0;
+  min-height:44px; font-size:13px; line-height:1.4; text-align:left;
+}
+#app .pause-settings-panel.pause-preferences-grid .volume-control > span { grid-column:1; grid-row:1; min-width:0; white-space:normal; overflow-wrap:anywhere; }
+#app .pause-settings-panel.pause-preferences-grid .volume-control > output { grid-column:2; grid-row:1; text-align:right; }
+#app .pause-settings-panel.pause-preferences-grid .volume-control > input { grid-column:1 / -1; grid-row:2; width:100%; min-width:0; margin:0; }
+#app .pause-settings-panel.pause-preferences-grid .volume-control + .volume-control { margin-top:20px; }
+#app .pause-settings-panel.pause-preferences-grid .setup-audio-controls .volume-control + .volume-control { margin-top:0; }
+#app .pause-settings-panel.pause-preferences-grid .settings-action {
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  min-height:44px; padding:12px 0; margin:0; border:0; border-radius:0; background:transparent; box-shadow:none;
+}
+#app .pause-settings-panel.pause-preferences-grid .settings-action + .settings-action { border-top:1px solid #e5e3da; }
+#app .pause-settings-panel.pause-preferences-grid .settings-action > span:not(.menu-select) { min-width:0; flex:1 1 50%; }
+#app .pause-settings-panel.pause-preferences-grid .settings-action strong { font-size:14px; line-height:1.35; }
+#app .pause-settings-panel.pause-preferences-grid .settings-action small { font-size:12px; line-height:1.4; margin-top:4px; }
+#app .pause-settings-panel.pause-preferences-grid .settings-action input[type=checkbox] { flex:0 0 26px; width:26px; height:26px; margin:0; }
+#app .pause-settings-panel.pause-preferences-grid .menu-select { min-width:0; flex:1 1 50%; }
+#app .pause-settings-panel.pause-preferences-grid .menu-select-trigger { min-height:44px; padding:10px 13px; font-size:14px; box-sizing:border-box; }
+#app .pause-settings-panel.pause-preferences-grid .settings-language-section .settings-action { padding:0; flex-wrap:wrap; row-gap:6px; }
+#app .pause-settings-panel.pause-preferences-grid .settings-language-section .settings-action > span:not(.menu-select) { flex-basis:100%; padding-left:15px; }
+#app .pause-settings-panel.pause-preferences-grid .settings-language-section .menu-select { flex-basis:100%; width:100%; }
+#app .pause-settings-panel.pause-preferences-grid [data-pause-fullscreen] { width:100%; margin-bottom:4px; font-size:14px; }
+#app .pause-settings-panel.pause-preferences-grid .pause-preferences-actions { flex:0 0 auto; display:flex; align-items:stretch; justify-content:space-between; gap:16px; border-top:1px solid #ded0b2; padding-top:12px; }
+#app .pause-settings-panel.pause-preferences-grid #pause-settings-back { min-height:44px; margin:0; padding:8px 16px; font-size:14px; }
+#app .pause-settings-panel.pause-preferences-grid .footer-reset { min-height:44px; white-space:normal; }
+#app .pause-settings-panel.pause-preferences-grid .preferences-guidance-footer { padding:0; border:0; background:transparent; }
+#app .pause-settings-panel.pause-preferences-grid .preferences-guidance-footer:has(.release-footer-action) { display:block; }
+
+#app .pause-settings-panel.pause-preferences-grid .preferences-guidance-footer .release-footer-actions { justify-content:center; }
+@media(max-width:700px) {
+  #app .pause-settings-panel.pause-preferences-grid { --preferences-gap:12px; padding:12px; gap:10px; }
+  #app .pause-settings-panel.pause-preferences-grid .pause-preferences-columns { grid-template-columns:minmax(0,1fr); }
+  #app .pause-settings-panel.pause-preferences-grid .pause-preferences-actions { flex-direction:column; gap:10px; }
+  #app .pause-settings-panel.pause-preferences-grid .pause-preferences-actions > button { width:100%; }
+}
+@media(orientation:landscape) and (max-height:600px) {
+  #app .pause-settings-panel.pause-preferences-grid { padding:12px; gap:6px; }
+  #app .pause-settings-panel.pause-preferences-grid > h2 { font-size:24px; }
+  #app .pause-settings-panel.pause-preferences-grid .pause-preferences-actions { flex-direction:row; padding-top:8px; }
+  #app .pause-settings-panel.pause-preferences-grid .pause-preferences-actions > button { width:auto; min-height:40px; }
+}
+/* Leave breathing room when keyboard focus scrolls a control into view. */
+#app .pause-settings-panel.pause-preferences-grid .pause-preferences-scroll { scroll-padding-block:8px; }
+#app .pause-settings-panel.pause-preferences-grid .pause-preferences-scroll :is(button,input,[data-menu-select-trigger]) { scroll-margin-block:8px; }
+
+/* This responsive dialog uses physical viewport dimensions, not menu-stage scaling. */
+#app[data-layout="desktop"] .pause-settings-panel.pause-preferences-grid {
+  position:relative; left:auto; top:auto; transform:none;
+}
+#app .pause-settings-panel.pause-preferences-grid .menu-select-value { overflow-wrap:anywhere; }
+@media(max-width:480px) {
+  #app .pause-settings-panel.pause-preferences-grid .settings-fps { flex-wrap:wrap; }
+  #app .pause-settings-panel.pause-preferences-grid .settings-fps > span { flex-basis:100%; width:100%; }
+}
+/* Network labels and inputs have their own form defaults; keep the shared cards identical. */
+#app .pause-settings-panel.pause-preferences-grid { text-align:center; }
+#app .pause-settings-panel.pause-preferences-grid .settings-action { flex-direction:row; flex:0 0 auto; text-align:left; }
+#app .pause-settings-panel.pause-preferences-grid input[type=range] { min-height:20px; height:20px; padding:0; border:0; background:transparent; }
+#app .pause-settings-panel.pause-preferences-grid .menu-select-trigger {
+  background:#fffdf8; border:2px solid #9bb8d0; border-bottom-width:5px; border-radius:11px;
+  color:var(--text); font-weight:850; text-align:left;
+}
+#app .pause-settings-panel.pause-preferences-grid .settings-action input[type=checkbox] { min-height:26px; padding:0; }

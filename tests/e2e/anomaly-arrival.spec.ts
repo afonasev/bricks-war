@@ -1,3 +1,4 @@
+import { openLocalLobby } from '../helpers/localLobby';
 import { expect, test } from '@playwright/test';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
@@ -6,7 +7,7 @@ for (const viewport of [{width:1440,height:960},{width:390,height:844}]) {
   test(`shared anomaly arrival completes without a notice at ${viewport.width}px`, async ({page}) => {
     await page.setViewportSize(viewport);
     await page.goto('/?muted=1&playtest-anomaly-arrival=1');
-    await page.getByRole('button',{name:/^Битва/}).click();
+    await openLocalLobby(page,'battle');
     await page.evaluate(()=>{
       const samples:{clock:string|null;phase:string|null;remaining:number}[]=[];
       (window as any).arrivalSamples=samples;
@@ -80,7 +81,7 @@ test('records one actual runtime alarm at shared spawn and retains mute-independ
   await page.locator('#music-volume').press('Home');
   await expect(page.locator('#music-volume')).toHaveValue('0');
   await page.locator('#settings-back').click();
-  await page.getByRole('button',{name:/^Битва/}).click();await page.locator('#start-match').click();
+  await openLocalLobby(page,'battle');await page.locator('#start-match').click();
   await expect(page.locator('#game-stage')).toHaveAttribute('data-arrival-serial','1',{timeout:10000});
   await page.waitForTimeout(1100);
   const recording=await page.evaluate(async()=>{

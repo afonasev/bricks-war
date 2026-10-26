@@ -1,0 +1,16 @@
+import { openLocalLobby } from '../helpers/localLobby';
+import {test,expect} from '@playwright/test';
+import {mkdir,writeFile} from 'node:fs/promises';
+const out=process.env.BRICKS_CANDIDATE_EVIDENCE ?? 'evidence/verify-public-player-candidate/pause-containment';
+const cases=['en','de','ja'].flatMap(locale=>([[1440,960],[1280,720],[1280,480],[390,844],[360,640],[568,320],[844,390]] as const).map(([width,height])=>({locale,width,height,controller:false})));cases.push({locale:'en',width:1280,height:720,controller:true});
+for(const {locale,width,height,controller} of cases)test(`ordinary Survival pause containment ${locale} ${width}x${height}${controller?' controller':''}`,async({browser,baseURL})=>{
+ const context=await browser.newContext({baseURL,locale,viewport:{width,height}});const page=await context.newPage();
+ if(controller)await context.addInitScript(()=>{const p={index:0,id:'Containment Pad',connected:true,mapping:'standard',axes:[0,0],buttons:Array.from({length:16},()=>({pressed:false,touched:false,value:0})),timestamp:0};Object.defineProperty(navigator,'getGamepads',{configurable:true,value:()=>[p]});});
+ try{
+  await page.goto('/?muted=1');await openLocalLobby(page,'survival');await page.locator('#start-match').click();await expect(page.locator('.match-loading')).toHaveCount(0);await expect(page.locator('canvas')).toBeVisible();await page.waitForTimeout(150);await page.keyboard.press('Escape');await expect(page.locator('#pause-overlay')).toBeVisible();await page.locator('#pause-settings').click();const panel=page.locator('#pause-settings-panel');await expect(panel).toBeVisible();if(process.env.BRICKS_PAUSE_CONTAINMENT_MOCK==='1')await page.addStyleTag({content:'#pause-overlay:has(#pause-settings-panel:not([hidden])) { position: fixed; }'});
+  const metrics=await panel.evaluate(e=>{const rect=(x:Element|null)=>x?.getBoundingClientRect().toJSON();const ancestors=[];for(let p=e.parentElement;p;p=p.parentElement){const c=getComputedStyle(p);ancestors.push({tag:p.tagName,id:p.id,class:p.className,rect:rect(p),position:c.position,transform:c.transform,filter:c.filter,contain:c.contain});}return {viewport:{width:innerWidth,height:innerHeight},panel:rect(e),overlay:rect(document.querySelector('#pause-overlay')),footer:rect(e.querySelector('.preferences-guidance-footer')),back:rect(e.querySelector('#pause-settings-back')),reset:rect(e.querySelector('[data-reset-preferences]')),ancestors};});
+  await mkdir(out,{recursive:true});const tag=`${locale}-${width}x${height}${controller?'-controller':''}`;await writeFile(`${out}/${tag}.json`,JSON.stringify(metrics,null,2));await page.screenshot({path:`${out}/${tag}.png`});await test.info().attach('exact-containment',{body:JSON.stringify(metrics),contentType:'application/json'});
+  if(controller)expect(metrics.footer!.height).toBeGreaterThan(0);for(const b of [metrics.panel!,metrics.footer!,metrics.back!,metrics.reset!]){expect(b.top).toBeGreaterThanOrEqual(0);expect(b.bottom).toBeLessThanOrEqual(height);expect(b.left).toBeGreaterThanOrEqual(0);expect(b.right).toBeLessThanOrEqual(width);}
+  await panel.locator('#pause-settings-back').click();await page.locator('#continue-match').click();await expect(page.locator('#pause-overlay')).toBeHidden();
+ }finally{await context.close();}
+});

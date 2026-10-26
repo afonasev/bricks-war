@@ -7,7 +7,7 @@ export interface ClientUpdateState {
   blocked: boolean;
   error: boolean;
   phase?: DesktopUpdate['phase'];
-  progress?: number; version?: string; currentVersion?: string; shellVersion?: string; component?: string;
+  progress?: number; version?: string; currentVersion?: string; shellVersion?: string; component?: string; requiresShell?: boolean;
 }
 
 /** Update consent belongs to this document, never to other tabs. */
@@ -95,7 +95,7 @@ export class ClientUpdate {
   }
 
   apply(): boolean {
-    if (!this.snapshot().available || this.snapshot().applying || this.requested || this.reloaded || !this.guard() || this.networkActive()) {
+    if (!this.snapshot().available || this.snapshot().applying || this.snapshot().phase === 'shell-required' || this.requested || this.reloaded || !this.guard() || this.networkActive()) {
       this.refresh();
       return false;
     }

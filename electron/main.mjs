@@ -10,6 +10,7 @@ import { TransferGate, UpdateCoordinator, ShellActivation } from './update-coord
 import { ShellUpdate } from './shell-update.mjs';
 import { GithubUpdates } from './github-updates.mjs';
 import { gameUrl, startupMuted as isStartupMuted } from './startup.mjs';
+import { CONTENT_ABI } from './compatibility.mjs';
 
 const ORIGIN = 'https://bricks.afonasev.tech';
 let restoredArgs = [];
@@ -17,7 +18,7 @@ try { const file = join(process.env.BRICKS_DESKTOP_QA_PROFILE || app.getPath('us
 const launchArgs = [...process.argv,...restoredArgs];
 const startupMuted = isStartupMuted(launchArgs, process.env.BRICKS_DESKTOP_QA_PROFILE);
 const initialGameUrl = gameUrl(ORIGIN, startupMuted);
-const SHELL_ABI = 2;
+const SHELL_ABI = CONTENT_ABI;
 const here = dirname(fileURLToPath(import.meta.url));
 if (process.platform === 'win32') app.setAppUserModelId('tech.afonasev.brickswar');
 if (process.env.BRICKS_DESKTOP_QA_PROFILE) app.setPath('userData', process.env.BRICKS_DESKTOP_QA_PROFILE);
@@ -64,13 +65,15 @@ app.whenReady().then(async () => {
     return githubDownload(path, limit, file);
   }
   store = await new ContentStore({ root: join(profile, 'content'), bundled: join(here, '..', 'build', 'desktop-content'),
-    publicKey: await readFile(join(here, 'content-public-key.pem'), 'utf8'), shellVersion: SHELL_ABI, download,
+    publicKey: await readFile(join(here, 'content-public-key.pem'), 'utf8'), shellVersion: SHELL_ABI, shellRelease: app.getVersion(), download,
     onProgress: () => {} }).open();
   const publicKey = await readFile(join(here,'content-public-key.pem'),'utf8');
   const shell = await new ShellUpdate({root:join(profile,'shell-update'),gate,fetcher:globalThis.fetch,publicKey,version:app.getVersion(),args:launchArgs.slice(1),helper:join(here,'shell-helper.mjs')}).open();
   const github = new GithubUpdates({gate,store,publicKey,shell,cachePath:join(profile,'github-updates-cache.json')});
-  coordinator = new UpdateCoordinator({store,gate,discover:() => github.discover(),history:() => github.history(),readyShell:() => shell.ready});
+  coordinator = new UpdateCoordinator({store,gate,discover:() => github.discover(),history:locale => github.history(locale),readyShell:() => shell.ready});
   coordinator.shellVersion = app.getVersion();
+  coordinator.startupError ||= shell.recoveryRequired;
+  if (coordinator.startupError && !shell.ready && !store.ready) coordinator.phase = 'install-error';
   if (shell.ready) { coordinator.phase = 'ready'; coordinator.available = true; }
   const activation=new ShellActivation(shell,()=>{coordinator.phase='install-error';coordinator.startupError=true;shell.ready=null;});
   app.on('before-quit',event=>{if(activation.pending){event.preventDefault();void activation.start().then(()=>app.quit(),()=>app.quit());}});
@@ -134,7 +137,7 @@ app.whenReady().then(async () => {
   handle('download', () => { if (!safeMenu) return state(); void coordinator.download(); return state(); });
   handle('cancel', () => coordinator.cancel());
   handle('activity', async inMenu => { safeMenu = inMenu; return coordinator.setActivity(inMenu); });
-  handle('history', () => coordinator.getHistory());
+  handle('history', locale => coordinator.getHistory(locale));
   ipcMain.on('desktop:safe-menu', (event, safe) => { if (allowedSender(event)) safeMenu = safe === true; });
   handle('apply', async () => {
     if (!safeMenu || applying || coordinator.phase !== 'ready') return false;

@@ -1,3 +1,5 @@
+import { translate, type Locale } from '../i18n/locale';
+
 export function formatDuration(milliseconds: number): string {
   const totalTenths = Math.floor(milliseconds / 100);
   const minutes = Math.floor(totalTenths / 600);
@@ -15,21 +17,23 @@ export function formatClock(milliseconds: number): string {
 
 export interface MatchClockPresentation {
   milliseconds: number;
-  label: 'ПРОШЛО ВРЕМЕНИ' | 'ОСТАЛОСЬ ВРЕМЕНИ';
-  ariaLabel: 'Прошедшее время матча' | 'Оставшееся время матча';
+  label: string;
+  ariaLabel: string;
 }
 
 export function matchClockPresentation(
   countUp: boolean,
   elapsedMs: number,
   remainingMs: number,
+  locale: Locale = 'ru',
 ): MatchClockPresentation {
   return countUp
-    ? { milliseconds: elapsedMs, label: 'ПРОШЛО ВРЕМЕНИ', ariaLabel: 'Прошедшее время матча' }
-    : { milliseconds: remainingMs, label: 'ОСТАЛОСЬ ВРЕМЕНИ', ariaLabel: 'Оставшееся время матча' };
+    ? { milliseconds: elapsedMs, label: translate(locale, 'elapsedLabel'), ariaLabel: translate(locale, 'elapsedAria') }
+    : { milliseconds: remainingMs, label: translate(locale, 'remainingLabel'), ariaLabel: translate(locale, 'remainingAria') };
 }
 
-export function formatPieces(count: number): string {
+export function formatPieces(count: number, locale: Locale = 'ru'): string {
+  if (locale !== 'ru') return translate(locale, new Intl.PluralRules(locale).select(count) === 'one' ? 'piecesOne' : 'piecesMany', { count: count.toLocaleString(locale) });
   const mod100 = count % 100;
   const mod10 = count % 10;
   const noun = mod100 >= 11 && mod100 <= 14

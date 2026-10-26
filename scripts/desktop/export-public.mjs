@@ -7,7 +7,8 @@ const files = execFileSync('git', ['ls-files', '-z'], { encoding: 'utf8' }).spli
 const selected = files.filter(file => /^(src|server|electron|public|scripts|tests|config)\//.test(file)
   || /^tools\//.test(file) && !/^tools\/(flow|test_flow)\.py$/.test(file)
   || !file.includes('/') && /^(package.*\.json|tsconfig.*\.json|vite.*\.ts|vitest.*\.ts|playwright.*\.ts|index\.html|\.gitignore|Makefile)$/.test(file)
-  || file === 'electron-builder.yml' || file === 'docs/desktop-distribution.md');
+  || file.startsWith('docs/release-notes/')
+  || ['electron-builder.yml', 'docs/desktop-distribution.md', 'docs/player-guide.md', 'docs/credits.md'].includes(file));
 for (const file of selected) {
   const target = resolve(destination, file); await mkdir(dirname(target), { recursive: true }); await copyFile(file, target);
 }
@@ -18,6 +19,8 @@ Browser and desktop block-puzzle arena with local and network play, human player
 
 - Play: https://bricks.afonasev.tech/
 - Installers: https://github.com/afonasev/bricks-war/releases/latest
+- [Quick start in seven languages](docs/player-guide.md)
+- [Credits and asset provenance](docs/credits.md)
 
 ## Development
 

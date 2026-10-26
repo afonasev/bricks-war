@@ -1,3 +1,4 @@
+import { openLocalLobby } from '../helpers/localLobby';
 import { expect, test } from '@playwright/test';
 import { mkdir } from 'node:fs/promises';
 
@@ -8,7 +9,7 @@ for (const viewport of [{width:1440,height:960},{width:390,height:844}]) {
     const errors: string[] = [];
     page.on('pageerror', e => errors.push(e.message));
     await page.goto('/?muted=1&playtest-board-events=1');
-    await page.getByRole('button', {name:/^Битва/}).click();
+    await openLocalLobby(page,'battle');
     if (viewport.width > 700) {
       const add = page.getByRole('button', {name:'Добавить ИИ',exact:true});
       while (await add.count()) await add.first().click();
@@ -46,7 +47,7 @@ for (const viewport of [{width:1440,height:960},{width:390,height:844}]) {
 
 test('captures real normal clear at three progress points without mutating tile sizes or score',async({page})=>{
   await page.goto('/?muted=1&playtest-clear=normal-2&playtest-board-events=1');
-  await page.getByRole('button',{name:/^Выживание/}).click();
+  await openLocalLobby(page,'survival');
   const remove=page.getByRole('button',{name:'Удалить Игрок 2'});
   if(await remove.count())await remove.click();
   await page.locator('#start-match').click();
@@ -74,7 +75,7 @@ test('captures real normal clear at three progress points without mutating tile 
 
 test('captures the unchanged cyan shield signal against workshop material', async ({page}) => {
   await page.goto('/?muted=1&playtest-shield-impact=1&playtest-shield-rows=1&playtest-shield-capture=200');
-  await page.getByRole('button',{name:/^Выживание/}).click();
+  await openLocalLobby(page,'survival');
   const remove = page.getByRole('button',{name:'Удалить Игрок 2'});
   if (await remove.count()) await remove.click();
   await page.locator('#start-match').click();

@@ -1,9 +1,10 @@
+import { openLocalLobby } from '../helpers/localLobby';
 import { expect, test, type Page } from '@playwright/test';
 
 async function setup(page: Page, mode = 'Выживание'): Promise<void> {
   await page.goto('/?muted=1');
   await page.evaluate(() => localStorage.clear()); await page.reload();
-  await page.getByRole('button', { name: new RegExp(`^${mode}`) }).click();
+  await openLocalLobby(page, mode);
   if (mode !== 'Выживание') {
     for (let i = 0; i < 4; i++) {
       const add = page.locator('.participant-card').nth(i).getByRole('button', { name: 'Добавить ИИ' });
@@ -95,7 +96,7 @@ test('keyboard Start preserves the running audio context across deferred initial
     };
   });
   await page.goto('/'); await page.evaluate(() => localStorage.clear()); await page.reload();
-  await page.getByRole('button', { name: /^Выживание/ }).click();
+  await openLocalLobby(page,'survival');
   await page.locator('#start-match').hover(); await page.keyboard.press('Enter');
   await expect(page.locator('.match-loading')).toBeVisible();
   expect(await page.evaluate(() => (window as any).__loadingAudioContext?.state)).toBe('running');

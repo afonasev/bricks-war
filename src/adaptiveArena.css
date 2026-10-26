@@ -1,0 +1,90 @@
+/* Approved adaptive local arena. Network and touch geometry retain their own contracts. */
+#app .arena-screen:not(.network-arena):not(.mobile-solo-arena) {
+  --clock-reserved-height: 0px;
+  grid-template-rows: minmax(0, 1fr);
+}
+#app .arena-screen:not(.network-arena):not(.mobile-solo-arena) > #game-stage {
+  grid-row: 1; margin: 0; min-height: 0;
+}
+#app .arena-screen:not(.network-arena):not(.mobile-solo-arena) .hud-grid[data-count] { inset: 0; }
+#app .arena-screen:not(.network-arena):not(.mobile-solo-arena) .hud-card {
+  position: absolute; left: var(--mobile-x); top: var(--mobile-y); border: 0; padding: 0;
+  width: var(--mobile-width); height: var(--mobile-height);
+}
+#app .arena-screen:not(.network-arena):not(.mobile-solo-arena) .wood-panel-shell { inset: -4px; border-radius: 3px; }
+#app .arena-screen:not(.network-arena):not(.mobile-solo-arena) .wood-panel-shell::before { padding: 3px; border-radius: 3px; }
+#app .arena-screen:not(.network-arena):not(.mobile-solo-arena) .wood-panel-shell::after { inset: 3px; }
+#app .arena-screen:not(.network-arena):not(.mobile-solo-arena) .wood-panel-foot {
+  left: -8px; right: -8px; bottom: -12px; height: 14px; border-radius: 3px;
+  box-shadow: inset 0 1px #ffffff45, 0 2px 4px #342a252b;
+}
+#app .arena-screen:not(.network-arena):not(.mobile-solo-arena) .wood-panel-foot::before,
+#app .arena-screen:not(.network-arena):not(.mobile-solo-arena) .wood-panel-foot::after { top: 5px; width: 3px; height: 3px; }
+#app .arena-screen:not(.network-arena):not(.mobile-solo-arena) > .round-timer {
+  inset: 0 0 auto auto; width: auto; height: auto; display: block; z-index: 4;
+}
+#app .arena-screen:not(.network-arena):not(.mobile-solo-arena) > .round-timer #match-clock {
+  display: block; position: static; min-width: 0; padding: 7.5px 21px 9px;
+  border: 1.5px solid #704b2d; border-top: 0; border-right: 0; border-radius: 0 0 0 13.5px;
+  background: linear-gradient(#714825b8, #603c22c9), var(--maple-texture) center / 780px auto;
+  color: #fff5df; font: 600 clamp(33px, 1.8vw, 67.5px)/1 "Trebuchet MS", sans-serif;
+  letter-spacing: 1.5px; font-variant-numeric: tabular-nums;
+  box-shadow: inset 1px -1px 0 #e3b57750, -2px 3px 5px #4d321d22; text-shadow: 0 1px 1px #58371b80;
+}
+/* A dense field group uses the reduced top strip; never reserve that strip twice. */
+#app .arena-screen.has-compact-arena-clock:not(.network-arena):not(.mobile-solo-arena) > .round-timer #match-clock {
+  padding: 1px 12px; font-size: 20px; border-radius: 0 0 0 8px;
+  box-shadow: inset 1px -1px 0 #e3b57750, -1px 1px 2px #4d321d22;
+}
+#app .arena-screen:not(.network-arena) > .round-timer #match-clock::before,
+#app .arena-screen:not(.network-arena) > .round-timer #match-clock::after { display: none; }
+#app .arena-screen:not(.network-arena):not(.mobile-solo-arena) > .round-timer.is-final #match-clock { color: #ffd4b4; }
+#app .arena-backdrop .arena-shape { display: none; }
+#app .arena-backdrop::before, #app .arena-backdrop::after {
+  content: ''; position: absolute; top: 0; bottom: 0; width: var(--arena-free-side, 0px);
+  display: none; background-image: url('./assets/arena/workshop-corners.webp');
+  background-size: var(--arena-art-width) auto; background-repeat: no-repeat;
+}
+#app .has-workshop-corners .arena-backdrop::before, #app .has-workshop-corners .arena-backdrop::after { display: block; }
+#app .arena-backdrop::before { left: 0; background-position: left bottom; }
+#app .arena-backdrop::after { right: 0; background-position: right bottom; }
+
+#app .arena-screen:not(.network-arena):not(.mobile-solo-arena) #hud-grid[data-count="1"] .desktop-field-heading {
+  width: calc(100% / var(--solo-hud-scale, 1)); height: 80px;
+  transform: scale(var(--solo-hud-scale, 1)); transform-origin: top left;
+}
+
+#app .has-workshop-corners .arena-backdrop { display: block; }
+/* Keep the header legible at large sizes and use three compact rows on narrow fields. */
+#app #hud-grid .desktop-field-heading .hud-identity { position: absolute; top: 2px; left: 4px; right: 4px; padding: 0; }
+#app #hud-grid .desktop-field-heading .hud-identity strong {
+  font-size: clamp(10px, calc(var(--arena-card-width) / 26), 20px); line-height: 1.1;
+  white-space: normal; overflow-wrap: anywhere;
+}
+#app #hud-grid .desktop-field-heading .hud-stats { position: absolute; top: 28px; left: 4px; right: 104px; padding: 0; margin: 0; gap: 4px; flex-wrap: nowrap; }
+#app #hud-grid .desktop-field-heading .hud-stats b,
+#app #hud-grid .desktop-field-heading .hud-stats span { font-size: clamp(9px, calc(var(--arena-card-width) / 30), 14px); line-height: 1.1; }
+#app #hud-grid .desktop-field-heading .shield-inventory { top: 28px; right: 56px; height: 18px; gap: 3px; }
+#app #hud-grid .desktop-field-heading .shield-slot,
+#app #hud-grid .desktop-field-heading .shield-slot svg { width: 15px; height: 18px; }
+#app #hud-grid .desktop-field-heading .hud-next-piece { top: 24px; right: 4px; transform: scale(.8); transform-origin: right top; }
+@container field-card (max-width: 260px) {
+  #app #hud-grid .desktop-field-heading .hud-stats { top: 26px; right: 4px; }
+  #app #hud-grid .desktop-field-heading .hud-stats b,
+  #app #hud-grid .desktop-field-heading .hud-stats span { font-size: 9px; }
+  #app #hud-grid .desktop-field-heading .shield-inventory { top: 39px; right: 38px; height: 12px; gap: 3px; }
+  #app #hud-grid .desktop-field-heading .shield-slot,
+  #app #hud-grid .desktop-field-heading .shield-slot svg { width: 10px; height: 12px; }
+  #app #hud-grid .desktop-field-heading .hud-next-piece { top: min(38px, calc(100% - var(--preview-height) * .55 - 1px)); right: 4px; transform: scale(.55); }
+}
+
+/* Original workshop greenery occupies only the transparent source's top-left strip.
+   The lower corner objects begin below .29 of its source width; .26 includes
+   all foliage while excluding them. This layer follows the same free-side gate. */
+#app .arena-foliage {
+  display: none; position: absolute; top: 0; left: 0;
+  width: var(--arena-free-side, 0px); height: calc(var(--arena-art-width) * .26);
+  background: url('./assets/arena/workshop-foliage.webp') left top / var(--arena-art-width) auto no-repeat;
+  pointer-events: none;
+}
+#app .has-workshop-corners .arena-foliage { display: block; }

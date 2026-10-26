@@ -1,3 +1,4 @@
+import { openLocalLobby } from '../helpers/localLobby';
 import { expect, test } from '@playwright/test';
 
 test.beforeEach(async ({ page }) => {
@@ -30,17 +31,21 @@ test('keeps the supported phone release flow touch-accessible', async ({ page })
   await expect(page.locator('.release-build-info')).toHaveText(/^Версия \d+\.\d+\.\d+(?:-dev)?(?: · .+)?$/);
 
   const menu = page.getByRole('navigation', { name: 'Главное меню' });
-  await expect(menu.getByRole('button')).toHaveCount(4);
-  await expect(menu.getByRole('button')).toContainText(['Выживание', 'Битва', 'Сетевая игра', 'Настройки']);
+  await expect(menu.getByRole('button')).toHaveCount(3);
+  await expect(menu.getByRole('button')).toContainText(['Играть', 'Сетевая игра', 'Настройки']);
   await expect(page.locator('.main-menu-screen .is-ui-selected')).toHaveCount(0);
-  await menu.getByRole('button', { name: /^Битва/ }).hover();
+  await menu.getByRole('button', { name: /^Играть/ }).hover();
   await expect(page.locator('.main-menu-screen .is-ui-selected')).toHaveCount(0);
-  await expect(page.locator('.input-badge')).toHaveCount(0);
+  await expect(page.locator('.input-confirm')).toHaveText('A');
+  await expect(page.locator('.input-confirm')).toBeHidden();
+  await expect(page.locator('.input-back')).toHaveCount(0);
 
-  await page.getByRole('button', { name: /^Выживание/ }).click();
-  await expect(page.locator('.mobile-survival-records')).toContainText('Женя');
-  await expect(page.locator('.mobile-survival-records')).toContainText('5 400');
-  await expect(page.getByLabel('Имя игрока 1')).toBeVisible();
+  await openLocalLobby(page,'survival');
+  await page.locator('[data-open-rating]').click();
+  await expect(page.locator('.lobby-dialog')).toContainText('Женя');
+  await expect(page.locator('.lobby-dialog')).toContainText('5 400');
+  await page.getByRole('button', { name: 'В лобби', exact: true }).click();
+  await expect(page.getByRole('button', {name:'Настроить участника 1',exact:true})).toBeVisible();
   await expect(page.locator('[data-mobile-setting="inputMode"], [data-mobile-tilt-setup]')).toHaveCount(0);
   await expect(page.locator('#start-match')).toBeVisible();
   await expect(page.locator('.is-ui-selected')).toHaveCount(0);
@@ -98,7 +103,7 @@ test('explains phone controls and omits desktop-only fullscreen settings', async
 });
 
 test('keeps phone Battle context in side zones and makes Pause exclusive', async ({ page }) => {
-  await page.getByRole('button', { name: /^Битва/ }).click();
+  await openLocalLobby(page,'battle');
   const attackMode = page.getByRole('combobox', { name: 'Режим атаки' });
   await expect(attackMode).toContainText('Всем соперникам');
   await attackMode.click();
@@ -108,6 +113,7 @@ test('keeps phone Battle context in side zones and makes Pause exclusive', async
   await page.getByRole('option', { name: /3 ИИ/ }).click();
   await page.locator('#start-match').click();
   await expect(page.locator('.hud-card')).toHaveCount(4);
+  await expect(page.locator('#countdown')).toBeHidden();
   await expect(page.locator('.arena-screen')).toHaveAttribute('data-conflict', 'on');
 
   const cards = await page.locator('.hud-card').evaluateAll((elements) => elements.map((element) => {
@@ -119,6 +125,13 @@ test('keeps phone Battle context in side zones and makes Pause exclusive', async
   expect(firstAi!.left).toBeGreaterThan(player!.right);
   expect(secondAi!.left).toBeGreaterThan(player!.right);
   expect(thirdAi!.left).toBeGreaterThan(player!.right);
+  const controls = await page.locator('.mobile-match-actions').boundingBox();
+  expect(controls).not.toBeNull();
+  expect(cards.every((card) => controls!.y + controls!.height <= card.top)).toBe(true);
+  await expect(page.locator('.mobile-match-timer')).toBeVisible();
+
+  expect(firstAi!.left).toBe(secondAi!.left);
+  expect(secondAi!.left).toBe(thirdAi!.left);
   expect(firstAi!.bottom).toBeLessThanOrEqual(secondAi!.top);
   expect(secondAi!.bottom).toBeLessThanOrEqual(thirdAi!.top);
 
@@ -134,6 +147,106 @@ test('keeps phone Battle context in side zones and makes Pause exclusive', async
   expect(settingsBounds.top).toBeGreaterThanOrEqual(0);
   expect(settingsBounds.bottom).toBeLessThanOrEqual(844);
   expect(settingsBounds.scrollHeight).toBe(settingsBounds.clientHeight);
+  await page.getByRole('button', { name: '← Назад к паузе' }).click();
+  await page.getByRole('button', { name: 'Продолжить', exact: true }).click();
+  await expect(page.locator('#pause-overlay')).toBeHidden();
+  await expect(page.locator('.mobile-match-actions')).toBeVisible();
+
+  await page.setViewportSize({ width: 844, height: 390 });
+  await expect(page.locator('#hud-grid')).toHaveAttribute('data-cell-size', '14');
+  const landscapeCards = await page.locator('.hud-card').evaluateAll((elements) => elements.map((element) => {
+    const box = element.getBoundingClientRect();
+    return { left: box.left, right: box.right, top: box.top, bottom: box.bottom, width: box.width };
+  }));
+  const [landscapePlayer, landscapeFirstAi, landscapeSecondAi, landscapeThirdAi] = landscapeCards;
+  expect(landscapePlayer!.width).toBeGreaterThan(landscapeFirstAi!.width);
+  expect(landscapePlayer!.top).toBeGreaterThanOrEqual(48);
+  expect(landscapeFirstAi!.left).toBeGreaterThan(landscapePlayer!.right);
+  expect(landscapeSecondAi!.left).toBeGreaterThan(landscapePlayer!.right);
+  expect(landscapeThirdAi!.left).toBeGreaterThan(landscapePlayer!.right);
+  expect(landscapeFirstAi!.top).toBe(landscapeSecondAi!.top);
+  expect(landscapeSecondAi!.top).toBe(landscapeThirdAi!.top);
+  expect(landscapeFirstAi!.right).toBeLessThanOrEqual(landscapeSecondAi!.left);
+  expect(landscapeSecondAi!.right).toBeLessThanOrEqual(landscapeThirdAi!.left);
+  const landscapeAiText = await page.locator('.mobile-ai-card').evaluateAll((elements) => elements.map((card) => {
+    const label = card.querySelector<HTMLElement>('.hud-identity strong');
+    const score = card.querySelector<HTMLElement>('.hud-stats b');
+    return [label, score].map((element) => ({
+      text: element?.textContent?.trim() ?? '',
+      fits: Boolean(element && element.scrollWidth <= element.clientWidth),
+      textOverflow: element ? getComputedStyle(element).textOverflow : '',
+    }));
+  }));
+  expect(landscapeAiText.flat().every((item) => item.text.length > 0 && item.fits && item.textOverflow !== 'ellipsis')).toBe(true);
+  const landscapeControls = await page.locator('.mobile-match-actions').boundingBox();
+  expect(landscapeControls).not.toBeNull();
+  expect(landscapeCards.every((card) => landscapeControls!.y + landscapeControls!.height <= card.top)).toBe(true);
+  await page.getByRole('button', { name: 'Поставить матч на паузу' }).click();
+  await expect(page.locator('#pause-overlay')).toBeVisible();
+  await expect(page.locator('.mobile-match-actions')).toBeHidden();
+  await page.getByRole('button', { name: 'Настройки', exact: true }).click();
+  await expect(settings).toBeVisible();
+  const landscapeSettings = await settings.evaluate((panel) => {
+    const bounds = (element: Element) => {
+      const rect = element.getBoundingClientRect();
+      return { top: rect.top, bottom: rect.bottom, left: rect.left, right: rect.right };
+    };
+    const body = panel.querySelector<HTMLElement>('.pause-preferences-scroll')!;
+    return { panel: bounds(panel), heading: bounds(panel.querySelector('h2')!),
+      back: bounds(panel.querySelector('#pause-settings-back')!), body: bounds(body),
+      scrollHeight: panel.scrollHeight, clientHeight: panel.clientHeight,
+      scrollWidth: body.scrollWidth, clientWidth: body.clientWidth };
+  });
+  expect(landscapeSettings.panel.top).toBeGreaterThanOrEqual(0);
+  expect(landscapeSettings.panel.bottom).toBeLessThanOrEqual(390);
+  expect(landscapeSettings.panel.left).toBeGreaterThanOrEqual(0);
+  expect(landscapeSettings.panel.right).toBeLessThanOrEqual(844);
+  expect(landscapeSettings.scrollHeight).toBe(landscapeSettings.clientHeight);
+  expect(landscapeSettings.scrollWidth).toBe(landscapeSettings.clientWidth);
+  expect(landscapeSettings.heading.bottom).toBeLessThanOrEqual(landscapeSettings.body.top);
+  expect(landscapeSettings.body.bottom).toBeLessThanOrEqual(landscapeSettings.back.top);
+  const languageSpacing = await settings.locator('.settings-language-section').evaluate((section) => {
+    const box = (element: Element) => element.getBoundingClientRect();
+    const caption = box(section.querySelector('strong')!);
+    const hint = box(section.querySelector('small')!);
+    const value = box(section.querySelector('.menu-select-value')!);
+    const trigger = box(section.querySelector('[data-menu-select-trigger]')!);
+    const card = box(section);
+    return { captionLeft: caption.left, hintLeft: hint.left, valueLeft: value.left,
+      insetX: caption.left - card.left, insetY: caption.top - card.top,
+      triggerTop: trigger.top, triggerBottom: trigger.bottom };
+  });
+  expect(languageSpacing.insetX).toBeGreaterThanOrEqual(12);
+  expect(languageSpacing.insetY).toBeGreaterThanOrEqual(8);
+  expect(languageSpacing.captionLeft).toBe(languageSpacing.valueLeft);
+  expect(languageSpacing.hintLeft).toBe(languageSpacing.valueLeft);
+  expect(languageSpacing.triggerTop).toBeGreaterThanOrEqual(landscapeSettings.body.top);
+  expect(languageSpacing.triggerBottom).toBeLessThanOrEqual(landscapeSettings.body.bottom);
+  const deadzone = settings.locator('[data-stick="stickDeadzone"]');
+  await deadzone.scrollIntoViewIfNeeded();
+  const lastControl = await deadzone.boundingBox();
+  expect(lastControl).not.toBeNull();
+  expect(lastControl!.y).toBeGreaterThanOrEqual(landscapeSettings.body.top);
+  expect(lastControl!.y + lastControl!.height).toBeLessThanOrEqual(landscapeSettings.body.bottom);
+  const sliderPairs = await settings.locator('.volume-control').evaluateAll((rows) => rows.map((row) => {
+    const label = row.querySelector('span')!;
+    const range = document.createRange(); range.selectNodeContents(label);
+    const text = range.getBoundingClientRect();
+    const labelBox = label.getBoundingClientRect();
+    const slider = row.querySelector('input')!.getBoundingClientRect();
+    const overlap = Math.max(0, Math.min(text.right, slider.right) - Math.max(text.left, slider.left))
+      * Math.max(0, Math.min(text.bottom, slider.bottom) - Math.max(text.top, slider.top));
+    return { text: label.textContent, overlap, fits: text.left >= labelBox.left && text.right <= labelBox.right };
+  }));
+  expect(sliderPairs).toHaveLength(5);
+  expect(sliderPairs.every((pair) => pair.overlap === 0 && pair.fits)).toBe(true);
+  const fixedBack = await settings.locator('#pause-settings-back').boundingBox();
+  expect(fixedBack).not.toBeNull();
+  expect(fixedBack!.y).toBe(landscapeSettings.back.top);
+  await page.getByRole('button', { name: '← Назад к паузе' }).click();
+  await page.getByRole('button', { name: 'Продолжить', exact: true }).click();
+  await expect(page.locator('#pause-overlay')).toBeHidden();
+  await expect(page.locator('.mobile-match-actions')).toBeVisible();
 });
 
 test('shows all ten Survival records above Start without scrolling', async ({ page }) => {
@@ -150,7 +263,7 @@ test('shows all ten Survival records above Start without scrolling', async ({ pa
     localStorage.setItem('bricks-war:solo-records:v1', JSON.stringify(records));
   });
   await page.reload();
-  await page.getByRole('button', { name: /^Выживание/ }).click();
+  await openLocalLobby(page,'survival');
   const scrolling = await page.locator('.setup-scroll, .mobile-survival-records ol').evaluateAll(elements => elements.filter(el => el.scrollHeight > el.clientHeight + 1 || el.scrollTop !== 0).map(el => el.className));
   expect(scrolling).toEqual([]);
   await expect(page.locator('.mobile-survival-records li:visible')).toHaveCount(10);
@@ -170,7 +283,7 @@ test('shows all ten Survival records above Start without scrolling', async ({ pa
 test('legacy tilt preference still offers screen controls only', async ({ page }) => {
   await page.evaluate(() => localStorage.setItem('bricks-war:mobile-settings:v1', JSON.stringify({ inputMode: 'tilt', aiCount: 3, aiDifficulty: 'hard' })));
   await page.reload();
-  await page.getByRole('button', { name: /^Битва/ }).click();
+  await openLocalLobby(page,'battle');
   await expect(page.locator('[data-mobile-setting="inputMode"], [data-mobile-tilt-setup]')).toHaveCount(0);
   await expect(page.getByRole('combobox', { name: 'Соперники' })).toContainText('3 ИИ');
   await expect(page.getByRole('combobox', { name: 'Сложность ИИ' })).toContainText('Сложная');

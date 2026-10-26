@@ -5,7 +5,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { contentReleasePlan, publishContentRelease } from './content-release.mjs';
 import { CONTENT_REPOSITORY, CONTENT_FEED, githubContentDownload } from '../../electron/update-source.mjs';
-import { validateManifest } from '../../electron/content.mjs';
+import { inspectManifest } from '../../electron/content.mjs';
+import { requirePublishedShell } from './application-release.mjs';
+import { ShellUpdate } from '../../electron/shell-update.mjs';
+import { TransferGate } from '../../electron/update-coordinator.mjs';
 
 const plan = await contentReleasePlan('build/desktop-content', await readFile('electron/content-public-key.pem', 'utf8'));
 if (!process.argv.includes('--publish')) {
@@ -25,21 +28,25 @@ if (!process.argv.includes('--publish')) {
   const publicRevision = gh('api', `repos/${CONTENT_REPOSITORY}/contents/SOURCE_REVISION?ref=main`, '--jq', '.content');
   if (Buffer.from(publicRevision, 'base64').toString().trim() !== plan.manifest.commit)
     throw Error('Publish the matching reviewed source snapshot before publishing game content');
+  const releaseKey = await readFile('electron/content-public-key.pem','utf8');
+  const releases = JSON.parse(gh('api','--paginate','--slurp',`repos/${CONTENT_REPOSITORY}/releases?per_page=100`)).flat();
+  const transport = new ShellUpdate({gate:new TransferGate(),fetcher:fetch});
+  await requirePublishedShell(plan.manifest,releases,async tag=>JSON.parse(await transport.bytes(tag,'shell-manifest.json',512000)),releaseKey);
   const scratch = await mkdtemp(join(tmpdir(), 'bricks-github-content-'));
   try {
     const checkout = join(scratch, 'pages');
     gh('repo', 'clone', CONTENT_REPOSITORY, checkout, '--', '--depth=1', '--branch=gh-pages');
     const pointer = join(checkout, 'desktop/game/latest.json');
-    const key = await readFile('electron/content-public-key.pem', 'utf8');
+    const key = releaseKey;
     let previous;
     try { previous = JSON.parse(await readFile(pointer, 'utf8')); }
     catch (error) { if (error.code !== 'ENOENT') throw error; }
     if (previous) {
-      const old = validateManifest(previous, key, 2);
+      const old = inspectManifest(previous, key);
       if (old.sequence > plan.manifest.sequence || old.sequence === plan.manifest.sequence
         && JSON.stringify(previous) !== JSON.stringify(plan.envelope)) throw Error('Refusing discovery rollback or sequence reuse');
     }
-    const notes = await generateReleaseNotes(previous ? validateManifest(previous,key,2).commit : undefined,plan.manifest.commit);
+    const notes = await generateReleaseNotes(previous ? inspectManifest(previous,key).commit : undefined,plan.manifest.commit);
     const find = async (tag, id) => {
       if (id) return JSON.parse(gh('api', `repos/${CONTENT_REPOSITORY}/releases/${id}`));
       // Listing a known endpoint distinguishes a missing release from authentication/network failure.
@@ -83,7 +90,7 @@ if (!process.argv.includes('--publish')) {
     for (let attempt = 0; attempt < 18; attempt++) {
       try {
         const bytes = await download('latest.json', 512_000);
-        const actual = validateManifest(JSON.parse(bytes), key, 2);
+        const actual = inspectManifest(JSON.parse(bytes), key);
         if (actual.sequence === plan.manifest.sequence && JSON.parse(bytes).signature === plan.envelope.signature) { confirmed = true; break; }
       } catch { /* Pages may still be deploying. */ }
       await new Promise(resolve => setTimeout(resolve, 10_000));

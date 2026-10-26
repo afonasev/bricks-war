@@ -2,19 +2,22 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { validateManifest } from './content.mjs';
 import { CONTENT_REPOSITORY, githubContentDownload } from './update-source.mjs';
 
-export function compareVersions(a, b) {
-  const parse = value => { const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(value ?? ''); if (!match) throw Error('Invalid stable version'); return match.slice(1).map(Number); };
-  const left = parse(a), right = parse(b);
-  for (let i = 0; i < 3; i++) if (left[i] !== right[i]) return Math.sign(left[i] - right[i]);
-  return 0;
-}
+import { compareVersions, supportsContent } from './compatibility.mjs';
+export { compareVersions } from './compatibility.mjs';
+const noteMarkers = { ru:'Русский', en:'English', fr:'Français', de:'Deutsch', es:'Español', ja:'日本語', 'zh-Hans':'简体中文' };
 export function localizedNotes(body, language = 'ru') {
-  const marker = language === 'en' ? 'English' : 'Русский';
-  const pattern = new RegExp(`^## ${marker}\\s*\\n([\\s\\S]*?)(?=^## (?:English|Русский)\\s*$|(?![\\s\\S]))`, 'm');
-  const selected = pattern.exec(body ?? '')?.[1]?.trim();
+  const marker = noteMarkers[language] ?? noteMarkers.en;
+  const sections = new Map();
+  // Only locale headings end a translated section; nested content headings stay intact.
+  const headings = [...(body ?? '').matchAll(/^## (Русский|English|Français|Deutsch|Español|日本語|简体中文)\s*$/gm)];
+  for (let i = 0; i < headings.length; i++) {
+    const heading = headings[i];
+    sections.set(heading[1], body.slice(heading.index + heading[0].length, headings[i+1]?.index).trim());
+  }
+  const selected = sections.get(marker);
   if (selected) return { text: selected, fallback: false };
-  const english = /^## English\s*\n([\s\S]*)/m.exec(body ?? '')?.[1]?.trim();
-  return { text: english || body?.trim() || 'Описание этой версии недоступно.', fallback: true };
+  const text = sections.get('English') || body?.trim();
+  return { text: text || '', fallback: true, ...(!text ? {notesUnavailable:'release'} : {}) };
 }
 
 export class GithubUpdates {
@@ -53,39 +56,66 @@ export class GithubUpdates {
   }
   async discover() {
     const releases = await this.list();
-    const shell = await this.shell?.discover(releases); if (shell) return shell;
     for (const release of releases.filter(r => /^content-\d+$/.test(r.tag_name)).sort((a,b) => Number(b.tag_name.slice(8)) - Number(a.tag_name.slice(8)))) {
       const sequence = Number(release.tag_name.slice(8));
-      if (sequence <= Math.max(this.store.state.highWater, this.store.manifest.sequence, this.store.ready?.sequence ?? 0)) continue;
+      const pending = this.store.state.pending === `release-${sequence}` || this.store.state.cancelledSequence === sequence;
+      if (sequence <= this.store.manifest.sequence || sequence < this.store.state.highWater
+        || (!pending && sequence <= Math.max(this.store.state.highWater, this.store.ready?.sequence ?? 0))) continue;
       if (!release.assets?.some(a => a.name === 'manifest.json')) continue;
       const envelope = JSON.parse((await this.download('manifest.json',512000,{sequence,sha256:'0'.repeat(64)})).toString());
-      let manifest;
-      try { manifest = validateManifest(envelope,this.publicKey,this.store.shellVersion); }
-      catch (error) { if (error.code === 'INCOMPATIBLE') continue; throw error; }
+      let manifest, requiresShell = false;
+      try { manifest = validateManifest(envelope,this.publicKey,this.store.shellVersion,this.store.shellRelease); }
+      catch (error) { if (error.code !== 'INCOMPATIBLE') throw error; manifest = error.manifest; requiresShell = true; }
       if (manifest.game !== 'bricks-war' || manifest.channel !== 'stable' || manifest.component !== 'content' || manifest.sequence !== sequence
         || compareVersions(manifest.gameVersion,this.store.manifest.gameVersion) <= 0) continue;
       if (!manifest.files.every(f => release.assets.some(a => a.name === f.sha256 && a.size === f.size && a.digest === `sha256:${f.sha256}`))) continue;
-      return { component: 'content', manifest, envelope, releaseId: release.id, tag: release.tag_name };
+      const content = { component:'content', manifest, envelope, releaseId:release.id, tag:release.tag_name };
+      if (!requiresShell) return content;
+      const shell = await this.shell?.discover(releases);
+      if (!shell?.compatibility || !supportsContent(manifest,shell.compatibility.abi,shell.compatibility.version)) {
+        // Do not hide an authenticated newer game behind an older compatible release.
+        return { ...content, component:'shell-required', requiresShell:true };
+      }
+      // A full installer already contains the same or a newer game: do not stage an older overlay.
+      if (compareVersions(shell.manifest.gameVersion,manifest.gameVersion) >= 0) return shell;
+      if (shell.compatibility.bundledSequence >= manifest.sequence) return { ...content,component:'shell-required',requiresShell:true };
+      let cancelled = false;
+      return { ...content, component:'shell', requiresShell:true,
+        prepare:async (progress,phase) => {
+          cancelled = false;
+          const plan = await shell.prepare(value=>progress(value*0.8),phase,{deferReady:true});
+          if (cancelled) throw new DOMException('Cancelled','AbortError');
+          phase('downloading');
+          await this.store.prepare(envelope,value=>progress(80+value*0.2),shell.compatibility);
+          if (cancelled) throw new DOMException('Cancelled','AbortError');
+          // No shell activation receipt exists until the whole application is ready.
+          await shell.commit(plan);
+        },
+        cancel:()=>{cancelled=true;shell.cancel();this.store.cancel();},
+        discard:async()=>{await shell.discard();await this.store.discardPrepared(manifest.sequence);},
+      };
     }
-    return null;
+    const shell = await this.shell?.discover(releases);
+    if (!shell) return null;
+    if (!supportsContent(this.store.manifest,shell.compatibility?.abi ?? 2,shell.compatibility?.version)) return null;
+    if (compareVersions(shell.manifest.gameVersion,this.store.manifest.gameVersion) < 0) {
+      if (shell.compatibility?.bundledSequence >= this.store.manifest.sequence) return null;
+      return {...shell,manifest:{...shell.manifest,gameVersion:this.store.manifest.gameVersion}};
+    }
+    return shell;
   }
-  async history() {
+  async history(language = 'ru') {
     const releases = this.releases ?? await this.list();
     const content = releases.filter(r => /^content-\d+$/.test(r.tag_name));
     const installedTag = `content-${this.store.manifest.sequence}`;
-    const selected = content.slice(0,5);
+    const selected = [...content];
     let installed = content.find(r => r.tag_name === installedTag);
     if (!installed) { try { installed = await this.api(`releases/tags/${installedTag}`); } catch { /* installed build may not have a public release */ } }
     if (installed && !selected.some(r => r.tag_name === installedTag)) selected.push(installed);
-    const shellReleases = releases.filter(r => /^v\d+\.\d+\.\d+$/.test(r.tag_name));
-    const currentShell = `v${this.shell?.version}`;
-    const shellRows = shellReleases.slice(0,5);
-    let installedShell = shellReleases.find(r => r.tag_name === currentShell);
-    if (!installedShell && this.shell) { try { installedShell = await this.api(`releases/tags/${currentShell}`); } catch { /* unavailable legacy release */ } }
-    if (installedShell && !shellRows.some(r=>r.tag_name===currentShell)) shellRows.push(installedShell);
-    const rows = selected.map(r => ({ tag:r.tag_name, version:r.name?.replace(/^Game content /,'') || r.tag_name, date:r.published_at, ...localizedNotes(r.body), installed:r.tag_name === installedTag }));
-    if (!installed) rows.push({ tag:installedTag, version:this.store.manifest.gameVersion, date:null, text:'Описание установленной версии недоступно в GitHub Releases.', fallback:true, installed:true });
-    rows.push(...shellRows.map(r=>({tag:r.tag_name,version:`Оболочка ${r.tag_name.slice(1)}`,date:r.published_at,...localizedNotes(r.body),installed:r.tag_name===currentShell})));
-    return rows;
+    const rows = selected.map(r => ({ tag:r.tag_name, version:r.name?.replace(/^Game content /,'') || r.tag_name, date:r.published_at, ...localizedNotes(r.body, language), installed:r.tag_name === installedTag }));
+    if (!installed) rows.push({ tag:installedTag, version:this.store.manifest.gameVersion, date:null, text:'', notesUnavailable:'installed', fallback:true, installed:true });
+    const versions = new Map();
+    for (const row of rows) if (!versions.has(row.version) || row.installed) versions.set(row.version,row);
+    return [...versions.values()];
   }
 }

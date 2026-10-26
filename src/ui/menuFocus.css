@@ -1,0 +1,22 @@
+/* One navigation state for every menu; value selection remains independent. */
+#app { --menu-focus-fill:#8bd4f6; --menu-focus-ink:#103e60; --menu-hover-fill:#f5ead2; }
+#app:is([data-input-mode="keyboard"],[data-input-mode="gamepad"])
+  :is([data-ui-focus],button,select):is(.is-ui-selected,:focus-visible) {
+  outline:none !important; box-shadow:none !important;
+  background-color:var(--menu-focus-fill) !important; color:var(--menu-focus-ink) !important;
+  border-color:transparent;
+}
+#app:is([data-input-mode="keyboard"],[data-input-mode="gamepad"]) .mode-choice:is(.is-ui-selected,:focus-visible) :is(strong,small,span) { color:var(--menu-focus-ink); }
+#app:is([data-input-mode="keyboard"],[data-input-mode="gamepad"]) .mode-choice:is(.is-ui-selected,:focus-visible) .mode-forward { opacity:1; transform:none; }
+/* Range/checkbox targets keep their native adjustment semantics and light their row. */
+#app:is([data-input-mode="keyboard"],[data-input-mode="gamepad"]) :is(.volume-control,.settings-action):has(> input:is(.is-ui-selected,:focus-visible)) {
+  background:var(--menu-focus-fill) !important; color:var(--menu-focus-ink) !important;
+  outline:none !important; box-shadow:none !important; border-radius:9px;
+}
+#app[data-input-mode="pointer"] :is(button,select,[data-ui-focus]):is(:focus,:focus-visible,.is-ui-selected),
+#app[data-layout="mobile"]:not([data-input-mode="keyboard"]):not([data-input-mode="gamepad"]) :is(button,select,[data-ui-focus]):is(:focus,:focus-visible,.is-ui-selected) { outline:none !important; }
+.name-keyboard-layout { display:flex !important; flex-direction:column; gap:7px; }
+.name-keyboard-row { display:flex; justify-content:center; gap:5px; }
+.name-keyboard-row button { min-width:0; flex:1; padding:10px 1px; font-size:16px; }
+.name-keyboard-row .name-keyboard-space { flex:5; }
+@media(max-width:760px) { .name-keyboard-row { gap:3px; } .name-keyboard-row button { font-size:12px; padding:10px 0; } }

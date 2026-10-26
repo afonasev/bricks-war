@@ -29,13 +29,15 @@ export class TransferGate {
 export class UpdateCoordinator {
   constructor({ store, discover, gate, history, readyShell = () => null }) {
     Object.assign(this, { store, discover, gate, history, readyShell });
-    this.phase = (store.ready || readyShell()) ? 'ready' : 'idle'; this.progress = 0;
+    this.startupError = Boolean(store.recovered);
+    this.phase = (store.ready || readyShell()) ? 'ready' : this.startupError ? 'install-error' : 'idle'; this.progress = 0;
     const previousProgress=store.onProgress; store.onProgress=phase=>{previousProgress?.(phase);if(phase==='verifying'&&this.consented)this.phase='verifying';};
     this.consented = false; this.available = Boolean(store.ready || readyShell()); this.inMenu = true;
   }
   snapshot() {
     return { available: this.available, applying: false, error: this.phase.endsWith('error'), phase: this.phase,
-      progress: this.progress, version: this.readyShell()?.version ?? this.store.ready?.gameVersion ?? this.candidate?.manifest?.gameVersion,
+      progress: this.progress, version: this.candidate?.manifest?.gameVersion ?? this.readyShell()?.version ?? this.store.ready?.gameVersion,
+      requiresShell: this.candidate?.requiresShell ?? Boolean(this.readyShell()),
       currentVersion: this.store.manifest.gameVersion, shellVersion: this.shellVersion, component: this.candidate?.component ?? 'content' };
   }
   check() {
@@ -45,14 +47,15 @@ export class UpdateCoordinator {
       try {
         this.candidate = await this.discover();
         this.available = Boolean(this.store.ready || this.readyShell() || this.candidate);
-        this.phase = (this.store.ready || this.readyShell()) ? 'ready' : this.candidate ? 'available' : this.startupError ? 'install-error' : 'idle';
+        this.phase = this.candidate?.component === 'shell-required' ? 'shell-required'
+          : (this.store.ready || this.readyShell()) ? 'ready' : this.candidate ? 'available' : this.startupError ? 'install-error' : 'idle';
       } catch { this.phase = (this.store.ready || this.readyShell()) ? 'ready' : 'check-error'; }
       return this.snapshot();
     })();
     return this.discovery;
   }
   download() {
-    if (this.operation || !this.candidate || this.phase === 'ready') return this.operation ?? Promise.resolve(this.snapshot());
+    if (this.operation || !this.candidate || this.phase === 'ready' || this.candidate.component === 'shell-required') return this.operation ?? Promise.resolve(this.snapshot());
     this.consented = true;
     this.phase = this.inMenu ? 'downloading' : 'paused';
     this.operation = (async () => {
@@ -73,7 +76,7 @@ export class UpdateCoordinator {
     await this.operation;
     if (this.candidate?.component === 'shell') await this.candidate.discard?.();
     else await this.store.discardPrepared?.(this.candidate?.manifest?.sequence);
-    this.phase = this.candidate ? 'available' : this.startupError ? 'install-error' : 'idle'; this.progress = 0;
+    this.phase = this.candidate?.component === 'shell-required' ? 'shell-required' : this.candidate ? 'available' : this.startupError ? 'install-error' : 'idle'; this.progress = 0;
     return this.snapshot();
   }
   async setActivity(inMenu) {
@@ -83,9 +86,9 @@ export class UpdateCoordinator {
     if (inMenu && this.operation && this.consented) this.phase = 'downloading';
     return this.snapshot();
   }
-  async getHistory() {
+  async getHistory(locale) {
     if (!this.inMenu) throw Error('History unavailable during match');
-    return this.history();
+    return this.history(locale);
   }
 }
 

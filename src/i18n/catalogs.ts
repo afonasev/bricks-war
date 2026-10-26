@@ -1,5 +1,25 @@
+import { updateEn, updateRu, updateFr, updateDe, updateEs, updateJa, updateZhHans } from './updateCatalogs';
+import { rulesEn, rulesRu, rulesFr, rulesDe, rulesEs, rulesJa, rulesZhHans } from './rulesCatalogs';
+import { labEn, labRu, labFr, labDe, labEs, labJa, labZhHans } from './labCatalogs';
+import { helpEn, helpRu, helpFr, helpDe, helpEs, helpJa, helpZhHans } from './helpCatalogs';
+import { journeyEn, journeyRu, journeyFr, journeyDe, journeyEs, journeyZhHans, journeyJa } from './journeyCatalogs';
 // Entry journey resources. IDs and user data are never resource values.
 export const en = {
+  "play": "Play",
+  "playHint": "Choose mode and players",
+  "previewPlay": "Play: choose a mode and players in the lobby",
+
+  "keyboardTitle": "Enter name",
+  "keyboardSpace": "Space",
+  "keyboardDelete": "Delete",
+  "keyboardDone": "Done",
+  "keyboardCancel": "Cancel",
+
+  ...updateEn,
+  ...journeyEn,
+  ...helpEn,
+  ...labEn,
+  ...rulesEn,
   "title": "Bricks War — local block arena",
   "loading": "Loading game",
   "loadingAria": "Loading Bricks War",
@@ -20,10 +40,10 @@ export const en = {
   "team": "Team battle",
   "teamHint": "Two teams of two players",
   "network": "Online play",
-  "networkHint": "Survival, Battle and Team battle",
+  "networkHint": "Play together online",
   "settings": "Settings",
   "settingsHint": "Sound, display, controls and how to play",
-  "exit": "Exit game",
+  "exit": "Exit",
   "exitHint": "Close the application",
   "previewSurvival": "Survival: board and record trophy",
   "previewBattle": "Battle: four separate boards",
@@ -115,6 +135,21 @@ export const en = {
 export type MessageKey = keyof typeof en;
 export type Catalog = { readonly [K in MessageKey]: string };
 export const ru: Catalog = {
+  "play": "Играть",
+  "playHint": "Выберите режим и игроков",
+  "previewPlay": "Играть: выбор режима и игроков в лобби",
+
+  "keyboardTitle": "Ввод имени",
+  "keyboardSpace": "Пробел",
+  "keyboardDelete": "Стереть",
+  "keyboardDone": "Готово",
+  "keyboardCancel": "Отмена",
+
+  ...updateRu,
+  ...journeyRu,
+  ...helpRu,
+  ...labRu,
+  ...rulesRu,
   "title": "Bricks War — локальная арена",
   "loading": "Загружаем игру",
   "loadingAria": "Загружаем Bricks War",
@@ -127,7 +162,7 @@ export const ru: Catalog = {
   "error": "Ошибка",
   "stack": "Стек",
   "menu": "Главное меню",
-  "survival": "Выживание",
+  "survival": "Кто больше",
   "survivalHint": "Продержитесь дольше и побейте рекорд",
   "battle": "Битва",
   "battleHint": "2–4 игрока. Каждый сражается за себя",
@@ -135,12 +170,12 @@ export const ru: Catalog = {
   "team": "Командный бой",
   "teamHint": "Две команды по два игрока",
   "network": "Сетевая игра",
-  "networkHint": "Выживание, Битва и Командный бой",
+  "networkHint": "Игра с друзьями по сети",
   "settings": "Настройки",
   "settingsHint": "Звук, экран, управление и как играть",
-  "exit": "Выход из игры",
+  "exit": "Выход",
   "exitHint": "Закрыть приложение",
-  "previewSurvival": "Выживание: игровое поле и кубок за рекорд",
+  "previewSurvival": "Кто больше: игровое поле и кубок за рекорд",
   "previewBattle": "Битва: четыре отдельных игровых поля",
   "previewTeam": "Командный бой: две команды по два игровых поля",
   "previewNetwork": "Сетевая игра: игровые поля на разных устройствах",
@@ -228,6 +263,21 @@ export const ru: Catalog = {
   "unmute": "Включить звук"
 };
 export const fr: Catalog = {
+  "play": "Jouer",
+  "playHint": "Choisissez le mode et les joueurs",
+  "previewPlay": "Jouer : mode et joueurs dans le salon",
+
+  "keyboardTitle": "Saisir un nom",
+  "keyboardSpace": "Espace",
+  "keyboardDelete": "Effacer",
+  "keyboardDone": "Terminer",
+  "keyboardCancel": "Annuler",
+
+  ...updateFr,
+  ...journeyFr,
+  ...helpFr,
+  ...labFr,
+  ...rulesFr,
   "title": "Bricks War — arène locale",
   "loading": "Chargement du jeu",
   "loadingAria": "Chargement de Bricks War",
@@ -248,7 +298,7 @@ export const fr: Catalog = {
   "team": "Bataille en équipes",
   "teamHint": "Deux équipes de deux joueurs",
   "network": "Jeu en ligne",
-  "networkHint": "Survie, bataille et équipes",
+  "networkHint": "Jouez ensemble en ligne",
   "settings": "Paramètres",
   "settingsHint": "Son, écran, commandes et règles",
   "exit": "Quitter le jeu",
@@ -341,6 +391,21 @@ export const fr: Catalog = {
   "unmute": "Activer le son"
 };
 export const de: Catalog = {
+  "play": "Spielen",
+  "playHint": "Modus und Spieler auswählen",
+  "previewPlay": "Spielen: Modus und Spieler in der Lobby wählen",
+
+  "keyboardTitle": "Name eingeben",
+  "keyboardSpace": "Leerzeichen",
+  "keyboardDelete": "Löschen",
+  "keyboardDone": "Fertig",
+  "keyboardCancel": "Abbrechen",
+
+  ...updateDe,
+  ...journeyDe,
+  ...helpDe,
+  ...labDe,
+  ...rulesDe,
   "title": "Bricks War — lokale Arena",
   "loading": "Spiel wird geladen",
   "loadingAria": "Bricks War wird geladen",
@@ -361,7 +426,7 @@ export const de: Catalog = {
   "team": "Teamkampf",
   "teamHint": "Zwei Teams mit je zwei Spielern",
   "network": "Online spielen",
-  "networkHint": "Überleben, Kampf und Teamkampf",
+  "networkHint": "Gemeinsam online spielen",
   "settings": "Einstellungen",
   "settingsHint": "Ton, Bild, Steuerung und Spielregeln",
   "exit": "Spiel beenden",
@@ -454,6 +519,21 @@ export const de: Catalog = {
   "unmute": "Ton einschalten"
 };
 export const es: Catalog = {
+  "play": "Jugar",
+  "playHint": "Elige el modo y los jugadores",
+  "previewPlay": "Jugar: modo y jugadores en la sala",
+
+  "keyboardTitle": "Introducir nombre",
+  "keyboardSpace": "Espacio",
+  "keyboardDelete": "Borrar",
+  "keyboardDone": "Listo",
+  "keyboardCancel": "Cancelar",
+
+  ...updateEs,
+  ...journeyEs,
+  ...helpEs,
+  ...labEs,
+  ...rulesEs,
   "title": "Bricks War — arena local",
   "loading": "Cargando el juego",
   "loadingAria": "Cargando Bricks War",
@@ -474,7 +554,7 @@ export const es: Catalog = {
   "team": "Batalla por equipos",
   "teamHint": "Dos equipos de dos jugadores",
   "network": "Juego en línea",
-  "networkHint": "Supervivencia, batalla y equipos",
+  "networkHint": "Juega con amigos en línea",
   "settings": "Ajustes",
   "settingsHint": "Sonido, pantalla, controles y reglas",
   "exit": "Salir del juego",
@@ -567,6 +647,21 @@ export const es: Catalog = {
   "unmute": "Activar sonido"
 };
 export const zhHans: Catalog = {
+  "play": "开始游戏",
+  "playHint": "选择模式和玩家",
+  "previewPlay": "游戏：在大厅选择模式和玩家",
+
+  "keyboardTitle": "输入名称",
+  "keyboardSpace": "空格",
+  "keyboardDelete": "删除",
+  "keyboardDone": "完成",
+  "keyboardCancel": "取消",
+
+  ...updateZhHans,
+  ...journeyZhHans,
+  ...helpZhHans,
+  ...labZhHans,
+  ...rulesZhHans,
   "title": "Bricks War — 本地竞技场",
   "loading": "正在加载游戏",
   "loadingAria": "正在加载 Bricks War",
@@ -587,7 +682,7 @@ export const zhHans: Catalog = {
   "team": "团队对战",
   "teamHint": "两队对战，每队两人",
   "network": "在线游戏",
-  "networkHint": "生存、对战与团队对战",
+  "networkHint": "与好友在线游戏",
   "settings": "设置",
   "settingsHint": "声音、画面、操作与玩法",
   "exit": "退出游戏",
@@ -680,6 +775,21 @@ export const zhHans: Catalog = {
   "unmute": "开启声音"
 };
 export const ja: Catalog = {
+  "play": "プレイ",
+  "playHint": "モードとプレイヤーを選択",
+  "previewPlay": "プレイ：ロビーでモードとプレイヤーを選択",
+
+  "keyboardTitle": "名前の入力",
+  "keyboardSpace": "空白",
+  "keyboardDelete": "削除",
+  "keyboardDone": "完了",
+  "keyboardCancel": "キャンセル",
+
+  ...updateJa,
+  ...journeyJa,
+  ...helpJa,
+  ...labJa,
+  ...rulesJa,
   "title": "Bricks War — ローカルアリーナ",
   "loading": "ゲームを読み込み中",
   "loadingAria": "Bricks War を読み込み中",
@@ -700,7 +810,7 @@ export const ja: Catalog = {
   "team": "チームバトル",
   "teamHint": "2 人ずつの 2 チーム",
   "network": "オンライン対戦",
-  "networkHint": "サバイバル・バトル・チーム戦",
+  "networkHint": "フレンドとオンラインプレイ",
   "settings": "設定",
   "settingsHint": "音声・画面・操作・遊び方",
   "exit": "ゲームを終了",

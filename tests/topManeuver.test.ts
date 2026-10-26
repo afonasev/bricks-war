@@ -73,16 +73,26 @@ describe('bounded maneuver on a high stack', () => {
     engine.step(200);
     expect(board.spawnSerial).toBe(2);
   });
-  it.each(['move-down', 'soft-drop-on'] as const)('permanently cancels grace after %s, even when down is blocked', action => {
+  it('permanently cancels grace after move-down, even when down is blocked', () => {
     const { engine, board } = fixture();
     act(engine, 'rotate-clockwise', 200);
-    act(engine, action);
+    act(engine, 'move-down');
     act(engine, 'soft-drop-off');
     act(engine, 'move-right');
     expect(board.maneuverCancelled).toBe(true);
     expect(board.maneuverRemainingMs).toBe(0);
     engine.step(100);
     expect(board.spawnSerial).toBe(2);
+  });
+  it('soft drop commits a grounded high-stack maneuver immediately', () => {
+    const { engine, board } = fixture();
+    act(engine, 'rotate-clockwise', 200);
+    expect(board.maneuverRemainingMs).toBe(400);
+    act(engine, 'soft-drop-on');
+    expect(board.spawnSerial).toBe(2);
+    expect(engine.state.participants[0]!.placedPieces).toBe(1);
+    expect(board.maneuverRemainingMs).toBe(0);
+    expect(board.softDrop).toBe(false);
   });
   it.each([HIDDEN_ROWS + 3, HIDDEN_ROWS + 4])('uses occupied visible cells at the zone boundary y=%i', y => {
     const { engine, board } = fixture(y);
@@ -122,7 +132,7 @@ describe('bounded maneuver on a high stack', () => {
     engine.resume(); restored.resume();
     engine.step(350); restored.step(200); restored.step(150);
     expect(restored.checkpoint()).toEqual(engine.checkpoint());
-    act(engine, 'soft-drop-on'); act(restored, 'soft-drop-on');
+    act(engine, 'move-down'); act(restored, 'move-down');
     const cancelled = MatchEngine.restore(JSON.parse(JSON.stringify(engine.checkpoint())));
     expect(cancelled.state.participants[0]!.board.maneuverCancelled).toBe(true);
     expect(cancelled.checkpoint()).toEqual(engine.checkpoint());

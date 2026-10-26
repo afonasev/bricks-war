@@ -1,7 +1,8 @@
+import { openLocalLobby } from '../helpers/localLobby';
 import { test, expect, type Page } from '@playwright/test';
 import { catalogs } from '../../src/i18n/catalogs';
 import { LOCALES, LANGUAGE_NAMES, type Locale } from '../../src/i18n/locale';
-const shots = 'evidence/add-persistent-game-language/screenshots';
+const shots = process.env.BRICKS_CANDIDATE_EVIDENCE ?? 'evidence/add-persistent-game-language/screenshots';
 async function choose(page: Page, locale: Locale) {
   await page.locator('.settings-language-section [data-menu-select-trigger]').click();
   await page.getByRole('option', { name: LANGUAGE_NAMES[locale], exact: true }).click();
@@ -96,7 +97,7 @@ test('localized startup error remains usable before app startup',async({browser}
 
 test('language change in pause preserves the current canvas and unrelated preferences',async({browser})=>{
  const context=await browser.newContext({locale:'ru-RU',viewport:{width:390,height:844},hasTouch:true});const page=await context.newPage();
- await page.goto('/?muted=1');await page.locator('[data-destination="survival"]').click();await page.locator('#start-match').click();
+ await page.goto('/?muted=1');await openLocalLobby(page,'survival');await page.locator('#start-match').click();
  await page.getByRole('button',{name:'Поставить матч на паузу'}).click();await page.getByRole('button',{name:'Настройки',exact:true}).click();
  const canvas=await page.locator('canvas').first().elementHandle();expect(canvas).not.toBeNull();
  await page.locator('#music-volume').fill('37');await page.locator('#music-volume').dispatchEvent('input');
@@ -105,8 +106,8 @@ test('language change in pause preserves the current canvas and unrelated prefer
  expect(await canvas!.evaluate(el=>el.isConnected)).toBe(true);
  expect(await page.evaluate(()=>localStorage.getItem('bricks-war:release-settings:v1'))).toBe(saved);
  await expect(page.locator('#music-volume')).toHaveValue('37');
- await page.screenshot({path:`${shots}/ja-pause-preferences.png`});
- await page.locator('#pause-settings-back').click();await page.getByRole('button',{name:'Продолжить',exact:true}).click();
+ await page.screenshot({path:`${process.env.BRICKS_CANDIDATE_EVIDENCE ?? 'evidence/localize-local-game-journey'}/setup-hud-screenshots/ja-pause-language.png`});
+ await page.locator('#pause-settings-back').click();await page.getByRole('button',{name:catalogs.ja.journeyContinue,exact:true}).click();
  expect(await canvas!.evaluate(el=>el.isConnected)).toBe(true);await context.close();
 });
 test('controller selector has one selected focus and localized family hints',async({browser})=>{

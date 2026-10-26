@@ -63,7 +63,7 @@ describe('shared anomaly transition', () => {
     expect(trigger.board.active?.definition.source).toBe('anomaly');
   });
 
-  it('retains all simultaneous locks and burns even a grounded uncommitted figure', () => {
+  it('retains simultaneous locks and protects an uncommitted figure in the bottom rows', () => {
     const engine = createFixture();engine.step(COUNTDOWN_MS);
     for (const p of engine.state.participants) lockAtThreshold(p);
     engine.step(FIXED_STEP_MS);
@@ -75,7 +75,11 @@ describe('shared anomaly transition', () => {
     second.state.participants[1]!.board.active = activePiece('O',0,3,BOARD_HEIGHT-2);
     second.state.participants[1]!.board.preparationRemainingMs = 0;
     second.step(FIXED_STEP_MS);
-    expect(second.state.anomalyTransition?.targets.map(t => t.participantId)).toEqual(['p2']);
+    expect(second.state.anomalyTransition?.targets.map(t => t.participantId)).toEqual([]);
+    const piece = structuredClone(second.state.participants[1]!.board.active);
+    second.step(1000);
+    expect(second.state.participants[1]!.board.active).toEqual(piece);
+    expect(second.state.participants[1]!.board.nextPiece.source).toBe('anomaly');
   });
 
   it.each(['clearing', 'burning'] as const)('restores the %s phase without drift and freezes warning, pressure and input', (phase) => {

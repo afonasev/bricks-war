@@ -27,10 +27,9 @@ import { landingPiece } from '../simulation/board';
 import { ANOMALY_COLOR, pieceCells, pieceColor, TETROMINO_COLORS } from '../simulation/tetrominoes';
 import {
   ARENA_CARD_GAP,
-  LOCAL_ARENA_CARD_GAP,
   ARENA_CARD_HEADER_HEIGHT,
   ARENA_EDGE_PADDING,
-  chooseArenaLayout,
+  chooseLocalArenaLayout,
   chooseNetworkLayout,
   chooseMobileSoloLayout,
   type ArenaLayout,
@@ -338,10 +337,10 @@ export class PlayScene extends Phaser.Scene {
     const state = this.runtime.engine.state;
     const { width, height } = this.viewport?.size() ?? this.scale;
     const count = state.participants.length;
-    const controlsReservedHeight = width > height ? 28 : 42;
+    const controlsReservedHeight = width > height && this.runtime.mobileSolo && count === 4 ? 52 : width > height ? 28 : 42;
     const layout = this.runtime.engine.kind === 'network' ? chooseNetworkLayout(width,height,count,this.runtime.mobileSolo) : this.runtime.mobileSolo
       ? chooseMobileSoloLayout(width, height, count, controlsReservedHeight)
-      : chooseArenaLayout(width, height - (this.workshopStudy ? 40 : 0), count, LOCAL_ARENA_CARD_GAP, Math.round((this.workshopStudy ? 80 : ARENA_CARD_HEADER_HEIGHT) * Math.max(1, Math.min(width / 1920, height / 1080))), this.workshopStudy ? 0 : 32, this.workshopStudy ? 0 : 22);
+      : chooseLocalArenaLayout(width, height, count, Math.round((this.workshopStudy ? 80 : ARENA_CARD_HEADER_HEIGHT) * Math.max(1, Math.min(width / 1920, height / 1080))));
     const layoutKey = `${layout.mode}:${layout.columns}:${layout.rows}:${layout.gap ?? ARENA_CARD_GAP}:${layout.cellSize}:${layout.headerHeight ?? ARENA_CARD_HEADER_HEIGHT}:${layout.participantCards?.map((card) => `${card.x}:${card.y}:${card.cellSize}:${card.headerHeight ?? ARENA_CARD_HEADER_HEIGHT}`).join('|') ?? ''}`;
     if (layoutKey !== this.lastLayoutKey) {
       this.lastLayoutKey = layoutKey;

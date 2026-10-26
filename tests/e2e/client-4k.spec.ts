@@ -1,3 +1,4 @@
+import { openLocalLobby } from '../helpers/localLobby';
 import { test, expect, type Page } from '@playwright/test';
 import { mkdir, writeFile } from 'node:fs/promises';
 
@@ -58,7 +59,7 @@ for (const [width,height,density] of [[3840,2160,1],[2560,1440,1],[2560,1440,1.5
         }
         await page.locator('[data-destination="settings"]').click(); await fit(page);
         await page.locator('#settings-back').click();
-        await page.locator('[data-destination="survival"]').click();
+        await openLocalLobby(page,'survival');
         if (players===4) {
           await page.evaluate(()=>{ (window as any).qa4kPads.forEach((pad:any)=>{pad.buttons[3].pressed=true;}); });
           await expect(page.locator('[data-player-name]')).toHaveCount(4);
@@ -87,7 +88,7 @@ for (const [width,height,density] of [[3840,2160,1],[2560,1440,1],[2560,1440,1.5
 
 test('density changes while playing update the buffer without changing logical HUD layout',async({page,context})=>{
   await page.setViewportSize({width:1440,height:960});
-  await page.goto('/?muted=1'); await page.locator('[data-destination="survival"]').click();
+  await page.goto('/?muted=1'); await openLocalLobby(page,'survival');
   await page.locator('#start-match').click(); await expect(page.locator('.match-loading')).toHaveCount(0);
   await page.waitForFunction(()=>document.querySelector('#match-clock')?.textContent !== '00:00');
   await buffer(page,1);
@@ -103,7 +104,7 @@ test('density changes while playing update the buffer without changing logical H
 
 test('phone canvas policy and touch controls remain unchanged',async({page})=>{
   await page.setViewportSize({width:390,height:844});
-  await page.goto('/?muted=1'); await page.locator('[data-destination="survival"]').click();
+  await page.goto('/?muted=1'); await openLocalLobby(page,'survival');
   await page.locator('#start-match').click(); await expect(page.locator('.match-loading')).toHaveCount(0);
   const measured=await buffer(page,1); await fit(page);
   await page.screenshot({path:`${evidence}/screenshots/phone-arena.png`});

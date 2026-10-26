@@ -21,7 +21,7 @@ for (const viewport of [{ width:1440,height:960 },{ width:1280,height:480 },{ wi
       const heading=page.locator('.main-menu-brand h1'); await expect(heading).toHaveAccessibleName('BRICKS WAR');
       await expect(page.locator('.main-menu-screen .menu-kicker')).toHaveCount(0);
       await expect(page.locator('.main-menu-screen footer small')).toHaveCount(0);
-      await expect(page.locator('.release-footer-credits')).toHaveText('© 2026 Evgeniy Afonasev · afonasev.tech · Made with Codex');
+      await expect(page.locator('.release-footer-credits')).toHaveText('© 2026 Evgeniy Afonasev · afonasev.tech');
       const logo=heading.locator('img'); await expect(logo).toBeVisible();
       expect(await logo.evaluate((img:HTMLImageElement)=>img.complete&&img.naturalWidth>0)).toBe(true);
       if(update) await expect(page.locator('.client-update-button')).toBeVisible();

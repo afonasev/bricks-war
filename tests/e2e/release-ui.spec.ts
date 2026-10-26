@@ -1,3 +1,4 @@
+import { openLocalLobby } from '../helpers/localLobby';
 import { expect, test } from '@playwright/test';
 
 test.beforeEach(async ({ page }) => {
@@ -15,56 +16,17 @@ async function expectWorkshopArt(page: import('@playwright/test').Page, state: s
 }
 
 test('updates the fixed main-menu showcase for pointer and keyboard selection', async ({ page }) => {
-  expect(await page.locator('.main-menu-screen').evaluate((screen) => `${getComputedStyle(screen).backgroundImage} ${getComputedStyle(screen, '::before').backgroundImage}`))
-    .not.toContain('radial-gradient');
-  const menu = page.getByRole('navigation', { name: 'Главное меню' });
-  const choices = menu.getByRole('button');
-  await expect(choices).toHaveCount(5);
-  expect(await choices.evaluateAll(els => els.flatMap(el => ['::before', '::after'].map(p => getComputedStyle(el, p).content)))).toEqual(Array(10).fill('none'));
-  if (process.env.BRICKS_RECORD_SCREENSHOTS) await page.screenshot({path: `${process.env.BRICKS_RECORD_SCREENSHOTS}/menu-1440x960.png`});
-  await expect(choices).toContainText(['Выживание', 'Битва', 'Командный бой', 'Сетевая игра', 'Настройки']);
-  await expect(page.locator('.main-menu-layout')).toBeVisible();
-  const showcase = page.locator('.menu-showcase');
-  await expect(showcase).toBeVisible();
-  await expect(showcase).toHaveAttribute('data-preview', 'survival');
-  await expect(showcase).toHaveAttribute('aria-label', /Выживание/);
-  await expectWorkshopArt(page, 'survival');
-  const before = await choices.nth(0).boundingBox();
-  const showcaseBefore = await showcase.boundingBox();
-  await choices.nth(1).hover();
-  await expect(choices.nth(1)).toHaveClass(/is-ui-selected/);
-  await expect(choices.nth(0)).not.toBeFocused();
-  await expect(page.locator('.mode-choice.is-ui-selected')).toHaveCount(1);
-  await expect(choices.nth(1).locator('.mode-forward')).toHaveCSS('opacity', '1');
-  await expect(showcase).toHaveAttribute('data-preview', 'battle');
-  await expect(showcase).toHaveAttribute('aria-label', /Битва/);
-  await expectWorkshopArt(page, 'battle');
-  await page.keyboard.press('ArrowDown');
-  await expect(choices.nth(2)).toHaveClass(/is-ui-selected/);
-  await expect(showcase).toHaveAttribute('data-preview', 'team-battle');
-  await expectWorkshopArt(page, 'team-battle');
-  const after = await choices.nth(0).boundingBox();
-  const showcaseAfter = await showcase.boundingBox();
-  expect(after).toEqual(before);
-  expect(showcaseAfter).toEqual(showcaseBefore);
-  await choices.nth(3).hover();
-  await expect(showcase).toHaveAttribute('data-preview', 'network');
-  await expect(showcase).toHaveAttribute('aria-label', /Сетевая игра/);
-  await expectWorkshopArt(page, 'network');
-  expect(await showcase.boundingBox()).toEqual(showcaseBefore);
-  await choices.nth(4).hover();
-  await expect(showcase).toHaveAttribute('data-preview', 'settings');
-  await expect(showcase).toHaveAttribute('aria-label', /Как играть/);
-  await expectWorkshopArt(page, 'settings');
-  expect(await showcase.boundingBox()).toEqual(showcaseBefore);
-  await choices.nth(2).hover();
-  await page.mouse.move(1200, 500);
-  await page.keyboard.press('Enter');
-  await expect(page.locator('[data-screen="team-battle"]')).toBeVisible();
-  await page.keyboard.press('Escape');
-  await expect(page.locator('[data-screen="main-menu"]')).toBeVisible();
-  await expect(page.locator('.menu-showcase')).toHaveAttribute('data-preview', 'team-battle');
-  await expect(page.locator('.is-ui-selected')).toHaveCount(1);
+  expect(await page.locator('.main-menu-screen').evaluate(screen=>`${getComputedStyle(screen).backgroundImage} ${getComputedStyle(screen,'::before').backgroundImage}`)).not.toContain('radial-gradient');
+  const choices=page.locator('.mode-menu button');await expect(choices).toHaveCount(3);
+  await expect(choices).toContainText(['Играть','Сетевая игра','Настройки']);
+  expect(await choices.evaluateAll(els=>els.flatMap(el=>['::before','::after'].map(p=>getComputedStyle(el,p).content)))).toEqual(Array(6).fill('none'));
+  const showcase=page.locator('.menu-showcase');await expect(showcase).toHaveAttribute('data-preview','play');await expectWorkshopArt(page,'battle');
+  const before=await choices.first().boundingBox(), artBefore=await showcase.boundingBox();
+  await choices.nth(1).hover();await expect(showcase).toHaveAttribute('data-preview','network');await expectWorkshopArt(page,'network');
+  await page.keyboard.press('ArrowDown');await expect(choices.nth(2)).toHaveClass(/is-ui-selected/);await expect(showcase).toHaveAttribute('data-preview','settings');await expectWorkshopArt(page,'settings');
+  expect(await choices.first().boundingBox()).toEqual(before);expect(await showcase.boundingBox()).toEqual(artBefore);
+  await choices.first().hover();await page.keyboard.press('Enter');await expect(page.locator('.unified-lobby')).toHaveAttribute('data-mode','battle');
+  await page.getByRole('button',{name:'B В меню',exact:true}).click();await expect(showcase).toHaveAttribute('data-preview','play');
 });
 
 test('updates the main-menu showcase from a connected gamepad', async ({ page }) => {
@@ -75,11 +37,11 @@ test('updates the main-menu showcase from a connected gamepad', async ({ page })
     Object.defineProperty(window, '__pressPadDown', { configurable: true, value: (pressed: boolean) => { buttons[13] = { pressed, touched: pressed, value: pressed ? 1 : 0 }; } });
   });
   await page.reload();
-  await expect(page.locator('.menu-showcase')).toHaveAttribute('data-preview', 'survival');
+  await expect(page.locator('.menu-showcase')).toHaveAttribute('data-preview', 'play');
   await page.evaluate(() => (window as typeof window & { __pressPadDown: (pressed: boolean) => void }).__pressPadDown(true));
-  await expect(page.locator('.menu-showcase')).toHaveAttribute('data-preview', 'battle');
+  await expect(page.locator('.menu-showcase')).toHaveAttribute('data-preview', 'network');
   await page.evaluate(() => (window as typeof window & { __pressPadDown: (pressed: boolean) => void }).__pressPadDown(false));
-  await expect(page.getByRole('button', { name: /^Битва/ })).toHaveClass(/is-ui-selected/);
+  await expect(page.locator('[data-network-entry]')).toHaveClass(/is-ui-selected/);
 });
 
 test('keeps the menu gamepad as navigation owner while Y joins and cycles gamepad slots', async ({ page }) => {
@@ -143,13 +105,14 @@ test('keeps the menu gamepad as navigation owner while Y joins and cycles gamepa
 });
 
 test('keeps every redesigned main-menu destination routed and reflows the preview', async ({ page }) => {
-  for (const [label, screen] of [
+  for (const [, screen] of [
     ['Выживание', 'survival'],
     ['Битва', 'battle'],
     ['Командный бой', 'team-battle'],
     ['Настройки', 'settings'],
   ] as const) {
-    await page.getByRole('button', { name: new RegExp(`^${label}(?:\\s|$)`) }).click();
+    if (screen === 'settings') await page.getByRole('button', { name: /^Настройки/ }).click();
+    else await openLocalLobby(page, screen);
     await expect(page.locator(`[data-screen="${screen}"]`)).toBeVisible();
     await expect(page.locator(`[data-screen="${screen}"]`)).toHaveClass(/premium-surface/);
     expect(await page.locator(`[data-screen="${screen}"]`).evaluate((surface) => `${getComputedStyle(surface).backgroundImage} ${getComputedStyle(surface, '::after').backgroundImage}`))
@@ -210,7 +173,7 @@ test('keeps release footer lines, badges, and geometry synchronized across scree
   await expect(page.locator('.release-guidance-footer .input-badge')).toHaveText(['A', 'B']);
   expect(main).toMatchObject({ x: 16, width: 1408, overflow: false, overlaps: false });
 
-  await page.getByRole('button', { name: /^Битва/ }).click();
+  await openLocalLobby(page,'battle');
   const setup = await readFooter();
   await expect(page.locator('.release-guidance-footer .input-badge')).toHaveText(['A', 'B', 'Y']);
   const { height: mainHeight, ...sharedSetupGeometry } = sharedGeometry;
@@ -355,7 +318,15 @@ test('opens localized phone Controls help, returns to Settings, and preserves pr
       }).map((node) => node.textContent?.trim() ?? node.tagName);
       const horizontalTextOverflow = textNodes.filter((node) => node.scrollWidth > node.clientWidth + 1).map((node) => node.textContent?.trim() ?? node.tagName);
       const heading = screen.querySelector<HTMLElement>('.phone-controls-heading')!;
+      const footer = screen.querySelector<HTMLElement>('.release-guidance-footer')!;
+      const footerBottom = footer.getBoundingClientRect().bottom;
+      const screenBottom = screen.getBoundingClientRect().bottom;
+      const pageFitsViewport = screen.getBoundingClientRect().height <= innerHeight;
       return {
+        footerLeftGap: Math.abs(footer.getBoundingClientRect().left - screen.getBoundingClientRect().left),
+        footerRightGap: Math.abs(footer.getBoundingClientRect().right - screen.getBoundingClientRect().right),
+        footerScreenBottomGap: Math.abs(screenBottom - footerBottom),
+        footerViewportBottomGap: pageFitsViewport ? Math.abs(innerHeight - footerBottom) : 0,
         missingBlocks: selectors.filter((_, index) => !queriedBlocks[index]),
         overlaps: [...overlaps(blocks), ...overlaps(Array.from(screen.querySelector('.phone-controls-figure')!.children)), ...overlaps(Array.from(diagram.children)), ...overlaps(Array.from(screen.querySelector('.phone-controls-directions')!.children)), ...overlaps(Array.from(heading.children))],
         clipped,
@@ -364,6 +335,10 @@ test('opens localized phone Controls help, returns to Settings, and preserves pr
         bottomFraction: diagram.dataset.bottomZoneFraction,
       };
     });
+    expect(result.footerLeftGap).toBeLessThanOrEqual(1);
+    expect(result.footerRightGap).toBeLessThanOrEqual(1);
+    expect(result.footerScreenBottomGap).toBeLessThanOrEqual(1);
+    expect(result.footerViewportBottomGap).toBeLessThanOrEqual(1);
     expect(result.missingBlocks).toEqual([]);
     expect(result.overlaps).toEqual([]);
     expect(result.clipped).toEqual([]);
@@ -452,7 +427,7 @@ test('keeps release settings aligned and the primary setup action compact', asyn
   expect(musicBox?.x).toBe(effectsBox?.x);
   expect(musicBox?.width).toBe(effectsBox?.width);
   await page.getByRole('button', { name: /Назад/ }).click();
-  await page.getByRole('button', { name: /^Выживание/ }).click();
+  await openLocalLobby(page,'survival');
   const startButton = page.getByRole('button', { name: 'Start' });
   const start = await startButton.boundingBox();
   const viewport = page.viewportSize();
@@ -466,7 +441,7 @@ test('shows mode-specific setup and removes participants reversibly', async ({ p
     { id: 'fixture-record', name: 'Тест', elapsedMs: 128_000, lineScore: 6_800, total: 6_800, finishedAt: 1_700_000_000_000, placedPieces: 42 },
     { id: 'legacy-record', name: 'Старый', elapsedMs: 64_000, lineScore: 2_400, total: 2_400 },
   ])));
-  await page.getByRole('button', { name: /^Выживание/ }).click();
+  await openLocalLobby(page,'survival');
   await expect(page.locator('.survival-rules li')).toHaveCount(5);
   await expect(page.locator('.mode-setup-screen > .mechanics-panel')).toHaveCount(0);
   await expect(page.getByLabel('Имя игрока 1')).toHaveValue('Игрок 1');
@@ -490,7 +465,7 @@ test('shows mode-specific setup and removes participants reversibly', async ({ p
   await expect(page.locator('.hud-card')).toHaveCount(2);
   await page.goto('/?muted=1');
 
-  await page.getByRole('button', { name: /^Битва/ }).click();
+  await openLocalLobby(page,'battle');
   await expect(page.locator('.participant-card')).toHaveCount(4);
   await expect(page.locator('.battle-player .battle-lobby')).toHaveCount(1);
   await expect(page.locator('.battle-player > h2')).toHaveText('От 2 до 4 игроков');
@@ -532,7 +507,7 @@ test('shows mode-specific setup and removes participants reversibly', async ({ p
   expect(editAffordance).toEqual({ content: '"✎"', contained: true });
   await playerOneName.fill('Александра-Игрок');
   await page.getByRole('button', { name: /Главное меню/ }).click();
-  await page.getByRole('button', { name: /^Битва/ }).click();
+  await openLocalLobby(page,'battle');
   await expect(page.getByLabel('Имя игрока 1')).toHaveValue('Александра-Игрок');
   await expect(page.locator('.mode-settings label')).toHaveCount(3);
   await expect(page.getByText('Финальное давление', { exact: true })).toHaveCount(0);
@@ -543,7 +518,7 @@ test('shows mode-specific setup and removes participants reversibly', async ({ p
   await expect(page.locator('.participant-card').nth(2).getByRole('button', { name: /Удалить/ })).toBeVisible();
 
   await page.getByRole('button', { name: /Главное меню/ }).click();
-  await page.getByRole('button', { name: /^Командный бой/ }).click();
+  await openLocalLobby(page,'team-battle');
   await expect(page.locator('.mode-rules')).toHaveCount(1);
   await expect(page.locator('.mode-rules')).toContainText(/Две команды по два игрока[\s\S]*Атакуйте команду соперников[\s\S]*До последней команды; одновременно — по очкам/);
   await expect(page.locator('.team-group')).toHaveCount(2);
@@ -568,7 +543,7 @@ test('starts a valid setup with the gamepad X button', async ({ page }) => {
     Object.defineProperty(navigator, 'getGamepads', { configurable: true, value: () => [pad] });
   });
   await page.reload();
-  await page.getByRole('button', { name: /^Выживание/ }).click();
+  await openLocalLobby(page,'survival');
   await expect(page.getByRole('button', { name: 'Start' })).toBeEnabled();
   await page.evaluate(() => {
     const pad = (window as typeof window & { __startPad: { buttons: Array<{ pressed: boolean }> } }).__startPad;
@@ -583,7 +558,7 @@ test('starts Survival with four distinct human controllers and no AI', async ({ 
     Object.defineProperty(navigator, 'getGamepads', { configurable: true, value: () => [pad(0), pad(1)] });
   });
   await page.reload();
-  await page.getByRole('button', { name: /^Выживание/ }).click();
+  await openLocalLobby(page,'survival');
   await page.getByRole('button', { name: 'Добавить игрока' }).first().click();
   await page.getByRole('button', { name: 'Добавить игрока' }).first().click();
   await expect(page.locator('.survival-lobby .participant-card.occupied')).toHaveCount(4);
@@ -603,7 +578,7 @@ test('uses premium dropdowns with pointer keyboard and gamepad', async ({ page }
     } });
   });
   await page.reload();
-  await page.getByRole('button', { name: /^Битва/ }).click();
+  await openLocalLobby(page,'battle');
   await expect(page.locator('select:visible')).toHaveCount(0);
 
   const duration = page.getByRole('combobox', { name: 'Длительность матча' });
@@ -700,11 +675,11 @@ test('lets an unassigned gamepad confirm the focused Back action with A without 
     Object.defineProperty(window, '__pressPadA', { configurable: true, value: (pressed: boolean) => { buttons[0] = { pressed, touched: pressed, value: pressed ? 1 : 0 }; } });
   });
   await page.reload();
-  await page.getByRole('button', { name: /^Битва/ }).click();
+  await openLocalLobby(page,'battle');
   await page.evaluate(() => (window as typeof window & { __pressPadA: (pressed: boolean) => void }).__pressPadA(true));
   await page.waitForTimeout(80);
   await page.evaluate(() => (window as typeof window & { __pressPadA: (pressed: boolean) => void }).__pressPadA(false));
   await expect(page.locator('[data-screen="main-menu"]')).toBeVisible();
-  await page.getByRole('button', { name: /^Битва/ }).click();
+  await openLocalLobby(page,'battle');
   await expect(page.locator('[data-slot-card="3"].empty')).toBeVisible();
 });

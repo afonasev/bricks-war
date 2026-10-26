@@ -13,6 +13,8 @@ export function validateShell(envelope, key, platform, arch, version, systemVers
   if (typeof envelope?.payload !== 'string' || envelope.payload.length > 512000 || typeof envelope.signature !== 'string'
     || !verify(null,Buffer.from(envelope.payload),key,Buffer.from(envelope.signature,'base64'))) throw Error('Invalid shell signature');
   const manifest = JSON.parse(envelope.payload);
+  if (manifest.contentAbi !== undefined && (!Number.isSafeInteger(manifest.contentAbi) || manifest.contentAbi < 1)) throw Error('Invalid shell content ABI');
+  if (manifest.contentAbi >= 3 && (!Number.isSafeInteger(manifest.contentSequence) || manifest.contentSequence < 1)) throw Error('Invalid bundled content identity');
   if (manifest.schema !== 1 || manifest.game !== 'bricks-war' || manifest.component !== 'shell' || manifest.channel !== 'stable'
     || compareVersions(manifest.version,version) <= 0 || manifest.updaterAbi !== 1 || !Array.isArray(manifest.files)) throw Object.assign(Error('Incompatible shell update'),{code:'INCOMPATIBLE'});
   const file = manifest.files.find(f => f.platform === platform && (f.arch === arch || f.arch === 'universal'));
@@ -61,11 +63,13 @@ export class ShellUpdate {
       let manifest;try{manifest=validateShell(envelope,this.publicKey,this.platform,this.arch,this.version);}catch(error){if(error.code==='INCOMPATIBLE')continue;throw error;}
       if (manifest.version !== release.tag_name.slice(1) || !release.assets.some(a => a.name === manifest.file.name && a.size === manifest.file.size && a.digest === `sha256:${manifest.file.sha256}`)) continue;
       this.selected = { release,manifest,envelope };
-      return { component:'shell',manifest:{gameVersion:manifest.version}, prepare: (progress,phase) => this.prepare(progress,phase), cancel:() => this.controller?.abort(),discard:async()=>{ this.ready=null; await rm(join(this.root,'ready.json'),{force:true}); } };
+      return { component:'shell',requiresShell:true,manifest:{gameVersion:manifest.version}, compatibility:{abi:manifest.contentAbi ?? 2,version:manifest.version,bundledSequence:manifest.contentSequence},
+        prepare: (progress,phase,options) => this.prepare(progress,phase,options), commit:plan=>this.commitPrepared(plan),
+        cancel:() => this.controller?.abort(),discard:async()=>{ this.ready=null; await rm(join(this.root,'ready.json'),{force:true}); } };
     }
     return null;
   }
-  async prepare(progress,phase=()=>{}) {
+  async prepare(progress,phase=()=>{}, {deferReady=false}={}) {
     this.controller = new AbortController();
     const {release,manifest,envelope} = this.selected;
     await mkdir(this.root,{recursive:true});
@@ -89,10 +93,16 @@ export class ShellUpdate {
     }
     this.controller.signal.throwIfAborted();
     const plan = {version:manifest.version,file,application:this.application,platform:this.platform,executable:this.executable,args:this.args,parentPid:process.pid,root:this.root};
+    if (!deferReady) await this.commitPrepared(plan);
+    return plan;
+  }
+  async commitPrepared(plan) {
+    this.controller.signal.throwIfAborted();
     await writeFile(join(this.root,'ready.json'),JSON.stringify(plan)); this.ready = plan;
   }
   async open() {
     await mkdir(this.root,{recursive:true});
+    this.recoveryRequired = (await failedShellVersions(this.root)).some(version=>compareVersions(version,this.version)>0);
     try {
       const plan = JSON.parse(await readFile(join(this.root,'ready.json'),'utf8'));
       const envelope = JSON.parse(await readFile(join(this.root,'shell-manifest.json'),'utf8'));

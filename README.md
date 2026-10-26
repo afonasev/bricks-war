@@ -4,6 +4,8 @@ Browser and desktop block-puzzle arena with local and network play, human player
 
 - Play: https://bricks.afonasev.tech/
 - Installers: https://github.com/afonasev/bricks-war/releases/latest
+- [Quick start in seven languages](docs/player-guide.md)
+- [Credits and asset provenance](docs/credits.md)
 
 ## Development
 

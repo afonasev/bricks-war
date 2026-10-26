@@ -1,4 +1,5 @@
 import './matchLoading.css';
+import { html as tr } from '../i18n/locale';
 
 export const MATCH_LOADING_MINIMUM_MS = 2_000;
 
@@ -29,7 +30,7 @@ export class MatchLoading {
           <div class="loading-piece loading-piece-coral"><i></i><i></i><i></i><i></i></div>
           <div class="loading-piece loading-piece-purple"><i></i><i></i><i></i><i></i></div>
         </div>
-        <h1>Собираем арену</h1><p>Скоро начнём</p>
+        <h1>${tr('arenaLoadingTitle')}</h1><p>${tr('arenaLoadingHint')}</p>
         <div class="match-loading-indicator" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></div>
       </div>`;
     document.body.append(this.element);

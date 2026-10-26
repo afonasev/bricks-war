@@ -1,3 +1,4 @@
+import { openLocalLobby } from '../helpers/localLobby';
 import { expect, test, type Page } from '@playwright/test';
 import { mkdir } from 'node:fs/promises';
 
@@ -73,7 +74,7 @@ for(const [width,height] of viewports) {
     await page.setViewportSize({width,height});
     await page.addInitScript(() => localStorage.setItem('bricks-war:solo-records:v1',JSON.stringify(Array.from({length:10},(_,i)=>({id:`r${i}`,name:i%2 ? `WWWWWWWWWWWWWWWWW${i}` : `Александр Велики${i}`,elapsedMs:600000,lineScore:123456-i,finishedAt:1780000000000,placedPieces:1000})))));
     await page.goto('/?muted=1');
-    await page.getByRole('button',{name:/^Выживание/}).click();
+    await openLocalLobby(page,'survival');
     await mkdir(evidence,{recursive:true});
     await page.screenshot({path:`${evidence}/setup-${width}x${height}.png`});
     await expectTenFit(page);
@@ -92,7 +93,7 @@ for(const [width,height] of [[1920,1080],[390,844],[1600,900],[1280,720]] as con
       Object.assign(window, { recordsTestPads:pads });
     });
     await page.goto('/?muted=1&playtest-fast=20&playtest-score=123456');
-    await page.getByRole('button',{name:/^Выживание/}).click();
+    await openLocalLobby(page,'survival');
     if (width === 1600) {
       for (const i of [0,1]) {
         await page.getByRole('combobox',{name:`Участник ${i+1}`,exact:true}).click();
@@ -159,7 +160,7 @@ for (const [width,height] of [[1440,960],[390,844]] as const) {
     await page.setViewportSize({width,height});
     await page.addInitScript(() => localStorage.setItem('bricks-war:solo-records:v1', JSON.stringify(Array.from({length:14},(_,i)=>({id:`r${i}`, name:i<6 ? ['Вася',' ВАСЯ ','вася'][i%3] : `Игрок ${i}`, lineScore:1000-i, elapsedMs:1000, finishedAt:1780000000000})))));
     await page.goto('/?muted=1');
-    await page.getByRole('button',{name:/^Выживание/}).click();
+    await openLocalLobby(page,'survival');
     const names = await page.locator('.survival-records .record-identity strong').allTextContents();
     expect(names).toHaveLength(10);
     expect(names.filter(name => name.trim().toLowerCase()==='вася')).toHaveLength(3);
@@ -172,7 +173,7 @@ test('Battle results keep compact actions and consistent keyboard subtitles', as
   test.setTimeout(60000);
   await page.setViewportSize({width:1440,height:960});
   await page.goto('/?muted=1&playtest-fast=20');
-  await page.getByRole('button',{name:/^Битва/}).click();
+  await openLocalLobby(page,'battle');
   await page.getByRole('combobox',{name:'Длительность матча',exact:true}).click();
   await page.getByRole('option',{name:'2 мин',exact:true}).click();
   await page.locator('#start-match').click();

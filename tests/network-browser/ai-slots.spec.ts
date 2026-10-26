@@ -1,22 +1,29 @@
 import {test,expect,type Page} from '@playwright/test';
-import {mkdir} from 'node:fs/promises';
-const evidence='evidence/add-network-ai-slots/browser';
+import {mkdir,writeFile} from 'node:fs/promises';
+const evidence=process.env.BRICKS_NETWORK_AI_EVIDENCE_DIR??'evidence/add-network-ai-slots/browser';
 async function enter(page:Page){await page.goto('/?muted=1');await page.getByRole('button',{name:/^Сетевая игра/}).click();}
 async function geometry(page:Page){
   const failures=await page.evaluate(()=>{
-    const visible=(e:HTMLElement)=>e.getBoundingClientRect().height>0&&getComputedStyle(e).visibility!=='hidden';
+    const painted=(e:HTMLElement)=>{const r=e.getBoundingClientRect();let left=r.left,right=r.right,top=r.top,bottom=r.bottom;for(let p=e.parentElement;p;p=p.parentElement){const c=getComputedStyle(p),b=p.getBoundingClientRect();if(/auto|scroll|hidden|clip/.test(c.overflowX)){left=Math.max(left,b.left);right=Math.min(right,b.right);}if(/auto|scroll|hidden|clip/.test(c.overflowY)){top=Math.max(top,b.top);bottom=Math.min(bottom,b.bottom);}}return {left,right,top,bottom};};
+    const visible=(e:HTMLElement)=>{const r=painted(e);return r.right>r.left&&r.bottom>r.top&&getComputedStyle(e).visibility!=='hidden';};
     const text=[...document.querySelectorAll<HTMLElement>('.network-screen strong,.network-screen button,.network-screen textarea,.network-screen label,.network-screen summary,.network-screen .menu-select-value')].filter(visible);
     const errors=text.filter(e=>e.scrollWidth>e.clientWidth+2||e.scrollHeight>e.clientHeight+2).map(e=>`clipped:${e.textContent}`);
     const elements=[...document.querySelectorAll<HTMLElement>('.network-screen button,.network-screen textarea,.network-screen input,.network-screen h1,.network-screen h2,.network-screen .network-roster li,.network-screen summary,.network-screen .menu-select')].filter(visible);
     for(let i=0;i<elements.length;i++){
-      const a=elements[i]!,r=a.getBoundingClientRect();if(r.left< -1||r.right>innerWidth+1)errors.push(`outside:${a.textContent}`);
-      for(const b of elements.slice(i+1)){if(a.contains(b)||b.contains(a))continue;const q=b.getBoundingClientRect();if(Math.min(r.right,q.right)-Math.max(r.left,q.left)>1&&Math.min(r.bottom,q.bottom)-Math.max(r.top,q.top)>1)errors.push(`overlap:${a.textContent}/${b.textContent}`);}
+      const a=elements[i]!,full=a.getBoundingClientRect(),r=painted(a);if(full.left< -1||full.right>innerWidth+1)errors.push(`outside:${a.textContent}`);
+      for(const b of elements.slice(i+1)){if(a.contains(b)||b.contains(a))continue;const q=painted(b);if(Math.min(r.right,q.right)-Math.max(r.left,q.left)>1&&Math.min(r.bottom,q.bottom)-Math.max(r.top,q.top)>1)errors.push(`overlap:${a.textContent}/${b.textContent}`);}
     }return errors;
-  });expect(failures).toEqual([]);
+  });
+  if(failures.length){
+    await page.screenshot({path:`${evidence}/geometry-failure-${page.viewportSize()!.width}x${page.viewportSize()!.height}.png`});
+    const details=await page.evaluate(()=>[...document.querySelectorAll<HTMLElement>('.network-heading h1,.network-content,.network-roster-panel h2')].map(e=>{const r=e.getBoundingClientRect();return {tag:e.tagName,text:e.matches('.network-content')?'content viewport':e.textContent,rect:{left:r.left,right:r.right,top:r.top,bottom:r.bottom},overflow:getComputedStyle(e).overflow,scrollTop:e.scrollTop};}));
+    await writeFile(`${evidence}/geometry-failure-details.json`,JSON.stringify({failures,details},null,2));
+  }
+  expect(failures).toEqual([]);
 }
 test('phone creator manages six AI, human opponent required, mixed roster and readable controls',async({browser,baseURL})=>{
   test.setTimeout(120000);await mkdir(evidence,{recursive:true});
-  const contexts=await Promise.all([browser.newContext({baseURL,viewport:{width:390,height:844}}),browser.newContext({baseURL,viewport:{width:1440,height:960}})]);
+  const contexts=await Promise.all([browser.newContext({baseURL,locale:'ru-RU',viewport:{width:390,height:844}}),browser.newContext({baseURL,locale:'ru-RU',viewport:{width:1440,height:960}})]);
   const [host,guest]=await Promise.all(contexts.map(c=>c.newPage())) as [Page,Page];const errors:string[]=[];
   for(const page of [host,guest])page.on('pageerror',error=>errors.push(error.message));
   const room=`ИИ и друзья ${Date.now()}`;

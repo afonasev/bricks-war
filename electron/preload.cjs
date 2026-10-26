@@ -5,7 +5,7 @@ contextBridge.exposeInMainWorld('bricksDesktop', {
   download: () => ipcRenderer.invoke('desktop:download'),
   cancel: () => ipcRenderer.invoke('desktop:cancel'),
   setActivity: inMenu => ipcRenderer.invoke('desktop:activity', inMenu === true),
-  history: () => ipcRenderer.invoke('desktop:history'),
+  history: locale => ipcRenderer.invoke('desktop:history', locale),
   apply: () => ipcRenderer.invoke('desktop:apply'),
   setSafeMenu: safe => ipcRenderer.send('desktop:safe-menu', safe === true),
   healthy: () => ipcRenderer.invoke('desktop:healthy'),

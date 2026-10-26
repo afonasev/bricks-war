@@ -1,6 +1,7 @@
 import { createHash, verify } from 'node:crypto';
 import { mkdir, readFile, writeFile, rename, rm, lstat, readdir, statfs } from 'node:fs/promises';
 import { join } from 'node:path';
+import { compareVersions, supportsContent } from './compatibility.mjs';
 
 export const MAX_FILE = 32 * 1024 * 1024;
 export const MAX_RELEASE = 128 * 1024 * 1024;
@@ -8,7 +9,7 @@ export const digest = bytes => createHash('sha256').update(bytes).digest('hex');
 export const safePath = path => typeof path === 'string' && /^[a-zA-Z0-9_./-]+$/.test(path)
   && !path.startsWith('/') && path.split('/').every(part => part && part !== '.' && part !== '..');
 
-export function validateManifest(envelope, publicKey, shellVersion) {
+export function inspectManifest(envelope, publicKey) {
   if (!envelope || typeof envelope.payload !== 'string' || envelope.payload.length > 512_000
     || typeof envelope.signature !== 'string' || !verify(null, Buffer.from(envelope.payload), publicKey, Buffer.from(envelope.signature, 'base64'))) throw Error('Invalid content signature');
   const m = JSON.parse(envelope.payload);
@@ -16,7 +17,9 @@ export function validateManifest(envelope, publicKey, shellVersion) {
     || !Number.isSafeInteger(m.minShellVersion)
     || !Array.isArray(m.files) || m.files.length < 1 || m.files.length > 1000) throw Error('Incompatible content manifest');
   if (m.schema === 1 && m.game !== undefined && (m.game !== 'bricks-war' || m.component !== 'content' || m.channel !== 'stable')) throw Error('Wrong game or channel');
-  if (m.minShellVersion > shellVersion) throw Object.assign(Error('Content requires a newer shell'), {code:'INCOMPATIBLE'});
+  if (m.minShellVersion < 1) throw Error('Invalid shell requirement');
+  compareVersions(m.gameVersion, m.gameVersion);
+  if (m.minShellRelease !== undefined) compareVersions(m.minShellRelease, m.minShellRelease);
   const paths = new Set(); let size = 0;
   for (const f of m.files) {
     if (!safePath(f.path) || paths.has(f.path) || !/^[a-f0-9]{64}$/.test(f.sha256)
@@ -27,18 +30,25 @@ export function validateManifest(envelope, publicKey, shellVersion) {
   return m;
 }
 
+export function validateManifest(envelope, publicKey, shellVersion, shellRelease) {
+  const m = inspectManifest(envelope, publicKey);
+  // Only a fully authenticated, structurally valid manifest can request a shell update.
+  if (!supportsContent(m, shellVersion, shellRelease)) throw Object.assign(Error('Content requires a newer shell'), {code:'INCOMPATIBLE', manifest:m});
+  return m;
+}
+
 async function atomicJson(path, data) {
   await writeFile(`${path}.tmp`, JSON.stringify(data)); await rename(`${path}.tmp`, path);
 }
 
 export class ContentStore {
-  constructor({ root, bundled, publicKey, shellVersion, download, onProgress = () => {} }) {
-    Object.assign(this, { root, bundled, publicKey, shellVersion, download, onProgress });
+  constructor({ root, bundled, publicKey, shellVersion, shellRelease, download, onProgress = () => {} }) {
+    Object.assign(this, { root, bundled, publicKey, shellVersion, shellRelease, download, onProgress });
     this.state = { highWater: 0, current: null, previous: null, pending: null, trial: false };
     this.active = bundled; this.ready = null;
   }
   async inventory(dir) {
-    const m = validateManifest(JSON.parse(await readFile(join(dir, 'manifest.json'), 'utf8')), this.publicKey, this.shellVersion);
+    const m = validateManifest(JSON.parse(await readFile(join(dir, 'manifest.json'), 'utf8')), this.publicKey, this.shellVersion, this.shellRelease);
     for (const f of m.files) {
       const path = join(dir, f.path);
       // Downloaded files are created by us; reject symlinks before serving after restart.
@@ -52,14 +62,14 @@ export class ContentStore {
     try { this.state = JSON.parse(await readFile(join(this.root, 'state.json'), 'utf8')); } catch { /* Initial state. */ }
     if (!Number.isSafeInteger(this.state.highWater) || this.state.highWater < 0) throw Error('Invalid content state');
     for (const k of ['current', 'previous', 'pending']) if (this.state[k] != null && !/^release-\d+$/.test(this.state[k])) throw Error('Invalid content state path');
-    if (this.state.trial) { this.state.current = this.state.previous; this.state.trial = false; this.state.pending = null; }
+    if (this.state.trial) { this.recovered = true; this.state.current = this.state.previous; this.state.trial = false; this.state.pending = null; }
     if (this.state.current) {
       try {
         const current = await this.inventory(join(this.root, this.state.current));
         if (current.sequence > this.bundledManifest.sequence) this.active = join(this.root, this.state.current);
         else { this.state.previous = this.state.current; this.state.current = null; }
       }
-      catch { this.state.current = null; }
+      catch { this.recovered = true; this.state.current = null; }
     }
     this.manifest = await this.inventory(this.active);
     if (this.state.pending) {
@@ -68,7 +78,7 @@ export class ContentStore {
         if (pending.sequence > this.manifest.sequence) this.ready = pending;
         else this.state.pending = null;
       }
-      catch { this.state.pending = null; }
+      catch (error) { if (error.code !== 'INCOMPATIBLE') { this.recovered = true; this.state.pending = null; } }
     }
     await this.save();
     return this;
@@ -85,20 +95,22 @@ export class ContentStore {
   }
   cancel() { this.downloadController?.abort(); }
   async discardPrepared(sequence) {
-    if (this.ready?.sequence !== sequence) return;
-    const pending = this.state.pending; this.ready = null; this.state.pending = null; await this.save();
+    if (this.state.pending !== `release-${sequence}`) return;
+    const pending = this.state.pending; this.ready = null; this.state.pending = null;
+    // An intentional cancellation may be offered again; a failed trial still may not.
+    this.state.cancelledSequence = sequence; await this.save();
     if (pending && pending !== this.state.current && pending !== this.state.previous) await rm(join(this.root,pending),{recursive:true,force:true});
   }
-  prepare(envelope, onBytes = () => {}) {
+  prepare(envelope, onBytes = () => {}, targetShell) {
     if (this.preparing) return this.preparing;
     this.downloadController = new AbortController();
-    this.preparing = this.enqueue(() => this.stage(envelope, onBytes, this.downloadController.signal)).finally(() => { this.preparing = null; });
+    this.preparing = this.enqueue(() => this.stage(envelope, onBytes, this.downloadController.signal, targetShell)).finally(() => { this.preparing = null; });
     return this.preparing;
   }
-  async stage(selectedEnvelope, onBytes = () => {}, signal) {
+  async stage(selectedEnvelope, onBytes = () => {}, signal, targetShell) {
     this.onProgress('checking');
     const envelope = selectedEnvelope ?? JSON.parse((await this.download('latest.json', 512_000)).toString());
-    const m = validateManifest(envelope, this.publicKey, this.shellVersion);
+    const m = validateManifest(envelope, this.publicKey, targetShell?.abi ?? this.shellVersion, targetShell?.version ?? this.shellRelease);
     if (selectedEnvelope) { if (m.sequence <= this.manifest.sequence || m.sequence < this.state.highWater) return false; if ((this.ready?.sequence ?? 0) >= m.sequence) return true; }
     else if (m.sequence <= Math.max(this.state.highWater, this.manifest.sequence, this.ready?.sequence ?? 0)) return false;
     const name = `release-${m.sequence}`, stage = join(this.root, `${name}.staging`);
@@ -127,7 +139,8 @@ export class ContentStore {
       // Persist replay protection before advertising readiness.
       const oldPending = this.state.pending;
       this.state.highWater = m.sequence; this.state.pending = name;
-      await this.save(); this.ready = m;
+      delete this.state.cancelledSequence;
+      await this.save(); this.ready = supportsContent(m, this.shellVersion, this.shellRelease) ? m : null;
       if (oldPending && oldPending !== name && oldPending !== this.state.current && oldPending !== this.state.previous)
         await rm(join(this.root, oldPending), { recursive: true, force: true });
       return true;

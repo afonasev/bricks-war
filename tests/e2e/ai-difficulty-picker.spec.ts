@@ -1,3 +1,4 @@
+import { openLocalLobby } from '../helpers/localLobby';
 import { expect, test, type Page } from '@playwright/test';
 async function install(page: Page, slots = ['human-1','off','off','off'], id = 'Xbox Wireless Controller') {
  await page.addInitScript(({slots,id}) => {
@@ -17,7 +18,7 @@ const dialog = (page: Page) => page.locator('[data-ai-choice]');
 for (const mode of ['Битва','Командный бой']) {
  test(`X selects AI difficulty, remembers it and isolates modal in ${mode}`,async({page})=>{
   await install(page);
-  await page.getByRole('button',{name:new RegExp(`^${mode}`)}).click();
+  await openLocalLobby(page, mode);
   await down(page,2,true);
   await expect(dialog(page)).toBeVisible();
   await expect(dialog(page).locator('.is-ui-selected')).toHaveText('Средняя');
@@ -53,15 +54,15 @@ for (const mode of ['Битва','Командный бой']) {
 test('Start respects invalid roster and X stays inactive in Survival and main menu',async({page})=>{
  await install(page,['off','off','off','off']);
  await press(page,2); await expect(dialog(page)).toHaveCount(0);
- await page.getByRole('button',{name:/^Битва/}).click();
+ await openLocalLobby(page,'battle');
  await press(page,9); await expect(page.locator('[data-screen="battle"]')).toBeVisible();
  await page.getByRole('button',{name:'← Главное меню',exact:true}).click();
- await page.getByRole('button',{name:/^Выживание/}).click();
+ await openLocalLobby(page,'survival');
  await press(page,2); await expect(dialog(page)).toHaveCount(0);
 });
 test('another modal blocks X and Start',async({page})=>{
  await install(page);
- await page.getByRole('button',{name:/^Битва/}).click();
+ await openLocalLobby(page,'battle');
  await page.getByLabel('Имя игрока 1').click();
  await expect(page.locator('[data-profile-choice]')).toBeVisible();
  await press(page,2); await press(page,9);
@@ -71,7 +72,7 @@ test('another modal blocks X and Start',async({page})=>{
 for (const size of [{width:1440,height:960},{width:1280,height:480},{width:800,height:620},{width:390,height:844}]) {
  test(`AI picker and hints fit ${size.width}x${size.height}`,async({page})=>{
   await page.setViewportSize(size); await install(page);
-  await page.getByRole('button',{name:/^Битва/}).click();
+  await openLocalLobby(page,'battle');
   await expect(page.locator('.footer-start kbd')).toHaveText('Start');
   await expect(page.locator('#start-match > span')).toHaveText('Начать матч');
   if(size.width>=700){
@@ -105,7 +106,7 @@ for (const size of [{width:1440,height:960},{width:1280,height:480},{width:800,h
 }
 test('PlayStation face labels do not replace Start label',async({page})=>{
  await install(page,undefined,'DualSense Wireless Controller');
- await page.getByRole('button',{name:/^Битва/}).click();
+ await openLocalLobby(page,'battle');
  await expect(page.locator('.input-ai')).toHaveText('□');
  await expect(page.locator('.footer-start kbd')).toHaveText('Start');
  await press(page,2);await expect(dialog(page)).toBeVisible();
@@ -113,7 +114,7 @@ test('PlayStation face labels do not replace Start label',async({page})=>{
 
 test('default medium confirms once and Y works again after closing',async({page})=>{
  await install(page);
- await page.getByRole('button',{name:/^Битва/}).click();
+ await openLocalLobby(page,'battle');
  await press(page,2); await press(page,0);
  await expect(page.locator('[data-slot="1"]')).toHaveValue('ai-medium');
  await press(page,3);

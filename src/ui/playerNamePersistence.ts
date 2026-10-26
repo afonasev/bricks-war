@@ -36,3 +36,8 @@ export function savePlayerNames(names: readonly string[], storage: WriteStorage 
     // Storage can be unavailable in privacy modes; the selected name still works this match.
   }
 }
+
+/** Generated participant names are identities for this roster, not saved personal names. */
+export function isGenericPlayerName(name: string): boolean {
+  return /^(?:игрок|player|joueur|spieler|jugador|玩家|プレイヤー)(?:\s*\d+)?$/iu.test(name.trim());
+}

@@ -1,3 +1,4 @@
+import { openLocalLobby } from '../helpers/localLobby';
 import { expect, test } from '@playwright/test';
 import { mkdir } from 'node:fs/promises';
 
@@ -8,7 +9,7 @@ for (const viewport of [{width:1440,height:960},{width:390,height:844}]) {
     const errors: string[] = [];
     page.on('pageerror', e => errors.push(e.message));
     await page.goto('/?muted=1&playtest-board-events=1');
-    await page.getByRole('button', {name:/^Битва/}).click();
+    await openLocalLobby(page,'battle');
     if (viewport.width > 700) {
       const add = page.getByRole('button', {name:'Добавить ИИ',exact:true});
       while (await add.count()) await add.first().click();

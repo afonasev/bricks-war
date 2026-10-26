@@ -171,6 +171,8 @@ describe('authoritative room lifecycle',()=>{
   });
   it('compatibility, overload and pagination are enforced',async()=>{
     const f=fixture();const c=await f.service.create('Lobby','Host');
+    expect(()=>f.service.connect(c,PROTOCOL_VERSION,'board-event-fifo-v1')).toThrow();
+    expect(()=>f.service.connect(c,PROTOCOL_VERSION,'soft-drop-contact-lock-v1')).toThrow();
     expect(()=>f.service.connect(c,PROTOCOL_VERSION+1,RULES_VERSION)).toThrow();expect(()=>f.service.list(0,51)).toThrow();
     const tiny=new RoomService(()=>0,1);await tiny.create('A','A');await expect(tiny.create('B','B')).rejects.toThrow();
     tiny.draining=true;await expect(tiny.create('C','C')).rejects.toThrow();

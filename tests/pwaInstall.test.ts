@@ -1,5 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { dismissIosInstallHint, shouldShowIosInstallHint } from '../src/ui/pwaInstall';
+import { catalogs } from '../src/i18n/catalogs';
+import { LOCALES, translate } from '../src/i18n/locale';
+
+const pwaInstallCopyKeys = [
+  'pwaInstallBeforeShare', 'pwaShareAction', 'pwaInstallBetweenActions',
+  'pwaAddToHomeScreen', 'pwaInstallAfterActions', 'pwaInstallDismissAria',
+] as const;
+const pwaLifecycleCopyKeys = [
+  'errorTitle', 'errorHelp', 'unknown', 'updateCheckHelp', 'updateDownloadHelp',
+  'updateBlocked', 'historyUnavailable', 'historyNotesUnavailable',
+  'updateApplyHelp',
+] as const;
 
 function browser(userAgent: string, options: { standalone?: boolean; dismissed?: boolean } = {}) {
   const values = new Map<string, string>();
@@ -25,5 +37,15 @@ describe('iOS PWA install hint', () => {
     const iosSafari = browser(safari);
     dismissIosInstallHint(iosSafari);
     expect(shouldShowIosInstallHint(iosSafari)).toBe(false);
+  });
+
+  it.each(LOCALES)('has complete PWA install, offline and update copy in %s', (locale) => {
+    for (const key of [...pwaInstallCopyKeys, ...pwaLifecycleCopyKeys]) {
+      expect(catalogs[locale][key].trim().length, `${locale}:${key}`).toBeGreaterThan(0);
+      expect(translate(locale, key), `${locale}:${key}`).not.toContain('{');
+      if (locale !== 'en' && key !== 'pwaInstallAfterActions') {
+        expect(catalogs[locale][key], `${locale}:${key}`).not.toBe(catalogs.en[key]);
+      }
+    }
   });
 });

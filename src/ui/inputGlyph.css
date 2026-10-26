@@ -1,0 +1,29 @@
+/* One bounded badge contract, independent of the host button's typography. */
+#app .input-glyph {
+  --glyph-size:28px;
+  display:inline-flex!important; align-items:center!important; justify-content:center!important;
+  box-sizing:border-box!important; width:auto!important; min-width:var(--glyph-size)!important;
+  height:var(--glyph-size)!important; flex:0 0 auto!important; padding:0 5px!important;
+  border:1px solid #387b20!important; border-radius:999px!important;
+  background:linear-gradient(#81ca43,#3e8b20)!important; color:white!important;
+  box-shadow:inset 0 2px #fff8,0 2px #0002!important;
+  font:bold 14px/1 'Trebuchet MS',sans-serif!important;
+  text-indent:0!important; letter-spacing:0!important; vertical-align:middle;
+}
+#app .input-glyph.input-back { background:linear-gradient(#ff997d,#d74b35)!important;border-color:#ae4f31!important; }
+#app .input-glyph.input-ai { background:linear-gradient(#55bafa,#126ac7)!important;border-color:#1b63a3!important; }
+#app .input-glyph:is(.input-roster,.input-reset) { background:linear-gradient(#ffe475,#ecc029)!important;border-color:#bb9123!important;color:#75501c!important; }
+#app .input-glyph.is-compact, #app :is(.lobby-card-hint,.lobby-editor-hint,.lobby-join-shortcuts) .input-glyph { --glyph-size:22px;font-size:12px!important; }
+#app .input-glyph[hidden] { display:none!important; }
+
+/* The font's hollow square sits below its optical centre. Draw it geometrically. */
+#app .input-glyph[data-face-symbol="□"] { position:relative!important; color:transparent!important; }
+#app .input-glyph[data-face-symbol="□"]::after {
+  content:''; position:absolute; inset:0; margin:auto; box-sizing:border-box;
+  width:.64em; height:.64em; border:1.5px solid white;
+}
+/* Match isMobilePlayViewport, including compact landscape phones. */
+@media (max-width:760px), (max-width:900px) and (max-height:600px) {
+  #app:not([data-gamepad-hints="connected"]) :is(.input-glyph,.release-footer-action,.lobby-card-hint,.lobby-join-shortcuts,.lobby-key.menu),
+  #app:not([data-gamepad-hints="connected"]) .lobby-editor-hint:not(:has(button)) { display:none!important; }
+}

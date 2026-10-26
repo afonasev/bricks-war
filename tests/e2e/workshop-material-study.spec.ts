@@ -1,3 +1,4 @@
+import { openLocalLobby } from '../helpers/localLobby';
 import { expect, test } from '@playwright/test';
 import { mkdir, writeFile, readFile } from 'node:fs/promises';
 const out=process.env.BRICKS_WORKSHOP_CAPTURE_DIR ?? 'evidence/toy-workshop-arena/material-study';
@@ -8,7 +9,7 @@ for (const viewport of [{width:1440,height:960},{width:1280,height:800},{width:1
   const errors:string[]=[];
   page.on('pageerror',e=>errors.push(e.message));
   await page.goto('/?muted=1&playtest-board-events=1');
-  await page.getByRole('button',{name:/^Выживание/}).click();
+  await openLocalLobby(page,'survival');
   const remove=page.getByRole('button',{name:'Удалить Игрок 2'});
   if(await remove.count())await remove.click();
   await page.getByRole('combobox',{name:'Стиль участника 1',exact:true}).click();

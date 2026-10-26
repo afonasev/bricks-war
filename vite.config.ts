@@ -1,4 +1,6 @@
 import { startupLocaleScript } from './src/i18n/bootstrap';
+import { catalogs } from './src/i18n/catalogs';
+import { LOCALES } from './src/i18n/locale';
 import { defineConfig } from 'vitest/config';
 import { viteSingleFile } from 'vite-plugin-singlefile';
 import { VitePWA } from 'vite-plugin-pwa';
@@ -139,6 +141,35 @@ function phaserReadonlyFeatureDetectorPlugin(): Plugin {
   };
 }
 
+function localizedManifestPlugin(assetRevision: string): Plugin {
+  return {
+    name: 'localized-pwa-manifests',
+    generateBundle() {
+      for (const locale of LOCALES) {
+        this.emitFile({
+          type: 'asset',
+          fileName: `manifest-${locale}.webmanifest`,
+          source: JSON.stringify({
+            name: 'Bricks War',
+            short_name: 'Bricks War',
+            description: catalogs[locale].pwaManifestDescription,
+            lang: locale,
+            start_url: './',
+            scope: './',
+            display: 'standalone',
+            background_color: '#fff9ec',
+            theme_color: '#080b18',
+            icons: [
+              { src: `pwa-192.png?v=${assetRevision}`, sizes: '192x192', type: 'image/png', purpose: 'any' },
+              { src: `pwa-512.png?v=${assetRevision}`, sizes: '512x512', type: 'image/png', purpose: 'any' },
+            ],
+          }, null, 2),
+        });
+      }
+    },
+  };
+}
+
 export default defineConfig(async ({ command }) => {
   const deployment = command === 'build' ? await readDeploymentBuildInfo() : null;
   const version = command === 'serve' ? `${packageInfo.version}-dev` : (deployment?.version ?? packageInfo.version);
@@ -154,34 +185,22 @@ export default defineConfig(async ({ command }) => {
   },
   plugins: [
     faviconPlugin(assetRevision),
+    localizedManifestPlugin(assetRevision),
     gameTuningFilePlugin(),
     phaserReadonlyFeatureDetectorPlugin(),
     VitePWA({
+      manifest: false,
       injectRegister: false,
       registerType: 'prompt',
-      manifest: {
-        name: 'Bricks War',
-        short_name: 'Bricks War',
-        description: 'Локальная Tetris-арена для людей и ИИ',
-        lang: 'ru',
-        start_url: './',
-        scope: './',
-        display: 'standalone',
-        background_color: '#fff9ec',
-        theme_color: '#080b18',
-        icons: [
-          { src: `pwa-192.png?v=${assetRevision}`, sizes: '192x192', type: 'image/png', purpose: 'any' },
-          { src: `pwa-512.png?v=${assetRevision}`, sizes: '512x512', type: 'image/png', purpose: 'any' },
-        ],
-      },
       workbox: {
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,txt,woff,woff2,webmanifest}'],
         // Singlefile sets assetsDir to empty; PWA's default regex would match
         // index.html and incorrectly omit its content revision.
         dontCacheBustURLsMatching: /^assets\/.*-[A-Za-z0-9_-]{8,}\./,
         cleanupOutdatedCaches: true,
         clientsClaim: false,
-        // Approved audio and workshop menu art are inlined (currently 8.46 MB).
-        maximumFileSizeToCacheInBytes: 12 * 1024 * 1024,
+        // Keep the complete single-file game (currently 14.24 MB) in the offline cache.
+        maximumFileSizeToCacheInBytes: 16 * 1024 * 1024,
         runtimeCaching: [{
           urlPattern: /\/audio\/music\/.*\.mp3$/,
           handler: 'CacheFirst',

@@ -1,9 +1,10 @@
+import { openLocalLobby } from '../helpers/localLobby';
 import {test,expect} from '@playwright/test';
 import {mkdir} from 'node:fs/promises';
 const out=process.env.BRICKS_WORKSHOP_CAPTURE_DIR ?? `evidence/toy-workshop-arena/material-study-${process.env.BRICKS_THEME_STAGE ? 'f6' : 'f5'}`;
 test('sprite clear removes tiles while preserving score and duration',async({page})=>{
   await page.goto('/?muted=1&playtest-clear=normal-2&playtest-board-events=1');
-  await page.getByRole('button',{name:/^Выживание/}).click();
+  await openLocalLobby(page,'survival');
   const remove=page.getByRole('button',{name:'Удалить Игрок 2'});
   if(await remove.count())await remove.click();
   await page.getByRole('combobox',{name:'Стиль участника 1',exact:true}).click();

@@ -1,3 +1,5 @@
+import { translate, type Locale } from '../i18n/locale';
+import { DEFAULT_GAME_TUNING } from '../domain/gameTuning';
 import type { MatchMessageTemplates } from '../domain/gameTuning';
 import type { MatchState } from '../domain/types';
 import {
@@ -60,25 +62,32 @@ function descriptor(kind: MatchEventKind, scope: 'global' | string, title: strin
   return { kind, scope, title, detail, ...MATCH_EVENT_DEFINITIONS[kind] };
 }
 
+/** Only application defaults are translated; custom stored message text stays verbatim. */
+function localizedDefaultMessage(messages: MatchMessageTemplates, key: 'roundStart' | 'finalPushTitle' | 'finalPushHint', locale: Locale): string {
+  const keys = { roundStart: 'noticeRoundStart', finalPushTitle: 'noticeFinalTitle', finalPushHint: 'noticeFinalHint' } as const;
+  return messages[key] === DEFAULT_GAME_TUNING.messages[key] ? translate(locale, keys[key]) : messages[key];
+}
+
 export function globalMatchEvent(
   state: MatchState,
   messages: MatchMessageTemplates,
+  locale: Locale = 'ru',
 ): MatchEventDescriptor | null {
   const hold = state.globalEventHold;
   const acceleratingPressure = state.isSurvival || state.options.battleTimeMode === 'until-victory';
   if (hold?.kind === 'final-push' || state.finalPushPulseMs > 0) {
     const baseDetail = acceleratingPressure
-      ? 'Серый ряд каждые 15 → 5 секунд'
-      : messages.finalPushHint;
+      ? translate(locale, 'noticePressureHint')
+      : localizedDefaultMessage(messages, 'finalPushHint', locale);
     const detail = baseDetail;
     return descriptor(
       'final-push',
       'global',
-      acceleratingPressure ? 'Фаза давления' : messages.finalPushTitle,
+      acceleratingPressure ? translate(locale, 'noticePressureTitle') : localizedDefaultMessage(messages, 'finalPushTitle', locale),
       detail,
     );
   }
-  if (state.roundStartPulseMs > 0) return descriptor('round-start', 'global', messages.roundStart);
+  if (state.roundStartPulseMs > 0) return descriptor('round-start', 'global', localizedDefaultMessage(messages, 'roundStart', locale));
   return null;
 }
 
@@ -87,11 +96,15 @@ export function participantMatchEvent(
   participantId: string,
   _messages: MatchMessageTemplates,
   senderNames: readonly string[],
+  locale: Locale = 'ru',
 ): MatchEventDescriptor | null {
   const incomingRows = state.pendingConflict?.incomingRows[participantId] ?? 0;
   if (incomingRows > 0) {
     const current = state.attackQueues[participantId]?.[0];
-    const values = { senders: current?.reason === 'pressure' ? '' : current?.senderLabel ?? senderNames.join(', '), rows: incomingRows };
+    const sender = state.participants.find(participant => participant.config.id === current?.senderId);
+    const queuedName = sender?.config.controller === 'ai' && current?.senderLabel === 'ИИ'
+      ? translate(locale, 'aiLabel') : current?.senderLabel;
+    const values = { senders: current?.reason === 'pressure' ? '' : queuedName ?? senderNames.join(', '), rows: incomingRows };
     return {
       ...descriptor('incoming-attack',participantId, `${values.senders}${values.senders ? ' ' : ''}⚔ ${incomingRows}`),
       lifetimeMs: current?.remainingMs ?? state.pendingConflict?.remainingWarningMs ?? 3000,
@@ -100,7 +113,7 @@ export function participantMatchEvent(
 
   const cleanup = state.cleanupEvents.find((event) => event.participantId === participantId);
   if (cleanup && !cleanup.amplified) return {
-    ...descriptor('cleanup', participantId, `Очищено · ${cleanup.rows}`, 'Серые ряды удалены'),
+    ...descriptor('cleanup', participantId, translate(locale, 'noticeCleanup', { rows: cleanup.rows }), translate(locale, 'noticeCleanupHint')),
     lifetimeMs: cleanup.pulseMs,
   };
   return null;

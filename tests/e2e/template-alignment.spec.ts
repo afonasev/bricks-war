@@ -1,3 +1,4 @@
+import { openLocalLobby } from '../helpers/localLobby';
 import {test,expect} from '@playwright/test';
 for(const viewport of [{width:1440,height:960},{width:1280,height:480},{width:390,height:844}]){
  test(`preferences, reset and keyboard navigation ${viewport.width}`,async({page})=>{
@@ -19,7 +20,7 @@ for(const viewport of [{width:1440,height:960},{width:1280,height:480},{width:39
  });
 }
 test('pause has the same preference values and stays paused on settings return',async({page})=>{
- await page.goto('/?muted=1');await page.locator('[data-destination="survival"]').click();await page.locator('#start-match').click();await expect(page.locator('.arena-screen')).toBeVisible();await expect(page.locator('.match-loading')).toHaveCount(0);await page.keyboard.press('Escape');await page.locator('#pause-settings').click();
+ await page.goto('/?muted=1');await openLocalLobby(page,'survival');await page.locator('#start-match').click();await expect(page.locator('.arena-screen')).toBeVisible();await expect(page.locator('.match-loading')).toHaveCount(0);await page.keyboard.press('Escape');await page.locator('#pause-settings').click();
  await expect(page.locator('#master-volume')).toBeVisible();await expect(page.locator('[data-stick="stickDeadzone"]')).toHaveCount(1);
  await page.locator('[data-stick="stickDeadzone"]').fill('25');await page.locator('#pause-settings-back').click();await expect(page.locator('#pause-menu-panel')).toBeVisible();await expect(page.locator('#pause-overlay')).toBeVisible();
  await page.locator('#pause-settings').click();await expect(page.locator('[data-stick="stickDeadzone"]')).toHaveValue('25');await page.screenshot({path:'evidence/align-game-template/pause-settings.png'});
@@ -65,7 +66,7 @@ for(const [id,glyph] of [['Xbox Controller','Y'],['Sony DualSense','△'],['Nint
 
 test('Y resets pause preferences without resuming',async({page})=>{
  await page.addInitScript(()=>{const pad={index:0,id:'Xbox Controller',connected:true,mapping:'standard',axes:[0,0],buttons:Array.from({length:16},()=>({pressed:false,value:0})),timestamp:0};Object.defineProperty(navigator,'getGamepads',{value:()=>[pad],configurable:true});(window as any).settingsPad=pad;});
- await page.goto('/?muted=1');await page.locator('[data-destination="survival"]').click();await page.locator('#start-match').click();await expect(page.locator('.match-loading')).toHaveCount(0);await page.keyboard.press('Escape');await page.locator('#pause-settings').click();
+ await page.goto('/?muted=1');await openLocalLobby(page,'survival');await page.locator('#start-match').click();await expect(page.locator('.match-loading')).toHaveCount(0);await page.keyboard.press('Escape');await page.locator('#pause-settings').click();
  await page.locator('#master-volume').fill('25');await page.evaluate(()=>{(window as any).settingsPad.buttons[3].pressed=true;});await expect(page.locator('#master-volume')).toHaveValue('100');await expect(page.locator('#pause-overlay')).toBeVisible();await page.evaluate(()=>{(window as any).settingsPad.buttons[3].pressed=false;});
 });
 

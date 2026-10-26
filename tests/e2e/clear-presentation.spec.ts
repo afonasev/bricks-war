@@ -1,3 +1,4 @@
+import { openLocalLobby } from '../helpers/localLobby';
 import { expect, test, type Page } from '@playwright/test';
 import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -6,7 +7,7 @@ import { join } from 'node:path';
 
 async function openFire(page: Page, lines: number): Promise<void> {
   await page.goto(`/?playtest-clear=fire-${lines}&muted=1`);
-  await page.getByRole('button', { name: /^Выживание/ }).click();
+  await openLocalLobby(page,'survival');
   const removeSecond = page.getByRole('button', { name: 'Удалить Игрок 2' });
   if (await removeSecond.count()) await removeSecond.click();
   await page.locator('#start-match').click();
@@ -17,7 +18,7 @@ async function openFire(page: Page, lines: number): Promise<void> {
 
 async function startCycle(page: Page, mode: 'normal' | 'fire', lines: number): Promise<void> {
   await page.goto(`/?playtest-clear=${mode}-${lines}&muted=1`);
-  await page.getByRole('button', { name: /^Выживание/ }).click();
+  await openLocalLobby(page,'survival');
   const removeSecond = page.getByRole('button', { name: 'Удалить Игрок 2' });
   if (await removeSecond.count()) await removeSecond.click();
   await page.locator('#start-match').click();

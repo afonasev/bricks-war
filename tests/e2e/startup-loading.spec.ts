@@ -19,7 +19,7 @@ for (const viewport of [{ width: 1440, height: 960 }, { width: 1280, height: 480
     const loading = page.locator('#startup-loading'); await expect(loading).toBeVisible();
     await expect(loading.getByRole('heading')).toHaveAttribute('aria-label', 'Bricks War');
     await expect(loading.locator('p')).toHaveText('Загружаем игру');
-    await expect(loading.locator('footer')).toHaveText('© 2026 Evgeniy Afonasev · afonasev.tech · Made with Codex');
+    await expect(loading.locator('footer')).toHaveText('© 2026 Evgeniy Afonasev · afonasev.tech');
     expect(await page.locator('#app').evaluate((el: HTMLElement) => el.inert)).toBe(true);
     expect(await loading.locator('.startup-loading-backdrop').evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true);
     const artRatio = await loading.locator('.startup-loading-backdrop').evaluate((img: HTMLImageElement) => img.naturalWidth / img.naturalHeight);

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MatchLoading } from '../src/ui/matchLoading';
+import { LOCALES, getLocale, setLocale, translate } from '../src/i18n/locale';
 
 // Exercise cancellation and the clock contract without a browser's wall-clock jitter.
 let frames: Map<number, FrameRequestCallback>;
@@ -18,7 +19,7 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
   frames = new Map(); listeners = new Map(); removed = false; let id = 0;
   element = { hidden: false, remove: () => { removed = true; }, setAttribute: () => {}, innerHTML: '', className: '', classList: { add: () => {} } };
-  vi.stubGlobal('document', { createElement: () => element, body: { append: () => {} } });
+  vi.stubGlobal('document', { documentElement: { lang: '' }, createElement: () => element, body: { append: () => {} } });
   vi.stubGlobal('window', { matchMedia: () => ({ matches: false }), addEventListener: (name: string, fn: (event: unknown) => void) => listeners.set(name, fn), removeEventListener: (name: string) => listeners.delete(name) });
   vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => { frames.set(++id, callback); return id; });
   vi.stubGlobal('cancelAnimationFrame', (key: number) => frames.delete(key));
@@ -76,4 +77,22 @@ it('skips the closing dissolve for reduced motion while keeping the two-second m
   const loading = new MatchLoading(); await painted(loading);
   const completion = loading.ready(); await vi.advanceTimersByTimeAsync(2_000); await frame();
   expect(await completion).toBe(true); expect(vi.getTimerCount()).toBe(0);
+});
+
+
+describe('selected match-loading language', () => {
+  it('renders both loading labels in every supported locale without changing lifecycle ownership', () => {
+    const previous = getLocale();
+    try {
+      for (const locale of LOCALES) {
+        setLocale(locale, null);
+        const loading = new MatchLoading();
+        expect(element.innerHTML).toContain(`<h1>${translate(locale, 'arenaLoadingTitle')}</h1>`);
+        expect(element.innerHTML).toContain(`<p>${translate(locale, 'arenaLoadingHint')}</p>`);
+        expect(loading.visible).toBe(true);
+        loading.cancel();
+        expect(listeners.size).toBe(0);
+      }
+    } finally { setLocale(previous, null); }
+  });
 });

@@ -20,8 +20,8 @@ try {
   if (!response?.ok()) throw new Error(`Release HTTP status: ${response?.status() ?? 'no response'}`);
   const actual = (await page.locator('.release-build-info').first().textContent())?.trim();
   if (actual !== expected) throw new Error(`Release identity mismatch: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
-  const battle = page.getByRole('navigation', { name: 'Главное меню' }).getByRole('button', { name: /^Битва/ });
-  if (!(await battle.isVisible())) throw new Error('Published menu has no visible Battle control');
+  const play = page.locator('[data-play-entry]');
+  if (!(await play.isVisible())) throw new Error('Published menu has no visible Play control');
   console.log(JSON.stringify({ url, status: response.status(), version: metadata.version, deployedAt: metadata.deployedAt, footer: actual }));
 } finally {
   await browser.close();

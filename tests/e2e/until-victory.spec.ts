@@ -1,3 +1,4 @@
+import { openLocalLobby } from '../helpers/localLobby';
 import { expect, test, type Page } from '@playwright/test';
 
 async function chooseVictory(page: Page): Promise<void> {
@@ -9,7 +10,7 @@ async function chooseVictory(page: Page): Promise<void> {
 for (const mode of ['Битва', 'Командный бой']) {
   test(`${mode} supports until-victory with a growing active clock and pause`, async ({ page }) => {
     await page.goto('/?muted=1');
-    await page.getByRole('button', { name: new RegExp(`^${mode}`) }).click();
+    await openLocalLobby(page,mode);
     if (mode === 'Командный бой') {
       const addAi = page.getByRole('button', { name: 'Добавить ИИ', exact: true });
       while (await addAi.count()) await addAi.first().click();
@@ -17,7 +18,7 @@ for (const mode of ['Битва', 'Командный бой']) {
     await chooseVictory(page);
     await expect(page.getByText(mode === 'Командный бой' ? 'До последней команды; одновременно — по очкам' : 'До последнего выжившего; одновременно — по очкам', { exact: true })).toBeVisible();
     await page.reload();
-    await page.getByRole('button', { name: new RegExp(`^${mode}`) }).click();
+    await openLocalLobby(page,mode);
     await expect(page.locator('#match-duration')).toHaveValue('until-victory');
     await page.getByRole('button', { name: 'Start' }).click();
     await expect(page.locator('#round-timer')).toHaveAttribute('aria-label', 'Прошедшее время матча');
@@ -36,7 +37,7 @@ for (const mode of ['Битва', 'Командный бой']) {
 test('phone Battle selects until-victory and displays an increasing timer', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/?muted=1');
-  await page.getByRole('button', { name: /^Битва/ }).click();
+  await openLocalLobby(page,'battle');
   await chooseVictory(page);
   await page.getByRole('button', { name: 'Start' }).click();
   await expect(page.locator('#mobile-match-timer')).toHaveAttribute('aria-label', 'Прошедшее время матча');
@@ -47,7 +48,7 @@ test('phone Battle selects until-victory and displays an increasing timer', asyn
 test('simultaneous final elimination explains the score exception and Repeat keeps the policy', async ({ page }) => {
   test.setTimeout(50000);
   await page.goto('/?muted=1&playtest-fast=20');
-  await page.getByRole('button', { name: /^Битва/ }).click();
+  await openLocalLobby(page,'battle');
   const removeAi = page.locator('[data-remove-slot="2"]');
   if (await removeAi.count()) await removeAi.click();
   await chooseVictory(page);

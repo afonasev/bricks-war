@@ -45,7 +45,7 @@ describe('production screen routing', () => {
 describe('shared menu input', () => {
   it('maps arrows, WASD, confirm, and back consistently', () => {
     expect(['ArrowUp', 'a', 'ArrowDown', 'd', 'Enter', ' ', 'Escape'].map(keyboardMenuAction)).toEqual([
-      'previous', 'previous', 'next', 'next', 'confirm', 'confirm', 'back',
+      'previous', 'decrease', 'next', 'increase', 'confirm', 'confirm', 'back',
     ]);
     expect(keyboardMenuAction('Backspace')).toBeNull();
   });

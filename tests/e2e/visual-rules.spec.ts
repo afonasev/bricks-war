@@ -1,12 +1,13 @@
 import { expect, test } from '@playwright/test';
 import { mkdir } from 'node:fs/promises';
+const screenshots = process.env.BRICKS_RULES_SCREENSHOTS ?? 'evidence/add-visual-rules/rework-f2/screenshots';
 
 for (const viewport of [{width:1440,height:960},{width:1280,height:480},{width:390,height:844},{width:360,height:640},{width:844,height:390},{width:800,height:620}]) {
   test(`illustrated rules navigation and all cards fit ${viewport.width}x${viewport.height}`, async ({page}) => {
     await page.setViewportSize(viewport);
     const errors: string[] = [];
     page.on('pageerror', error=>errors.push(error.message));
-    await page.goto('/');
+    await page.goto('/?muted=1');
     await page.locator('[data-destination="settings"]').click();
     await page.locator('#open-rules').click();
     await expect(page.locator('#rules-progress')).toHaveText('1 / 8');
@@ -21,7 +22,7 @@ for (const viewport of [{width:1440,height:960},{width:1280,height:480},{width:3
     await expect(page.locator('#rules-progress')).toHaveText('2 / 8');
     await page.keyboard.press('ArrowLeft');
     await expect(page.locator('#rules-progress')).toHaveText('1 / 8');
-    await mkdir('evidence/add-visual-rules/rework-f2/screenshots', {recursive:true});
+    await mkdir(screenshots, {recursive:true});
     const deckText: string[] = [];
     for (let i=0;i<8;i++) {
       await page.locator(`[data-rule-topic="${i}"]`).click();
@@ -40,7 +41,7 @@ for (const viewport of [{width:1440,height:960},{width:1280,height:480},{width:3
         return {svgOverflow,outside,overlaps,clipped,horizontalOverflow:document.documentElement.scrollWidth>innerWidth+1};
       });
       expect(layout,`card ${i+1}`).toEqual({svgOverflow:[],outside:0,overlaps:0,clipped:[],horizontalOverflow:false});
-      await page.screenshot({path:`evidence/add-visual-rules/rework-f2/screenshots/${viewport.width}x${viewport.height}-card-${i+1}.png`});
+      await page.screenshot({path:`${screenshots}/${viewport.width}x${viewport.height}-card-${i+1}.png`});
     }
     const fullDeck = deckText.join('\n');
     expect(fullDeck).toContain('Очищай ряды — атакуй');

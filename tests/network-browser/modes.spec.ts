@@ -4,7 +4,7 @@ const evidence=process.env.BRICKS_NETWORK_MODES_EVIDENCE_DIR??'evidence/add-netw
 async function enter(page:Page){await page.goto('/?muted=1');await page.getByRole('button',{name:/^Сетевая игра/}).click();}
 async function pick(page:Page,label:string,value:string){await page.getByRole('combobox',{name:label,exact:true}).click();await page.getByRole('option',{name:value,exact:true}).click();}
 for(const viewport of [{width:1440,height:960},{width:390,height:844}])test(`network Battle/Teams preferences and authoritative join/return ${viewport.width}`,async({browser,baseURL})=>{
- const hostContext=await browser.newContext({baseURL,viewport});const guestContext=await browser.newContext({baseURL,viewport});const host=await hostContext.newPage(),guest=await guestContext.newPage();const errors:string[]=[];for(const p of [host,guest])p.on('pageerror',e=>errors.push(e.message));
+ const hostContext=await browser.newContext({baseURL,locale:'ru-RU',viewport});const guestContext=await browser.newContext({baseURL,locale:'ru-RU',viewport});const host=await hostContext.newPage(),guest=await guestContext.newPage();const errors:string[]=[];for(const p of [host,guest])p.on('pageerror',e=>errors.push(e.message));
  const room=`Modes ${viewport.width} ${Date.now()}`;
  try {
   await enter(host);await host.getByRole('button',{name:'Создать лобби',exact:true}).click();await host.getByLabel('Название лобби').fill(room);await host.getByLabel('Ваше имя',{exact:true}).fill('Создатель');

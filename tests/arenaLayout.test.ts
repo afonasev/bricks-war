@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { LOCAL_ARENA_CARD_GAP, chooseArenaLayout, chooseMobileSoloLayout, chooseNetworkLayout } from '../src/rendering/arenaLayout';
+import { LOCAL_ARENA_CARD_GAP, chooseLocalArenaLayout, chooseArenaLayout, chooseMobileSoloLayout, chooseNetworkLayout } from '../src/rendering/arenaLayout';
 
 describe('adaptive arena layout', () => {
   it.each([
@@ -132,6 +132,27 @@ describe('adaptive arena layout', () => {
     expect(secondAi!.x + secondAi!.cardWidth).toBeLessThanOrEqual(840);
     expect((player!.x + secondAi!.x + secondAi!.cardWidth) / 2).toBe(422);
   });
+
+  it('lays out three AI miniatures in a non-overlapping landscape row below the controls', () => {
+    const layout = chooseMobileSoloLayout(844, 390, 4, 52);
+    const [player, firstAi, secondAi, thirdAi] = layout.participantCards!;
+    expect(layout.participantCards).toHaveLength(4);
+    expect(player!.cellSize).toBeGreaterThan(firstAi!.cellSize);
+    expect(firstAi!.cellSize).toBe(9);
+    expect(firstAi!.cellSize).toBe(secondAi!.cellSize);
+    expect(secondAi!.cellSize).toBe(thirdAi!.cellSize);
+    expect(player!.y).toBeGreaterThanOrEqual(52);
+    expect(player!.y + player!.cardHeight).toBeLessThanOrEqual(386);
+    for (const ai of [firstAi!, secondAi!, thirdAi!]) {
+      expect(ai.x).toBeGreaterThanOrEqual(player!.x + player!.cardWidth);
+      expect(ai.y + ai.cardHeight / 2).toBeCloseTo(player!.y + player!.cardHeight / 2, 0);
+    }
+    expect(firstAi!.y).toBe(secondAi!.y);
+    expect(secondAi!.y).toBe(thirdAi!.y);
+    expect(firstAi!.x + firstAi!.cardWidth).toBeLessThanOrEqual(secondAi!.x);
+    expect(secondAi!.x + secondAi!.cardWidth).toBeLessThanOrEqual(thirdAi!.x);
+    expect(thirdAi!.x + thirdAi!.cardWidth).toBeLessThanOrEqual(840);
+  });
 });
 
 describe('local desktop field spacing', () => {
@@ -142,5 +163,31 @@ describe('local desktop field spacing', () => {
     expect(layout.slotHeight * layout.rows + 16 * (layout.rows - 1) + 8).toBe(height);
     expect(layout.cardWidth).toBeLessThanOrEqual(layout.slotWidth);
     expect(layout.cardHeight).toBeLessThanOrEqual(layout.slotHeight);
+  });
+});
+
+
+describe('centered workshop group', () => {
+  it.each([[3840,2160],[1440,960],[1280,480],[800,1000]])('fits maximum square cells and exact pedestal gaps at %ix%i', (width,height) => {
+    for (const count of [1,2,3,4]) {
+      const header = Math.round(52 * Math.max(1, Math.min(width/1920,height/1080)));
+      const layout = chooseLocalArenaLayout(width,height,count,header);
+      const cards = layout.participantCards!;
+      const left = Math.min(...cards.map(c=>c.x-8));
+      const right = Math.max(...cards.map(c=>c.x+c.cardWidth+8));
+      expect(left).toBeGreaterThan(32);
+      expect(width-right).toBe(left);
+      for (const card of cards) {
+        expect(card.y-4).toBeGreaterThanOrEqual(24);
+        expect(card.y+card.cardHeight+12).toBeLessThanOrEqual(height);
+        expect(card.cardWidth).toBe(layout.cellSize*10+4);
+        expect(card.cardHeight).toBe(header+layout.cellSize*20+4);
+      }
+      for (let i=1;i<cards.length;i++) if (cards[i]!.y===cards[i-1]!.y)
+        expect(cards[i]!.x-8-(cards[i-1]!.x+cards[i-1]!.cardWidth+8)).toBe(32);
+      const horizontalRoom = (width-96-48*(layout.columns-1))/layout.columns;
+      const verticalRoom = (height-48-48*(layout.rows-1))/layout.rows;
+      expect((layout.cellSize+1)*10+20>horizontalRoom || header+(layout.cellSize+1)*20+20>verticalRoom).toBe(true);
+    }
   });
 });

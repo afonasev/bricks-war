@@ -1,3 +1,4 @@
+import { openLocalLobby } from '../helpers/localLobby';
 import { test, expect } from '@playwright/test';
 
 test.use({ serviceWorkers: 'block' });
@@ -23,7 +24,7 @@ for (const viewport of [{ width: 1440, height: 960 }, { width: 390, height: 844 
     await page.keyboard.press('Control++');
     await page.keyboard.press('Meta+-');
     expect(await page.evaluate(() => window.visualViewport!.scale)).toBe(1);
-    await page.getByRole('button', { name: /^Выживание/ }).click();
+    await openLocalLobby(page,'survival');
     const name = page.getByLabel('Имя игрока 1');
     await name.fill('Проверка');
     await name.focus();

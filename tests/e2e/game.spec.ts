@@ -1,10 +1,11 @@
+import { openLocalLobby } from '../helpers/localLobby';
 import { expect, test, type Page } from '@playwright/test';
 
 async function resetAndOpen(page: Page, destination: 'Битва' | 'Командный бой', query = '?muted=1'): Promise<void> {
   await page.goto(`/${query}`);
   await page.evaluate(() => localStorage.clear());
   await page.reload();
-  await page.getByRole('button', { name: new RegExp(`^${destination}`) }).click();
+  await openLocalLobby(page, destination);
 }
 
 async function fillBattle(page: Page, count = 4): Promise<void> {
@@ -52,7 +53,7 @@ test('launches four compact fields with complete unframed previews and stable pe
 
 test('keeps a one-player Survival surface tightly around the maximum-height board', async ({ page }) => {
   await page.goto('/?muted=1');
-  await page.getByRole('button', { name: /^Выживание/ }).click();
+  await openLocalLobby(page,'survival');
   await page.getByRole('button', { name: 'Удалить Игрок 2' }).click();
   await page.getByRole('button', { name: 'Start' }).click();
 
@@ -77,7 +78,7 @@ test('keeps a one-player Survival surface tightly around the maximum-height boar
 
 test('does not mount a Survival anomaly-arrival notice', async ({ page }) => {
   await page.goto('/?muted=1&playtest-survival-level-up=1');
-  await page.getByRole('button', { name: /^Выживание/ }).click();
+  await openLocalLobby(page,'survival');
   await page.getByRole('button', { name: 'Start' }).click();
   await expect(page.locator('#countdown')).toBeHidden({ timeout: 6000 });
   await page.waitForTimeout(450);
@@ -351,7 +352,7 @@ test('Start Menu opens pause on every connected gamepad and resumes only after r
     Object.defineProperty(navigator,'getGamepads',{configurable:true,value:()=>pads});
   });
   await page.goto('/?muted=1');
-  await page.getByRole('button', { name: /^Выживание/ }).click();
+  await openLocalLobby(page,'survival');
   await page.getByRole('button', { name: 'Start' }).click();
   await expect(page.locator('#countdown')).toBeHidden({timeout:6000});
   const press = async (index: number, down: boolean) => {

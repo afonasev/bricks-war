@@ -1,7 +1,7 @@
-import { DEFAULT_PLAYER_NAMES, normalizePlayerName } from './playerNamePersistence';
+import { DEFAULT_PLAYER_NAMES, normalizePlayerName, isGenericPlayerName } from './playerNamePersistence';
 
 export const GAMEPAD_PROFILE_STORAGE_KEY = 'bricks-war:gamepad-profiles:v2';
-export interface GamepadProfile { id: string; device: string; name: string }
+export interface GamepadProfile { id: string; device: string; name: string; uses?: number }
 type ProfileStorage = Pick<Storage, 'getItem' | 'setItem'>;
 
 export function gamepadDescription(pad: Gamepad): string {
@@ -23,7 +23,7 @@ export class GamepadProfiles {
         if (!item || typeof item.id !== 'string' || !item.id || ids.has(item.id)
           || typeof item.device !== 'string' || typeof item.name !== 'string') continue;
         ids.add(item.id);
-        this.profiles.push({ id: item.id, device: item.device, name: normalizePlayerName(item.name, 0) });
+        this.profiles.push({ id: item.id, device: item.device, name: normalizePlayerName(item.name, 0), uses: Number.isSafeInteger(item.uses) && item.uses > 0 ? item.uses : 0 });
       }
     } catch { /* Inaccessible storage does not prevent in-memory names. */ }
   }
@@ -31,7 +31,7 @@ export class GamepadProfiles {
     return this.profiles.filter((profile) => profile.device === device && !assigned.has(profile.id));
   }
   create(device: string, name: string): GamepadProfile {
-    const profile = { id: crypto.randomUUID(), device, name: normalizePlayerName(name, 0) };
+    const profile = { id: crypto.randomUUID(), device, name: normalizePlayerName(name, 0), uses: 0 };
     this.profiles.push(profile);
     this.save();
     return profile;
@@ -48,7 +48,19 @@ export class GamepadProfiles {
   }
   rememberName(name: string): void {
     const normalized = normalizePlayerName(name, 0);
+    if (isGenericPlayerName(normalized)) return;
     if (!this.profiles.some((profile) => profile.name === normalized)) this.create('keyboard', normalized);
+  }
+  rankedNames(): string[] {
+    const totals = new Map<string, number>();
+    this.profiles.filter(p => !isGenericPlayerName(p.name)).forEach(p => totals.set(p.name, (totals.get(p.name) ?? 0) + (p.uses ?? 0)));
+    return [...totals].sort((a,b) => b[1]-a[1]).map(([name]) => name);
+  }
+  useName(name: string): void {
+    if (isGenericPlayerName(name)) return;
+    this.rememberName(name);
+    const profile = this.profiles.find(p => p.name === normalizePlayerName(name, 0));
+    if (profile) { profile.uses = (profile.uses ?? 0) + 1; this.save(); }
   }
   rename(id: string, name: string): void {
     const profile = this.profiles.find((item) => item.id === id);

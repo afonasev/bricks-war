@@ -3,7 +3,6 @@ import { gamepadFooterHintsMarkup } from '../ui/gamepadFooterHints';
 import {MenuFocusController} from '../ui/menuNavigation';
 import {loadReleaseSettings} from '../ui/releaseSettings';
 import { clientUpdate } from '../pwa/clientUpdate';
-import { releaseMetadataMarkup } from '../ui/releaseMetadata';
 import { MatchLoading } from '../ui/matchLoading';
 import { shieldInventoryMarkup, shieldInventoryKey } from '../ui/shieldInventory';
 import * as Phaser from 'phaser/dist/phaser.esm.js';
@@ -24,17 +23,25 @@ import {setNetworkParticipation} from '../pwa/participation';
 import {isMobilePlayViewport} from '../ui/mobileSettings';
 import {enhanceMenuSelects} from '../ui/menuSelect';
 import type { TileStyleSelection } from '../domain/types';
-import { MODE_LABELS, NETWORK_MODES, roomRules, balancedNetworkTeams, type ResolvedRoomRules } from './rules';
+import { NETWORK_MODES, roomRules, balancedNetworkTeams, type ResolvedRoomRules } from './rules';
 import { loadPersonal, savePersonal, loadCreator, loadCreatorRules, saveCreatorRules, saveCreatorRoom, saveCreatorBots, type NetworkControls } from './setupPersistence';
 import type { NetworkMode } from './protocol';
 import { teamScores } from '../simulation/competition';
 import { decodeMatchState } from '../simulation/match';
 import type { GameAudio } from '../audio/GameAudio';
+import { html as tr, text as localeText, getLocale } from '../i18n/locale';
+import { localizedNetworkMessage, networkText, networkUiText, networkAiName, networkAiDifficulty } from './presentationCopy';
+import type { NetworkUiKey } from '../i18n/networkUiCatalogs';
 import './lobbyRoster.css';
 const escape=(v:string)=>v.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));
-const aiLabels={easy:'Лёгкий',medium:'Средний',hard:'Сложный',expert:'Эксперт'};
-const styleOptions=(selected:TileStyleSelection)=>[...TILE_STYLES.map(t=>({id:t.id as string,label:t.label})),{id:'random',label:'Случайный'}].map(t=>`<option value="${t.id}" ${t.id===selected?'selected':''}>${t.label}</option>`).join('');
-const phaseLabel={waiting:'Ожидание',countdown:'Старт',playing:'Идёт матч',paused:'Пауза',results:'Результаты'};
+const u=(key:NetworkUiKey,values?:Record<string,string|number>)=>networkUiText(key,getLocale(),values);
+const h=(key:NetworkUiKey,values?:Record<string,string|number>)=>escape(u(key,values));
+const aiLabels=()=>({easy:networkAiDifficulty('easy'),medium:networkAiDifficulty('medium'),hard:networkAiDifficulty('hard'),expert:networkAiDifficulty('expert')});
+const seatName=(s:PublicSeat)=>networkAiName(s.kind,s.name,s.difficulty??undefined);
+const tileStyleKeys={random:'tileRandom',classic:'tileClassic','sea-crystals':'tileClassic','construction-bricks':'tileBricks','pixel-adventure':'tilePixel','stone-fortress':'tileStone',marmalade:'tileMarmalade','forest-mosaic':'tileForest'} as const;
+const modeLabels={survival:'survival',battle:'battle','team-battle':'team'} as const;
+const styleOptions=(selected:TileStyleSelection)=>[...TILE_STYLES.map(t=>({id:t.id as string,label:localeText(tileStyleKeys[t.id])})),{id:'random',label:localeText('tileRandom')}].map(t=>`<option value="${t.id}" ${t.id===selected?'selected':''}>${escape(t.label)}</option>`).join('');
+const phaseLabels={waiting:'waiting',countdown:'countdown',playing:'playing',paused:'networkPaused',results:'networkResults'} as const;
 type Controls = NetworkControls;
 export class NetworkApp {
   private menuFocus:MenuFocusController;
@@ -62,17 +69,18 @@ export class NetworkApp {
   private listBusy=false;
   private listOffset=0;
   private storageAvailable=true;
+  private arenaLanguage=getLocale();
   constructor(private root:HTMLElement,private onMenu:()=>void,private audio?:Pick<GameAudio,'syncNetworkAnomalies'|'syncMusic'|'enterMenu'>,private preferences?:(onClose:()=>void)=>void) {
     this.root.classList.add('network-root');
-    this.menuFocus=new MenuFocusController(root,{onBack:()=>{const close=this.root.querySelector<HTMLButtonElement>('[data-network-prefs-back]');if(close)close.click();else void this.action(this.view==='list'?'menu':'list');},onInputMode:mode=>{this.root.dataset.inputMode=mode;}});
+    this.menuFocus=new MenuFocusController(root,{onBack:()=>{const displayCancel=this.root.querySelector<HTMLButtonElement>('[data-display-no]');if(displayCancel){displayCancel.click();return;}const close=this.root.querySelector<HTMLButtonElement>('[data-network-prefs-back]');if(close)close.click();else void this.action(this.view==='list'?'menu':'list');},onInputMode:mode=>{this.root.dataset.inputMode=mode;}});
     window.addEventListener('keydown',this.keyDown);window.addEventListener('keyup',this.keyUp);
     window.addEventListener('deviceorientation',this.sensor);
     this.timer=setInterval(()=>{if(this.view==='list')void this.refreshList();},2000);
     void this.showList();this.frame=requestAnimationFrame(this.poll);
   }
-  private button(label:string,action:string,disabled=false):string {return `<button type="button" data-net-action="${action}" ${disabled?'disabled':''}>${label}</button>`;}
+  private button(label:string,action:string,disabled=false):string {return `<button type="button" data-net-action="${action}" ${disabled?'disabled':''}>${escape(label)}</button>`;}
   private shell(title:string,body:string):void {
-    this.root.innerHTML=`<main class="network-screen release-screen premium-surface mode-setup-screen" data-network-view="${this.view}"><header class="network-heading release-heading"><button type="button" class="screen-back" data-net-action="menu" aria-label="Главное меню">← Главное меню</button><div><p class="eyebrow">BRICKS WAR · СЕТЬ</p><h1>${title}</h1></div></header><output class="network-status" role="status" id="network-status"></output><div class="network-content">${body}</div><footer class="menu-metadata-footer">${gamepadFooterHintsMarkup()}${releaseMetadataMarkup()}</footer></main>`;
+    this.root.innerHTML=`<main class="network-screen release-screen premium-surface mode-setup-screen" data-network-view="${this.view}"><header class="network-heading release-heading"><button type="button" class="screen-back" data-net-action="menu" aria-label="${tr('menu')}">← ${tr('menu')}</button><div><p class="eyebrow">${h('networkMark')}</p><h1>${title}</h1></div></header><output class="network-status" role="status" id="network-status"></output><div class="network-content">${body}</div><footer class="menu-metadata-footer">${gamepadFooterHintsMarkup()}</footer></main>`;
     this.bind();
   }
   private bind():void {
@@ -84,12 +92,12 @@ export class NetworkApp {
     if(this.view!=='arena'||this.root.querySelector('#network-pause:not([hidden]),[data-network-preferences],[data-display-confirm]'))this.menuFocus.activate('network');else this.menuFocus.suspend();
   }
   private status(message:string):void {
-    const text=message+(this.storageAvailable?'':' · браузер не сохраняет место; возврат после перезагрузки не гарантирован');
+    const text=localizedNetworkMessage(message)+(this.storageAvailable?'':` · ${networkText('browserStorageWarning')}`);
     for(const element of this.root.querySelectorAll<HTMLElement>('#network-status,#network-mobile-status')){element.textContent=text;if(element.id==='network-mobile-status')element.hidden=message==='Подключено'&&this.storageAvailable;}
   }
   private async action(action:string):Promise<void> {
     try {
-      if(action==='preferences'){this.sources.clear();this.sendControls();this.preferences?.(()=>this.activateNavigation());this.activateNavigation();return;}
+      if(action==='preferences'){const language=getLocale();this.sources.clear();this.sendControls();this.preferences?.(()=>{if(this.view==='list'&&language!==getLocale())void this.showList();else this.activateNavigation();});this.activateNavigation();return;}
       if(action==='menu') {this.destroy();this.onMenu();return;}
       if(action==='list'){await this.showList();return;}
       if(action.startsWith('page:')){this.listOffset=Number(action.slice(5));await this.refreshList();return;}
@@ -106,7 +114,7 @@ export class NetworkApp {
       if(action.startsWith('ai-remove:')){this.session?.send({type:'ai-remove',participantId:action.slice(10)});return;}
       if(action==='start' || action==='lobby'){this.session?.send({type:action});return;}
       if(action==='ready') {const own=this.session?.snapshot?.seats.find(s=>s.id===this.credential?.participantId);this.session?.send({type:'ready',ready:!own?.ready});return;}
-    } catch(error){this.status(error instanceof Error?error.message:'Не удалось выполнить действие.');}
+    } catch(error){this.status(error instanceof Error?error.message:networkText('actionFailed'));}
   }
   private destroyArena():void {
     this.matchLoading?.cancel();this.matchLoading=null;
@@ -124,7 +132,7 @@ export class NetworkApp {
       for(const source of this.sources.keys())this.blocked.add(source);this.sources.clear();
     }
     this.session?.dispose();this.session=null;this.view='list';this.renderKey='';
-    this.shell('Сетевая игра',`<p>Выживание, Битва и Командный бой · минимум 2 человека · до 8 участников с ИИ · одно место на устройстве</p><section id="network-current"></section><div class="network-actions">${this.button('Создать лобби','create')}${this.button('Настройки','preferences')}${this.button('Обновить','retry')}</div><section id="network-lobbies" aria-label="Лобби"></section>`);
+    this.shell(networkText('online'),`<p>${h('modeList')} · ${networkText('minTwo')} · ${networkText('upToEight')} ${networkText('withAi')} · ${networkText('oneDevice')}</p><section id="network-current"></section><div class="network-actions">${this.button(networkText('createRoom'),'create')}${this.button(networkText('networkSettings'),'preferences')}${this.button(networkText('refresh'),'retry')}</div><section id="network-lobbies" aria-label="${escape(networkText('lobbyList'))}"></section>`);
     await this.refreshList();
   }
   private async refreshList():Promise<void> {
@@ -133,8 +141,8 @@ export class NetworkApp {
       const list=await networkRequest<{rooms:LobbySummary[];next:number|null}>(`lobbies?offset=${this.listOffset}`);
       if(this.view!=='list'||this.destroyed)return;
       const container=this.root.querySelector('#network-lobbies')!;
-      container.innerHTML=list.rooms.length?list.rooms.map(room=>`<article class="network-lobby"><div><h2>${escape(room.name)} ${room.protected?'🔒':''}</h2><p>${MODE_LABELS[room.mode??'survival']} · ${room.count}/8 · ${phaseLabel[room.phase]}</p></div>${this.button('Войти',`join:${room.id}`,room.phase!=='waiting'||room.count>=8||!!this.credential)}</article>`).join(''):'<p>Лобби пока нет. Создайте первое.</p>';
-      container.innerHTML+=`<div class="network-actions">${this.listOffset?this.button('Предыдущая страница',`page:${Math.max(0,this.listOffset-50)}`):''}${list.next!==null?this.button('Следующая страница',`page:${list.next}`):''}</div>`;
+      container.innerHTML=list.rooms.length?list.rooms.map(room=>`<article class="network-lobby"><div><h2>${escape(room.name)} ${room.protected?'🔒':''}</h2><p>${localeText(modeLabels[room.mode??'survival'])} · ${room.count}/8 · ${networkText(phaseLabels[room.phase])}</p></div>${this.button(networkText('networkJoin'),`join:${room.id}`,room.phase!=='waiting'||room.count>=8||!!this.credential)}</article>`).join(''):`<p>${escape(networkText('noRooms'))}</p>`;
+      container.innerHTML+=`<div class="network-actions">${this.listOffset?this.button(u('previousPage'),`page:${Math.max(0,this.listOffset-50)}`):''}${list.next!==null?this.button(u('nextPage'),`page:${list.next}`):''}</div>`;
       const current=this.root.querySelector('#network-current')!;
       if(this.credential) {
         try {
@@ -142,27 +150,27 @@ export class NetworkApp {
           if(this.view!=='list')return;
           if(!snapshot.state||snapshot.state.phase==='results'||this.arenaIdentity!==this.matchIdentity(snapshot))this.destroyArena();
           const own=snapshot.seats.find(s=>s.id===this.credential?.participantId);
-          current.innerHTML=`<article class="network-current"><h2>Ваш текущий матч</h2><p>${escape(snapshot.room.name)} · ${phaseLabel[snapshot.room.phase]}${own?.absence?` · возврат: ${Math.ceil(own.absence.remainingMs/1000)} с`:''}</p>${this.button('Вернуться','return')}</article>`;
+          current.innerHTML=`<article class="network-current"><h2>${escape(networkText('statusCurrent'))}</h2><p>${escape(snapshot.room.name)} · ${networkText(phaseLabels[snapshot.room.phase])}${own?.absence?` · ${h('returnCountdown',{seconds:Math.ceil(own.absence.remainingMs/1000)})}`:''}</p>${this.button(u('returnButton'),'return')}</article>`;
         } catch(error) {
-          if(['auth','ended'].includes((error as {code?:string}).code??'')){this.destroyArena();this.credential=null;storeCredential(null);setNetworkParticipation(false);current.innerHTML='<p>Срок возврата истёк. Можно войти в новое лобби.</p>';this.bind();return;}
-          current.innerHTML=`<article class="network-current"><h2>Ваш текущий матч</h2><p>Возврат пока не подтверждён</p>${this.button('Повторить возврат','return')}</article>`;
-          this.status(error instanceof Error?error.message:'Нет связи.');
+          if(['auth','ended'].includes((error as {code?:string}).code??'')){this.destroyArena();this.credential=null;storeCredential(null);setNetworkParticipation(false);current.innerHTML=`<p>${escape(networkText('returnExpired'))}</p>`;this.bind();return;}
+          current.innerHTML=`<article class="network-current"><h2>${escape(networkText('statusCurrent'))}</h2><p>${escape(networkText('returnPending'))}</p>${this.button(networkText('retryReturn'),'return')}</article>`;
+          this.status(error instanceof Error?error.message:networkText('noConnection'));
         }
       } else current.innerHTML='';
-      this.bind();this.status('Список обновлён');
-    }catch{if(this.view==='list'){this.root.querySelector('#network-lobbies')!.innerHTML='';this.status('Сервис недоступен. Проверьте связь и повторите. Локальная игра доступна в главном меню.');}}
+      this.bind();this.status(networkText('listUpdated'));
+    }catch{if(this.view==='list'){this.root.querySelector('#network-lobbies')!.innerHTML='';this.status(networkText('serviceUnavailable'));}}
     finally{this.listBusy=false;}
   }
   private rulesFields(rules:ResolvedRoomRules, disabled=false):string {
-    const select=(name:string,label:string,choices:readonly (readonly [string,string])[],value:string)=>`<label>${label}<select aria-label="${label}" name="${name}" ${disabled?'disabled':''}>${choices.map(([v,l])=>`<option value="${v}" ${v===value?'selected':''}>${l}</option>`).join('')}</select></label>`;
-    return select('mode','Режим',NETWORK_MODES.map(v=>[v,MODE_LABELS[v]]),rules.mode)
-      +select('battleDifficulty','Темп битвы',[['family','Семейный'],['normal','Обычный'],['sport','Спортивный']],rules.battleDifficulty)
-      +(rules.mode==='survival'?'':select('softDrop','Ускорение',[['slow','Медленное'],['fast','Быстрое'],['very-fast','Очень быстрое']],rules.softDrop))
-      +(rules.mode==='survival'?'':select('battleTimeMode','Длительность',[['until-victory','До победы'],['timed','По времени']],rules.battleTimeMode)
-      +(rules.battleTimeMode==='timed'?select('durationMinutes','Минуты',Array.from({length:9},(_,i)=>[String(i+2),String(i+2)]),String(rules.durationMinutes)):'')
-      +select('pressure','Давление',[['automatic','Автоматическое'],['fixed','Фиксированное'],['extended','Продлённое']],rules.pressure)
-      +select('conflictEnabled','Атаки',[['true','Включены'],['false','Выключены']],String(rules.conflictEnabled))
-      +(rules.mode==='team-battle'?'':select('conflictTargeting','Цель атак',[['all-opponents','Всем соперникам'],['hunt-leader','Лидеру']],rules.conflictTargeting)));
+    const select=(name:string,label:string,choices:readonly (readonly [string,string])[],value:string)=>`<label>${escape(label)}<select aria-label="${escape(label)}" name="${name}" ${disabled?'disabled':''}>${choices.map(([v,l])=>`<option value="${v}" ${v===value?'selected':''}>${escape(l)}</option>`).join('')}</select></label>`;
+    return select('mode',u('mode'),NETWORK_MODES.map(v=>[v,localeText(modeLabels[v])]),rules.mode)
+      +select('battleDifficulty',u('battleTempo'),[['family',u('family')],['normal',u('normal')],['sport',u('sport')]],rules.battleDifficulty)
+      +(rules.mode==='survival'?'':select('softDrop',u('softDrop'),[['slow',u('slow')],['fast',u('fast')],['very-fast',u('veryFast')]],rules.softDrop))
+      +(rules.mode==='survival'?'':select('battleTimeMode',u('duration'),[['until-victory',u('untilVictory')],['timed',u('timed')]],rules.battleTimeMode)
+      +(rules.battleTimeMode==='timed'?select('durationMinutes',u('minutes'),Array.from({length:9},(_,i)=>[String(i+2),String(i+2)]),String(rules.durationMinutes)):'')
+      +select('pressure',u('pressure'),[['automatic',u('automatic')],['fixed',u('fixed')],['extended',u('extended')]],rules.pressure)
+      +select('conflictEnabled',u('attacks'),[['true',u('enabled')],['false',u('disabled')]],String(rules.conflictEnabled))
+      +(rules.mode==='team-battle'?'':select('conflictTargeting',u('attackTarget'),[['all-opponents',u('allOpponents')],['hunt-leader',u('leader')]],rules.conflictTargeting)));
   }
   private formRules(form:HTMLFormElement, fallback:ResolvedRoomRules):ResolvedRoomRules {
     const values=Object.fromEntries(new FormData(form));
@@ -170,7 +178,7 @@ export class NetworkApp {
   }
   private createForm():void {
     this.view='create';const creator=loadCreator();const personal=loadPersonal(this.controls);let rules=loadCreatorRules(creator.mode);
-    this.shell('Создать лобби',`<form id="network-form"><label>Название лобби<textarea aria-label="Название лобби" name="roomName" required maxlength="32" rows="2">${escape(creator.roomName)}</textarea></label><label>Ваше имя<textarea aria-label="Ваше имя" name="name" required maxlength="32" rows="2">${escape(personal.name)}</textarea></label><label>Пароль (необязательно)<input name="password" type="password" maxlength="64" autocomplete="new-password"></label><section id="network-create-rules">${this.rulesFields(rules)}</section><div class="network-actions"><button type="submit" ${this.credential?'disabled':''}>Создать</button>${this.button('Список лобби','list')}</div></form>`);
+    this.shell(networkText('createRoom'),`<form id="network-form"><label>${escape(networkText('roomName'))}<textarea aria-label="${escape(networkText('roomName'))}" name="roomName" required maxlength="32" rows="2">${escape(creator.roomName)}</textarea></label><label>${escape(networkText('yourName'))}<textarea aria-label="${escape(networkText('yourName'))}" name="name" required maxlength="32" rows="2">${escape(personal.name)}</textarea></label><label>${escape(networkText('passwordOptional'))}<input name="password" type="password" maxlength="64" autocomplete="new-password"></label><section id="network-create-rules">${this.rulesFields(rules)}</section><div class="network-actions"><button type="submit" ${this.credential?'disabled':''}>${h('createSubmit')}</button>${this.button(networkText('backToRooms'),'list')}</div></form>`);
     const form=this.root.querySelector<HTMLFormElement>('form')!;
     const bindRules=()=>{this.root.querySelectorAll<HTMLSelectElement>('#network-create-rules select').forEach(control=>control.onchange=()=>{
       const mode=control.name==='mode'?control.value as NetworkMode:rules.mode;
@@ -179,11 +187,11 @@ export class NetworkApp {
       this.root.querySelector('#network-create-rules')!.innerHTML=this.rulesFields(rules);bindRules();enhanceMenuSelects(this.root);
     });};bindRules();enhanceMenuSelects(this.root);
     form.onsubmit=event=>{event.preventDefault();void this.submit('create',rules);};
-    if(this.credential)this.status('Сначала вернитесь в своё лобби и покиньте его.');
+    if(this.credential)this.status(u('leaveFirst'));
   }
   private joinForm(roomId:string):void {
     this.view='join';
-    this.shell('Войти в лобби',`<form id="network-form"><input type="hidden" name="roomId" value="${escape(roomId)}"><label>Ваше имя<input name="name" required maxlength="32" value="${escape(loadPersonal(this.controls).name)}"></label><label>Пароль (если лобби закрыто)<input name="password" type="password" maxlength="64" autocomplete="current-password"></label><div class="network-actions"><button type="submit">Войти</button>${this.button('Список лобби','list')}</div></form>`);
+    this.shell(networkText('networkJoin'),`<form id="network-form"><input type="hidden" name="roomId" value="${escape(roomId)}"><label>${escape(networkText('yourName'))}<input name="name" required maxlength="32" value="${escape(loadPersonal(this.controls).name)}"></label><label>${escape(networkText('passwordClosed'))}<input name="password" type="password" maxlength="64" autocomplete="current-password"></label><div class="network-actions"><button type="submit">${escape(networkText('networkJoin'))}</button>${this.button(networkText('backToRooms'),'list')}</div></form>`);
     this.root.querySelector<HTMLFormElement>('form')!.onsubmit=event=>{event.preventDefault();void this.submit('join');};
   }
   private async submit(path:string,rules?:ResolvedRoomRules):Promise<void> {
@@ -199,12 +207,12 @@ export class NetworkApp {
       this.credential=response.credential;
       const stored=storeCredential(response.credential);this.storageAvailable=stored;
       this.attach(response.credential);
-      if(!stored)this.status('Браузер не сохраняет место: возврат после перезагрузки не гарантирован.');
-    }catch(error){this.status(error instanceof Error?error.message:'Не удалось подключиться.');button.disabled=false;}
+      if(!stored)this.status(u('storageWarning'));
+    }catch(error){this.status(error instanceof Error?error.message:networkText('connectFailed'));button.disabled=false;}
   }
   private attach(credential:Credential):void {
     this.session?.dispose();const session=new NetworkMatchSession(credential);this.session=session;
-    this.view='connecting';this.renderKey='';this.shell('Подключение',this.button('Список лобби','list'));
+    this.view='connecting';this.renderKey='';this.shell(u('connectingTitle'),this.button(networkText('backToRooms'),'list'));
     session.onChange=()=>{
       if(this.session!==session)return;
       const snapshot=session.snapshot;
@@ -218,22 +226,22 @@ export class NetworkApp {
     this.session.onResetInput=()=>{for(const source of this.sources.keys())this.blocked.add(source);this.sources.clear();};
     this.session.connect();
   }
-  private teamSelect(teamId:string,name:string):string {return `<label>Команда<select aria-label="Команда" name="${name}"><option value="team-1" ${teamId==='team-1'?'selected':''}>Команда 1</option><option value="team-2" ${teamId==='team-2'?'selected':''}>Команда 2</option></select></label>`;}
+  private teamSelect(teamId:string,name:string):string {return `<label>${h('team')}<select aria-label="${h('team')}" name="${name}"><option value="team-1" ${teamId==='team-1'?'selected':''}>${h('teamNumber',{number:1})}</option><option value="team-2" ${teamId==='team-2'?'selected':''}>${h('teamNumber',{number:2})}</option></select></label>`;}
   private seatState(seat:PublicSeat):string {
-    return seat.kind==='ai'?'Готов автоматически':`${seat.connected?seat.ready?'Готов':'Не готов':'Возвращается'}${seat.absence?` · ${Math.ceil(seat.absence.remainingMs/1000)} с`:''}`;
+    return seat.kind==='ai'?u('autoReady'):`${seat.connected?seat.ready?u('ready'):u('notReady'):u('returning')}${seat.absence?` · ${h('seconds',{seconds:Math.ceil(seat.absence.remainingMs/1000)})}`:''}`;
   }
   private rosterSeat(seat:PublicSeat,index:number,snapshot:ClientSnapshot,creator:boolean):string {
     const ai=seat.kind==='ai';
-    const roles=ai?`ИИ · ${aiLabels[seat.difficulty!]}`:[seat.id===snapshot.ownId?'Вы':'',seat.id===snapshot.creatorId?'Создатель':''].filter(Boolean).join(' · ');
+    const roles=ai?`${tr('aiLabel')} · ${escape(aiLabels()[seat.difficulty!])}`:[seat.id===snapshot.ownId?u('you'):'',seat.id===snapshot.creatorId?u('creator'):''].filter(Boolean).join(' · ');
     const state=this.seatState(seat);
-    const editor=ai&&creator?`<details class="network-ai-editor"><summary>Настроить ИИ</summary><form data-network-ai="${seat.id}"><label>Сложность ИИ<select aria-label="Сложность ИИ" name="difficulty">${Object.entries(aiLabels).map(([v,l])=>`<option value="${v}" ${v===seat.difficulty?'selected':''}>${l}</option>`).join('')}</select></label><label>Вид фигур ИИ<select data-menu-select-layout="style-list" aria-label="Вид фигур ИИ" name="tileStyle">${styleOptions(seat.tileStyle)}</select></label>${roomRules(snapshot.rules).mode==='team-battle'?this.teamSelect(seat.teamId??'team-1','teamId'):''}<div class="network-ai-actions"><button type="submit">Сохранить ИИ</button>${this.button('Удалить ИИ',`ai-remove:${seat.id}`)}</div></form></details>`:'';
-    return `<li data-seat-id="${seat.id}" data-kind="${seat.kind}" data-ready="${ai||seat.ready&&seat.connected}"><span class="network-seat-number" aria-hidden="true">${index+1}</span><div class="network-seat-copy"><strong>${escape(seat.name)}</strong><small>${roles}${roomRules(snapshot.rules).mode==='team-battle'?` · Команда ${seat.teamId==='team-2'?2:1}`:''}</small><span class="network-seat-state">${state}</span></div>${editor}</li>`;
+    const editor=ai&&creator?`<details class="network-ai-editor"><summary>${h('configureAi')}</summary><form data-network-ai="${seat.id}"><label>${h('aiDifficulty')}<select aria-label="${h('aiDifficulty')}" name="difficulty">${Object.entries(aiLabels()).map(([v,l])=>`<option value="${v}" ${v===seat.difficulty?'selected':''}>${escape(l)}</option>`).join('')}</select></label><label>${h('aiStyle')}<select data-menu-select-layout="style-list" aria-label="${h('aiStyle')}" name="tileStyle">${styleOptions(seat.tileStyle)}</select></label>${roomRules(snapshot.rules).mode==='team-battle'?this.teamSelect(seat.teamId??'team-1','teamId'):''}<div class="network-ai-actions"><button type="submit">${h('saveAi')}</button>${this.button(u('removeAi'),`ai-remove:${seat.id}`)}</div></form></details>`:'';
+    return `<li data-seat-id="${seat.id}" data-kind="${seat.kind}" data-ready="${ai||seat.ready&&seat.connected}"><span class="network-seat-number" aria-hidden="true">${index+1}</span><div class="network-seat-copy"><strong>${escape(seatName(seat))}</strong><small>${roles}${roomRules(snapshot.rules).mode==='team-battle'?` · ${h('teamNumber',{number:seat.teamId==='team-2'?2:1})}`:''}</small><span class="network-seat-state">${state}</span></div>${editor}</li>`;
   }
   private renderSession():void {
     const session=this.session;const snapshot=session?.snapshot;
     if(!session)return;
     if(!session.active){this.destroyArena();this.view='ended';this.credential=null;
-      this.shell('Сессия завершена',`<p>${escape(session.status)}</p>${this.button('Список лобби','list')}`);return;}
+      this.shell(networkText('sessionEnded'),`<p>${escape(localizedNetworkMessage(session.status))}</p>${this.button(networkText('backToRooms'),'list')}`);return;}
     if(!snapshot){this.status(session.status);return;}
     if(snapshot.state) {
       const generation=`${snapshot.matchId}:${snapshot.connectionEpoch}`;
@@ -261,18 +269,18 @@ export class NetworkApp {
     this.renderKey=key;
     if(snapshot.state?.phase==='results') {
       this.view='results';
-      this.shell('Результаты',`${snapshot.state.options.matchVariant==='teams'?`<p>${teamScores(snapshot.state.participants.map(p=>({id:p.config.id,score:p.score,alive:p.board.alive,teamId:p.config.teamId}))).map(t=>`Команда ${t.teamId==='team-2'?2:1}: ${t.score} очков`).join(' · ')}</p>`:''}<ol class="network-roster">${[...snapshot.state.participants].sort((a,b)=>a.placement!-b.placement!||b.score-a.score).map(p=>`<li><strong>${p.placement}. ${escape(p.config.label)}${p.config.controller==='ai'?' · ИИ':''}${p.config.teamId?` · Команда ${p.config.teamId==='team-2'?2:1}`:''}${snapshot.state!.winnerIds.includes(p.config.id)?' · Победа':''}</strong><span>${p.score} очков · ${formatClock(p.survivalMs)}</span></li>`).join('')}</ol><div class="network-actions">${this.button('В лобби','lobby')}${this.button('Покинуть','leave')}</div>`);
+      this.shell(networkText('networkResults'),`${snapshot.state.options.matchVariant==='teams'?`<p>${teamScores(snapshot.state.participants.map(p=>({id:p.config.id,score:p.score,alive:p.board.alive,teamId:p.config.teamId}))).map(t=>`${h('teamNumber',{number:t.teamId==='team-2'?2:1})}: ${h('points',{count:t.score})}`).join(' · ')}</p>`:''}<ol class="network-roster">${[...snapshot.state.participants].sort((a,b)=>a.placement!-b.placement!||b.score-a.score).map(p=>`<li><strong>${p.placement}. ${escape(networkAiName(p.config.controller==='ai'?'ai':'human',p.config.label,p.config.difficulty))}${p.config.controller==='ai'?` · ${tr('aiLabel')}`:''}${p.config.teamId?` · ${h('teamNumber',{number:p.config.teamId==='team-2'?2:1})}`:''}${snapshot.state!.winnerIds.includes(p.config.id)?` · ${h('victory')}`:''}</strong><span>${h('points',{count:p.score})} · ${formatClock(p.survivalMs)}</span></li>`).join('')}</ol><div class="network-actions">${this.button(u('toLobby'),'lobby')}${this.button(networkText('leave'),'leave')}</div>`);
     } else {
       this.view='lobby';const own=snapshot.seats.find(s=>s.id===snapshot.ownId)!;
       const creator=snapshot.creatorId===snapshot.ownId;
       const seats=snapshot.seats.filter(s=>s.retained);const humans=seats.filter(s=>s.kind==='human');const bots=seats.filter(s=>s.kind==='ai');
       const rules=roomRules(snapshot.rules);
       const canStart=(rules.mode!=='team-battle'||balancedNetworkTeams(seats))&&humans.length>=2&&seats.length<=8&&humans.every(s=>s.ready&&s.connected&&!s.absence);
-      this.shell(escape(snapshot.room.name),`<p class="network-intro">${MODE_LABELS[rules.mode]} · минимум 2 человека · до 8 участников${rules.mode==='team-battle'?' · равные команды 2×2 / 3×3 / 4×4':''}</p><div class="network-room-grid"><section class="network-roster-panel release-panel"><p class="eyebrow">ОБЩАЯ КОМНАТА</p><h2>Участники · ${seats.length}/8</h2><p class="network-roster-hint">Люди: ${humans.length} · ИИ: ${bots.length}/6. Для старта нужны минимум два готовых человека.</p><ul class="network-roster">${seats.map((s,i)=>this.rosterSeat(s,i,snapshot,creator)).join('')}</ul>${creator?`<div class="network-actions">${this.button('Добавить ИИ','ai-add',seats.length>=8||bots.length>=6)}</div>`:''}</section><div class="network-settings-column"><section class="network-personal-panel release-panel"><p class="eyebrow">НА ЭТОМ УСТРОЙСТВЕ</p><h2>Ваш игрок</h2>
-      <form id="network-profile"><label>Ваше имя<textarea aria-label="Ваше имя" name="name" maxlength="32" rows="2" required>${escape(own.name)}</textarea></label><label>Вид фигур<select data-menu-select-layout="style-list" aria-label="Вид фигур" name="tileStyle">${styleOptions(own.tileStyle)}</select></label>
-      <label>Управление на этом устройстве<select aria-label="Управление на этом устройстве" id="network-controls"><option value="keyboard">WASD</option><option value="arrows">Стрелки</option><option value="touch">Касания</option><option value="gamepad">Геймпад 1</option><option value="gamepad-2">Геймпад 2</option><option value="gamepad-3">Геймпад 3</option><option value="tilt">Наклон и касания</option></select></label>${rules.mode==='team-battle'?`<div id="network-team">${this.teamSelect(own.teamId??'team-1','ownTeam')}</div>`:''}<button type="submit">Сохранить имя и фигуры</button></form>
-      </section><section class="network-rules-panel release-panel"><p class="eyebrow">ДЛЯ ВСЕХ УЧАСТНИКОВ</p><h2>Правила матча</h2><form id="network-rules">${this.rulesFields(rules,!creator)}${creator?'<button type="submit">Применить правила</button>':''}</form></section></div></div>
-      <div class="network-actions">${this.button(own.ready?'Снять готовность':'Готов','ready',!own.connected)}${creator?this.button('Начать','start',!canStart):''}${this.button('Покинуть','leave')}</div>`);
+      this.shell(escape(snapshot.room.name),`<p class="network-intro">${localeText(modeLabels[rules.mode])} · ${networkText('minTwo')} · ${networkText('upToEight')}${rules.mode==='team-battle'?` · ${h('equalTeams')}`:''}</p><div class="network-room-grid"><section class="network-roster-panel release-panel"><p class="eyebrow">${h('sharedRoom')}</p><h2>${h('participants',{count:seats.length})}</h2><p class="network-roster-hint">${h('rosterHint',{humans:humans.length,bots:bots.length})}</p><ul class="network-roster">${seats.map((s,i)=>this.rosterSeat(s,i,snapshot,creator)).join('')}</ul>${creator?`<div class="network-actions">${this.button(u('addAi'),'ai-add',seats.length>=8||bots.length>=6)}</div>`:''}</section><div class="network-settings-column"><section class="network-personal-panel release-panel"><p class="eyebrow">${h('thisDevice')}</p><h2>${h('yourPlayer')}</h2>
+      <form id="network-profile"><label>${escape(networkText('yourName'))}<textarea aria-label="${escape(networkText('yourName'))}" name="name" maxlength="32" rows="2" required>${escape(own.name)}</textarea></label><label>${h('pieceStyle')}<select data-menu-select-layout="style-list" aria-label="${h('pieceStyle')}" name="tileStyle">${styleOptions(own.tileStyle)}</select></label>
+      <label>${h('deviceControls')}<select aria-label="${h('deviceControls')}" id="network-controls"><option value="keyboard">WASD</option><option value="arrows">${h('arrows')}</option><option value="touch">${h('touch')}</option><option value="gamepad">${h('gamepad',{number:1})}</option><option value="gamepad-2">${h('gamepad',{number:2})}</option><option value="gamepad-3">${h('gamepad',{number:3})}</option><option value="tilt">${h('tiltTouch')}</option></select></label>${rules.mode==='team-battle'?`<div id="network-team">${this.teamSelect(own.teamId??'team-1','ownTeam')}</div>`:''}<button type="submit">${h('saveProfile')}</button></form>
+      </section><section class="network-rules-panel release-panel"><p class="eyebrow">${h('allParticipants')}</p><h2>${h('matchRules')}</h2><form id="network-rules">${this.rulesFields(rules,!creator)}${creator?`<button type="submit">${h('applyRules')}</button>`:''}</form></section></div></div>
+      <div class="network-actions">${this.button(own.ready?u('unready'):u('ready'),'ready',!own.connected)}${creator?this.button(u('start'),'start',!canStart):''}${this.button(networkText('leave'),'leave')}</div>`);
       this.root.querySelector<HTMLFormElement>('#network-profile')!.onsubmit=e=>{e.preventDefault();const v=Object.fromEntries(new FormData(e.currentTarget as HTMLFormElement));savePersonal({name:String(v.name),tileStyle:v.tileStyle as TileStyleSelection});session.send({type:'profile',name:String(v.name),tileStyle:v.tileStyle as TileStyleSelection});};
       this.root.querySelectorAll<HTMLFormElement>('[data-network-ai]').forEach(form=>form.onsubmit=e=>{e.preventDefault();const values=Object.fromEntries(new FormData(form));session.send({type:'ai-update',participantId:form.dataset.networkAi!,...values} as ClientCommand);});
       const style=this.root.querySelector<HTMLSelectElement>('#network-profile select[name="tileStyle"]')!;
@@ -305,8 +313,8 @@ export class NetworkApp {
     }).catch(error=>{
       if(this.matchLoading!==loading)return;
       this.destroyArena();this.view='ended';
-      this.shell('Не удалось подготовить матч', `<p>Попробуйте вернуться в комнату.</p>${this.button('К списку','list')}`);
-      this.status(error instanceof Error?error.message:'Ошибка подготовки матча');
+      this.shell(networkText('gamePreparingFailed'), `<p>${escape(networkText('tryRoomAgain'))}</p>${this.button(u('toList'),'list')}`);
+      this.status(error instanceof Error?error.message:u('prepareError'));
     });
   }
   private buildArena():void {
@@ -321,16 +329,16 @@ export class NetworkApp {
     this.root.innerHTML=`<main class="network-arena arena-screen premium-surface">
       <header class="network-arena-heading arena-topline">
         <div class="arena-brand"><strong>BRICKS WAR</strong><output id="network-status" class="match-status network-status"></output></div>
-        <div class="round-timer"><output id="network-clock" class="round-timer-value" aria-label="Время матча"></output><small>${MODE_LABELS[roomRules(this.session.snapshot.rules).mode].toUpperCase()}</small></div>
-        <div class="arena-utilities"><button type="button" data-net-action="pause" class="pause-control" aria-label="Пауза"><span aria-hidden="true">Ⅱ</span><b>ПАУЗА</b></button></div>
+        <div class="round-timer"><output id="network-clock" class="round-timer-value" aria-label="${h('matchTime')}"></output><small>${localeText(modeLabels[roomRules(this.session.snapshot.rules).mode]).toLocaleUpperCase(getLocale())}</small></div>
+        <div class="arena-utilities"><button type="button" data-net-action="pause" class="pause-control" aria-label="${h('pause')}"><span aria-hidden="true">Ⅱ</span><b>${h('pauseCaps')}</b></button></div>
       </header>
       <div class="network-stage game-stage" id="network-stage"><div id="network-canvas" class="game-canvas"></div>
-        <div class="mobile-touch-zones network-mobile-zones" data-network-mobile-zones aria-label="Касания: внизу влево, ускорение и вправо; выше — поворот"><span class="mobile-touch-zone mobile-touch-zone-left" aria-hidden="true">←</span><span class="mobile-touch-zone mobile-touch-zone-down" aria-hidden="true">↓</span><span class="mobile-touch-zone mobile-touch-zone-right" aria-hidden="true">→</span></div>
+        <div class="mobile-touch-zones network-mobile-zones" data-network-mobile-zones aria-label="${tr('mobileTouchAria')}"><span class="mobile-touch-zone mobile-touch-zone-left" aria-hidden="true">←</span><span class="mobile-touch-zone mobile-touch-zone-down" aria-hidden="true">↓</span><span class="mobile-touch-zone mobile-touch-zone-right" aria-hidden="true">→</span></div>
         <div id="network-hud"></div><output id="network-countdown" class="countdown"></output>
-        </div><div class="mobile-match-actions network-mobile-actions"><button type="button" data-net-action="pause" class="mobile-match-action" aria-label="Пауза"><span aria-hidden="true">Ⅱ</span></button><output id="network-mobile-clock" class="mobile-match-timer" aria-label="Время матча"></output></div>
+        </div><div class="mobile-match-actions network-mobile-actions"><button type="button" data-net-action="pause" class="mobile-match-action" aria-label="${h('pause')}"><span aria-hidden="true">Ⅱ</span></button><output id="network-mobile-clock" class="mobile-match-timer" aria-label="${h('matchTime')}"></output></div>
       <output id="network-mobile-status" class="network-mobile-status" role="status" hidden></output>
-      <div class="network-touch" hidden><button data-control="left" aria-label="Влево">←</button><button data-control="down" aria-label="Ускорить">↓</button><button data-control="right" aria-label="Вправо">→</button><button data-control="rotate" aria-label="Поворот">↻</button>${this.controls==='tilt'?this.button('Наклон','tilt'):''}</div>
-      <div id="network-pause" class="pause-overlay" role="dialog" aria-modal="true" hidden></div></main>`;
+      <div class="network-touch" hidden><button data-control="left" aria-label="${h('left')}">←</button><button data-control="down" aria-label="${h('down')}">↓</button><button data-control="right" aria-label="${h('right')}">→</button><button data-control="rotate" aria-label="${h('rotate')}">↻</button>${this.controls==='tilt'?this.button(u('tilt'),'tilt'):''}</div>
+      <div id="network-pause" class="pause-overlay" role="dialog" aria-modal="true" aria-labelledby="network-pause-title" hidden></div></main>`;
     this.bind();
     const stage=this.root.querySelector<HTMLElement>('#network-stage')!;
     const touch=(event:PointerEvent,action?:string)=>{
@@ -360,6 +368,18 @@ export class NetworkApp {
     const session=this.session;const snapshot=session?.snapshot;if(!session||!snapshot?.state||this.view!=='arena'||!this.arenaElement)return;
     this.status(session.status);
     const arena=this.root.querySelector<HTMLElement>('.network-arena')!;
+    if(this.arenaLanguage!==getLocale()) {
+      this.arenaLanguage=getLocale();
+      this.root.querySelectorAll('#network-clock,#network-mobile-clock').forEach(e=>e.setAttribute('aria-label',u('matchTime')));
+      const mode=this.root.querySelector('.round-timer small');if(mode)mode.textContent=localeText(modeLabels[roomRules(snapshot.rules).mode]).toLocaleUpperCase(getLocale());
+      this.root.querySelectorAll('[data-net-action="pause"]').forEach(e=>e.setAttribute('aria-label',u('pause')));
+      const caption=this.root.querySelector('.pause-control b');if(caption)caption.textContent=u('pauseCaps');
+      this.root.querySelector('[data-network-mobile-zones]')?.setAttribute('aria-label',localeText('mobileTouchAria'));
+      for(const [action,key] of [['left','left'],['down','down'],['right','right'],['rotate','rotate']] as const)this.root.querySelector(`[data-control="${action}"]`)?.setAttribute('aria-label',u(key));
+      const tilt=this.root.querySelector('[data-net-action="tilt"]');if(tilt)tilt.textContent=u('tilt');
+      const hud=this.root.querySelector<HTMLElement>('#network-hud');if(hud)delete hud.dataset.key;
+      const pause=this.root.querySelector<HTMLElement>('#network-pause');if(pause)delete pause.dataset.renderKey;
+    }
     arena.classList.toggle('mobile-solo-arena',isMobilePlayViewport());
     const own=snapshot.state.participants.find(p=>p.config.id===snapshot.ownId)!;
     const presentation=session.state.participants[0]!;
@@ -379,10 +399,10 @@ export class NetworkApp {
           const card=this.layout!.participantCards![i]!;
           const slot=Number(p.config.controllerLabel??i);
           const palette=p.config.teamId?(p.config.teamId==='team-1'?1:2):Math.min(3,Math.max(0,slot))+1;
-          const preview=i===0?nextPiecePreviewMarkup(p.board.nextPiece):'';
-          const shields=i===0?shieldInventoryMarkup(p, session.state):'';
+          const preview=i===0?nextPiecePreviewMarkup(p.board.nextPiece,getLocale()):'';
+          const shields=i===0?shieldInventoryMarkup(p, session.state,getLocale()):'';
           return `<article class="hud-card network-field-card hud-palette-slot-${palette} ${i===0?'network-own-card':'network-mini-card'} ${card.cardWidth<=250?'is-compact':''} ${p.board.alive?'':'is-out'}" style="--preview-atlas:url('${WORKSHOP_THEME_TEXTURES[p.resolvedTileStyle].url}');left:${card.x}px;top:${card.y}px;width:${card.cardWidth}px;height:${card.cardHeight}px;--network-header:${card.headerHeight}px;--player-name-color:${playerAccentForSlot(slot)}">
-            <div class="wood-panel-shell" aria-hidden="true"></div><div class="wood-panel-foot" aria-hidden="true"></div><header class="network-field-heading" data-field="${p.config.id}"><div class="hud-identity"><strong>${escape(p.config.label)}${p.config.teamId?` · К${p.config.teamId==='team-2'?2:1}`:''}</strong></div><div class="hud-stats"><b>${p.score.toLocaleString('ru-RU')} очков</b>${i===0?`<span>${p.placedPieces} фигур</span>`:''}</div>${i===0?'':`<small>${p.board.alive?'В игре':'Выбыл'}</small>`}</header>${shields}${preview}${p.board.alive?'':'<b class="out-label">ВЫБЫЛ</b>'}</article>`;
+            <div class="wood-panel-shell" aria-hidden="true"></div><div class="wood-panel-foot" aria-hidden="true"></div><header class="network-field-heading" data-field="${p.config.id}"><div class="hud-identity"><strong>${escape(networkAiName(p.config.controller==='ai'?'ai':'human',p.config.label,p.config.difficulty))}${p.config.teamId?` · ${h('teamShort',{number:p.config.teamId==='team-2'?2:1})}`:''}</strong></div><div class="hud-stats"><b>${h('points',{count:p.score.toLocaleString(getLocale())})}</b>${i===0?`<span>${h('pieces',{count:p.placedPieces})}</span>`:''}</div>${i===0?'':`<small>${p.board.alive?u('inGame'):u('out')}</small>`}</header>${shields}${preview}${p.board.alive?'':`<b class="out-label">${h('outCaps')}</b>`}</article>`;
         }).join('');
       }
     }
@@ -399,9 +419,9 @@ export class NetworkApp {
       const eligible=!!snapshot.manualPausedBy&&(snapshot.manualPausedBy===snapshot.ownId||snapshot.creatorId===snapshot.ownId);
       const renderKey=JSON.stringify([snapshot.manualPausedBy,snapshot.creatorId,snapshot.ownId,
         absent.map(s=>[s.id,s.name,Math.ceil(s.absence!.remainingMs/1000),s.absence!.blocksGameplay]),pauser?.name]);
-      const html=`<section class="network-pause-panel"><h2>Матч на паузе</h2>${pauser?`<p>Пауза: ${escape(pauser.name)}</p>`:''}<div class="network-absences">${absent.map(s=>`<article><span>${escape(s.name)} · ${Math.ceil(s.absence!.remainingMs/1000)} с${s.absence!.blocksGameplay?'':' · наблюдатель'}</span>${snapshot.creatorId===snapshot.ownId&&s.id!==snapshot.creatorId?this.button('Исключить и продолжить',`exclude:${s.id}`):''}</article>`).join('')}</div><div class="network-actions">${this.controls==='tilt'?this.button('Настроить наклон','tilt'):''}${eligible?this.button('Продолжить','resume'):snapshot.manualPausedBy?'<p>Продолжить могут поставивший паузу и создатель.</p>':''}${this.button('Настройки','preferences')}${this.button('К списку','list')}</div></section>`;
+      const html=`<section class="network-pause-panel"><h2 id="network-pause-title">${h('paused')}</h2>${pauser?`<p>${h('pausedBy',{name:pauser.name})}</p>`:''}<div class="network-absences">${absent.map(s=>`<article><span>${escape(seatName(s))} · ${h('seconds',{seconds:Math.ceil(s.absence!.remainingMs/1000)})}${s.absence!.blocksGameplay?'':` · ${h('spectator')}`}</span>${snapshot.creatorId===snapshot.ownId&&s.id!==snapshot.creatorId?this.button(u('excludeContinue'),`exclude:${s.id}`):''}</article>`).join('')}</div><div class="network-actions">${this.controls==='tilt'?this.button(u('configureTilt'),'tilt'):''}${eligible?this.button(u('resume'),'resume'):snapshot.manualPausedBy?`<p>${h('resumePermission')}</p>`:''}${this.button(networkText('networkSettings'),'preferences')}${this.button(u('toList'),'list')}</div></section>`;
       if(overlay.dataset.renderKey!==renderKey){overlay.innerHTML=html;overlay.dataset.renderKey=renderKey;this.bind();}
-    } else delete overlay.dataset.renderKey;
+    } else if(overlay.dataset.renderKey){delete overlay.dataset.renderKey;this.activateNavigation();}
   }
   private press(source:string,action:string):void {
     if(this.root.querySelector('[data-network-preferences],[data-display-confirm],[data-virtual-keyboard]')||this.matchLoading?.visible||this.blocked.has(source)||this.sources.has(source))return;
@@ -423,8 +443,8 @@ export class NetworkApp {
   private sensor=(e:DeviceOrientationEvent)=>{this.orientation=e;};
   private async enableTilt():Promise<void> {
     const orientation=DeviceOrientationEvent as typeof DeviceOrientationEvent & {requestPermission?:()=>Promise<string>};
-    if(orientation.requestPermission && await orientation.requestPermission()!=='granted'){this.status('Доступ к наклону не разрешён. Используйте касания.');return;}
-    if(this.orientation)this.tilt.calibrate(this.orientation);this.tiltEnabled=true;this.status('Наклон включён. Держите устройство удобно.');
+    if(orientation.requestPermission && await orientation.requestPermission()!=='granted'){this.status(u('tiltDenied'));return;}
+    if(this.orientation)this.tilt.calibrate(this.orientation);this.tiltEnabled=true;this.status(u('tiltEnabled'));
   }
   private poll=()=>{
     if(this.destroyed)return;

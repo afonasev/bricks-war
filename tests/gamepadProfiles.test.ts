@@ -57,3 +57,12 @@ describe('local gamepad name preferences', () => {
     expect(blocked.profiles[0]!.name).toBe('Другое');
   });
 });
+
+it('keeps generated Player choices out of meaningful history without deleting legacy data', () => {
+  const profiles = new GamepadProfiles(memory());
+  profiles.create('legacy', 'Игрок 1'); profiles.create('legacy', 'Player 2');
+  profiles.useName('Игрок 3'); profiles.useName('Player 4'); profiles.useName('Аня');
+  expect(profiles.rankedNames()).toEqual(['Аня']);
+  expect(profiles.profiles.some(p => p.name === 'Игрок 1')).toBe(true);
+  expect(profiles.profiles.some(p => p.name === 'Игрок 3')).toBe(false);
+});

@@ -4,6 +4,7 @@ import { homedir } from 'node:os';
 import { sign, createPublicKey } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { digest, validateManifest } from '../../electron/content.mjs';
+import { CONTENT_ABI, MIN_SHELL_RELEASE } from '../../electron/compatibility.mjs';
 const keyPath = process.env.BRICKS_CONTENT_PRIVATE_KEY ?? join(homedir(), '.config', 'bricks-war', 'content-private-key.pem');
 const privateKey = await readFile(keyPath, 'utf8');
 const publicKey = await readFile('electron/content-public-key.pem', 'utf8');
@@ -20,10 +21,10 @@ async function inventory(dir, prefix = '') {
 }
 await inventory('dist'); files.sort((a,b) => a.path.localeCompare(b.path));
 const pkg = JSON.parse(await readFile('package.json', 'utf8'));
-const payload = JSON.stringify({ schema: 1, game: 'bricks-war', component: 'content', channel: 'stable', sequence, gameVersion: pkg.version, minShellVersion: 2,
+const payload = JSON.stringify({ schema: 1, game: 'bricks-war', component: 'content', channel: 'stable', sequence, gameVersion: pkg.version, minShellVersion: CONTENT_ABI, minShellRelease: MIN_SHELL_RELEASE,
   commit: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), files });
 const envelope = { payload, signature: sign(null, Buffer.from(payload), privateKey).toString('base64') };
-validateManifest(envelope, publicKey, 2);
+validateManifest(envelope, publicKey, CONTENT_ABI, pkg.version);
 await mkdir('build', { recursive: true });
 await rm('build/desktop-content', { recursive: true, force: true });
 await cp('dist', 'build/desktop-content', { recursive: true });

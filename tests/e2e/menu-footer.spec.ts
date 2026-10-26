@@ -1,3 +1,4 @@
+import {openLocalLobby} from '../helpers/localLobby';
 import {test,expect} from '@playwright/test';
 import {writeFileSync} from 'node:fs';
 
@@ -20,8 +21,7 @@ for(const [width,height] of [[1440,960],[1280,480],[800,620],[390,844],[390,667]
   }
   await check('main');
   for(const mode of ['Выживание','Битва','Командный бой']){
-   const button=page.getByRole('button',{name:new RegExp(`^${mode}`)});
-   if(await button.count()&&await button.isVisible()){await button.click();await check(mode);await page.getByRole('button',{name:'← Главное меню',exact:true}).click();}
+   await openLocalLobby(page,mode);await check(mode);await page.locator('[data-lobby-back]').click();
   }
   await page.getByRole('button',{name:/^Настройки/}).click();await check('settings');
   await page.locator('.settings-list').evaluate(el=>{el.scrollTop=el.scrollHeight});await check('settings scrolled');

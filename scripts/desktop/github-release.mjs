@@ -4,7 +4,8 @@ import { join } from 'node:path';
 import { generateReleaseNotes } from './release-notes.mjs';
 import { readFile, readdir, writeFile } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
-import { digest } from '../../electron/content.mjs';
+import { digest, validateManifest } from '../../electron/content.mjs';
+import { CONTENT_ABI } from '../../electron/compatibility.mjs';
 import { load } from 'js-yaml';
 const repo = 'afonasev/bricks-war';
 const config = load(await readFile('electron-builder.yml', 'utf8'));
@@ -26,7 +27,9 @@ for (const name of names) {
   }
 }
 if (!catalog.mac || !catalog.win || !names.includes('latest.yml') || !names.includes('latest-mac.yml')) throw Error('Both platforms and updater metadata required');
-const shellPayload = JSON.stringify({schema:1,game:'bricks-war',component:'shell',channel:'stable',updaterAbi:1,version,files:shellFiles});
+const bundled = validateManifest(JSON.parse(await readFile('build/desktop-content/manifest.json','utf8')),publicKey,CONTENT_ABI,version);
+if (bundled.gameVersion !== version) throw Error('Installer and bundled game must have one application version');
+const shellPayload = JSON.stringify({schema:1,game:'bricks-war',component:'shell',channel:'stable',updaterAbi:1,contentAbi:CONTENT_ABI,contentSequence:bundled.sequence,version,files:shellFiles});
 const shellEnvelope = JSON.stringify({payload:shellPayload,signature:sign(null,Buffer.from(shellPayload),privateKey).toString('base64')});
 await writeFile('build/installers/shell-manifest.json',shellEnvelope); names.push('shell-manifest.json'); hashes.set('shell-manifest.json',digest(Buffer.from(shellEnvelope)));
 await writeFile('build/installers/SHA256SUMS', [...hashes].map(([name, hash]) => `${hash}  ${name}`).join('\n') + '\n');

@@ -72,15 +72,33 @@ describe('entry language contract', () => {
   it('runs prepaint bootstrap without app modules for every locale and blocked storage', () => {
     const script = startupLocaleScript();
     for (const locale of LOCALES) {
-      const document = {documentElement:{lang:''},title:''};
+      const manifest = { href: '' };
+      const description = { content: '' };
+      const document = {documentElement:{lang:''},title:'',querySelector:(selector:string)=>selector.startsWith('meta')?description:manifest};
       const window: Record<string, any> = {};
       runInNewContext(script,{window,document,navigator:{languages:['it',locale]},localStorage:{getItem:()=>null}});
       expect(document.documentElement.lang).toBe(locale);
       expect(document.title).toBe(catalogs[locale].title);
       expect(window.__bricksLocale.copy.errorTitle).toBe(catalogs[locale].errorTitle);
+      expect(manifest.href).toBe(`./manifest-${locale}.webmanifest`);
+      expect(description.content).toBe(catalogs[locale].pwaManifestDescription);
     }
-    const document = {documentElement:{lang:''},title:''};
+    const document = {documentElement:{lang:''},title:'',querySelector:()=>null};
     runInNewContext(script,{window:{},document,navigator:{languages:['ru']},localStorage:{getItem:()=>{throw Error('blocked');}}});
     expect(document.documentElement.lang).toBe('ru');
+  });
+
+  it('updates the manifest link when the in-app locale changes', () => {
+    const manifest = { href: '' };
+      const description = { content: '' };
+    vi.stubGlobal('document', { documentElement: { lang: '' }, title: '', querySelector: (selector:string) => selector.startsWith('meta')?description:manifest });
+    try {
+      for (const locale of LOCALES) {
+        setLocale(locale, null);
+        expect(manifest.href).toBe(`./manifest-${locale}.webmanifest`);
+      expect(description.content).toBe(catalogs[locale].pwaManifestDescription);
+        expect(document.documentElement.lang).toBe(locale);
+      }
+    } finally { setLocale('en', null); vi.unstubAllGlobals(); }
   });
 });

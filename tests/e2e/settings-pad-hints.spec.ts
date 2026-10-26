@@ -1,3 +1,4 @@
+import { openLocalLobby } from '../helpers/localLobby';
 import {test,expect} from '@playwright/test';
 for(const [id,back,reset] of [['Xbox Controller','B','Y'],['Sony DualSense','○','△'],['Nintendo Switch Pro','A','X'],['Unknown Pad','Право','Верх']]) {
  test(`settings footer hints persist with pointer input: ${id}`,async({page})=>{
@@ -14,7 +15,7 @@ for(const [id,back,reset] of [['Xbox Controller','B','Y'],['Sony DualSense','○
    if(id==='Xbox Controller')await page.screenshot({path:`evidence/settings-footer-reset-action/settings-${viewport.width}.png`});
   }
   await page.setViewportSize({width:1440,height:960});await page.locator('#open-controls').click();await expect(page.locator('.controls-screen footer .input-back')).toHaveText(back!);await expect(page.locator('footer .input-reset')).toHaveCount(0);await expect(page.locator('button .input-badge')).toHaveCount(0);await page.locator('#controls-back').click();
-  await page.locator('#settings-back').click();await page.locator('[data-destination="battle"]').click();
+  await page.locator('#settings-back').click();await openLocalLobby(page,'battle');
   await expect(page.locator('footer .input-back')).toHaveText(back!);await expect(page.locator('footer .input-roster')).toHaveText(reset!);await expect(page.locator('footer .input-reset')).toHaveCount(0);
   if(id==='Xbox Controller'){
    const centers=await page.locator('#start-match kbd').evaluate(el=>{const range=document.createRange();range.selectNodeContents(el);const text=range.getBoundingClientRect(),badge=el.getBoundingClientRect();return {x:Math.abs((text.left+text.right-badge.left-badge.right)/2),y:Math.abs((text.top+text.bottom-badge.top-badge.bottom)/2)};});expect(centers.x).toBeLessThanOrEqual(1);expect(centers.y).toBeLessThanOrEqual(2);
@@ -27,7 +28,7 @@ for(const [id,back,reset] of [['Xbox Controller','B','Y'],['Sony DualSense','○
 
 test('pause and network preference footers show B and Y before controller input',async({page})=>{
  await page.addInitScript(()=>{const pad={index:0,id:'Xbox Controller',connected:true,mapping:'standard',axes:[0,0],buttons:Array.from({length:16},()=>({pressed:false,value:0})),timestamp:0};Object.defineProperty(navigator,'getGamepads',{value:()=>[pad],configurable:true});(window as any).hintPad=pad;});
- await page.goto('/?muted=1');await page.locator('[data-destination="survival"]').click();await page.locator('#start-match').click();await expect(page.locator('.match-loading')).toHaveCount(0);await page.keyboard.press('Escape');await page.locator('#pause-settings').click();
+ await page.goto('/?muted=1');await openLocalLobby(page,'survival');await page.locator('#start-match').click();await expect(page.locator('.match-loading')).toHaveCount(0);await page.keyboard.press('Escape');await page.locator('#pause-settings').click();
  await expect(page.locator('#pause-settings-panel footer .input-confirm')).toHaveText('A');await expect(page.locator('#pause-settings-panel footer [data-reset-preferences]')).toHaveCount(1);await expect(page.locator('#pause-settings-panel footer .input-back')).toHaveText('B');await expect(page.locator('#pause-settings-panel footer .input-back')).toBeVisible();await expect(page.locator('footer .input-reset')).toBeVisible();
  await page.locator('#master-volume').fill('25');await page.evaluate(()=>{(window as any).hintPad.buttons[3].pressed=true});await expect(page.locator('#master-volume')).toHaveValue('100');await page.evaluate(()=>{(window as any).hintPad.buttons[3].pressed=false});await page.locator('#pause-settings-back').click();await expect(page.locator('#pause-overlay')).toBeVisible();
  await page.route('**/api/network/lobbies**',route=>route.fulfill({json:{rooms:[],next:null}}));await page.goto('/?muted=1');await page.locator('[data-network-entry]').click();await page.getByRole('button',{name:'Настройки',exact:true}).click();

@@ -1,0 +1,9 @@
+import { openLocalLobby } from '../helpers/localLobby';
+import {test,expect} from '@playwright/test';
+import {catalogs} from '../../src/i18n/catalogs';
+for(const locale of ['de','ja'] as const)for(const [width,height] of [[360,640],[844,390]] as const)test(`small local modal ${locale} ${width}x${height}`,async({browser,baseURL})=>{
+ const context=await browser.newContext({baseURL,locale,viewport:{width,height}});const page=await context.newPage();
+ try{await page.goto('/?muted=1');await expect(page.locator('[data-destination="battle"] .mode-copy small')).toHaveText(catalogs[locale].battlePhoneHint);await page.screenshot({path:`evidence/verify-public-player-candidate/small/${locale}-menu-${width}.png`});await openLocalLobby(page,'survival');await page.locator('#start-match').click();await expect(page.locator('.match-loading')).toHaveCount(0);await expect(page.locator('canvas')).toBeVisible();await page.waitForTimeout(150);await page.locator('#manual-pause').click();await page.locator('#pause-settings').click();await expect(page.getByRole('dialog')).toHaveAccessibleName(catalogs[locale].settings);
+ for(let i=0;i<20;i++){await page.keyboard.press('Tab');expect(await page.locator('#pause-settings-panel').evaluate(e=>e.contains(document.activeElement))).toBe(true);}
+ await page.locator('#pause-settings-back').scrollIntoViewIfNeeded();await page.screenshot({path:`evidence/verify-public-player-candidate/small/${locale}-settings-${width}.png`});const b=await page.locator('#pause-settings-back').boundingBox();expect(b!.x).toBeGreaterThanOrEqual(0);expect(b!.x+b!.width).toBeLessThanOrEqual(width);await page.keyboard.press('Escape');await expect(page.locator('#pause-overlay')).toHaveAccessibleName(catalogs[locale].pausedTitle);await page.locator('#continue-match').click();await expect(page.locator('#pause-overlay')).toBeHidden();}finally{await context.close();}
+});

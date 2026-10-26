@@ -156,14 +156,49 @@
 
 /* F12: one actual wood backdrop, with no opaque mobile/network canvas wash. */
 #app .arena-screen { background:linear-gradient(#fff4db18,#b9752910),var(--maple-texture) center/cover; }
-/* Mobile miniatures use a single narrow edge, with no bottom plank or inset rim. */
-#app .mobile-solo-arena .mobile-ai-card .wood-panel-shell,
+/* Network miniatures retain their compact single edge. */
 #app[data-layout="mobile"] .network-arena .network-mini-card .wood-panel-shell { inset:-1px; border:1px solid var(--panel-edge); border-radius:1px; filter:none; }
-#app .mobile-solo-arena .mobile-ai-card .wood-panel-shell::before,
-#app .mobile-solo-arena .mobile-ai-card .wood-panel-shell::after,
-#app .mobile-solo-arena .mobile-ai-card .wood-panel-foot { display:none; }
 #app :is(.mobile-solo-arena,.network-arena) .wood-panel-shell::after { display:none; }
 
 #app[data-layout="mobile"] .network-arena .network-mini-card .wood-panel-shell::before,
 #app[data-layout="mobile"] .network-arena .network-mini-card .wood-panel-shell::after,
 #app[data-layout="mobile"] .network-arena .network-mini-card .wood-panel-foot { display:none; }
+
+
+/* Local phone fields share the desktop wood material at a compact scale.
+   Portrait AI frames fit inside the existing six-pixel stack gaps. */
+#app .mobile-solo-arena:not(.network-arena) .hud-card {
+  --mobile-frame-rim:6px; --mobile-frame-overhang:8px;
+  --mobile-frame-foot-bottom:10px; --mobile-frame-foot-height:12px;
+}
+#app .mobile-solo-arena:not(.network-arena) .mobile-ai-card {
+  --mobile-frame-rim:1.5px; --mobile-frame-overhang:2px;
+  --mobile-frame-foot-bottom:3px; --mobile-frame-foot-height:4px;
+}
+#app .mobile-solo-arena:not(.network-arena) .wood-panel-shell {
+  inset:calc(-1 * var(--mobile-frame-rim)); border:0; border-radius:3px;
+  filter:drop-shadow(0 2px 1px #342a2533);
+}
+#app .mobile-solo-arena:not(.network-arena) .wood-panel-shell::before {
+  display:block; padding:var(--mobile-frame-rim); border-radius:3px;
+}
+#app .mobile-solo-arena:not(.network-arena) .wood-panel-shell::after {
+  display:block; inset:var(--mobile-frame-rim); border-width:1px; border-radius:1px;
+}
+#app .mobile-solo-arena:not(.network-arena) .wood-panel-foot {
+  display:block; left:calc(-1 * var(--mobile-frame-overhang)); right:calc(-1 * var(--mobile-frame-overhang));
+  bottom:calc(-1 * var(--mobile-frame-foot-bottom)); height:var(--mobile-frame-foot-height);
+  border-radius:3px; box-shadow:inset 1px 1px 1px #ffffff45,0 2px 2px #342a2533;
+}
+#app .mobile-solo-arena:not(.network-arena) .wood-panel-foot::before,
+#app .mobile-solo-arena:not(.network-arena) .wood-panel-foot::after { display:block; top:45%; width:2px; height:2px; }
+#app .mobile-solo-arena:not(.network-arena) .wood-panel-foot::before { left:6px; }
+#app .mobile-solo-arena:not(.network-arena) .wood-panel-foot::after { right:6px; }
+#app .mobile-solo-arena:not(.network-arena) .mobile-ai-card .wood-panel-foot::before,
+#app .mobile-solo-arena:not(.network-arena) .mobile-ai-card .wood-panel-foot::after { width:1px; height:1px; }
+@media (orientation:landscape) {
+  #app .mobile-solo-arena:not(.network-arena) .mobile-ai-card {
+    --mobile-frame-rim:3px; --mobile-frame-overhang:4px;
+    --mobile-frame-foot-bottom:6px; --mobile-frame-foot-height:7px;
+  }
+}

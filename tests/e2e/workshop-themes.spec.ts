@@ -1,3 +1,4 @@
+import { openLocalLobby } from '../helpers/localLobby';
 import {test,expect} from '@playwright/test';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {TILE_STYLES} from '../../src/domain/tileStyles';
@@ -7,7 +8,7 @@ const out=`${root}/${stage}`;
 for(const style of TILE_STYLES) test(`theme comparison ${style.id}`,async({page})=>{
   const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto('/?muted=1&playtest-board-events=1');
-  await page.getByRole('button',{name:/^Выживание/}).click();
+  await openLocalLobby(page,'survival');
   const remove=page.getByRole('button',{name:'Удалить Игрок 2'});if(await remove.count())await remove.click();
   await page.getByRole('combobox',{name:'Стиль участника 1',exact:true}).click();
   const option=page.getByRole('option',{name:style.label,exact:true});

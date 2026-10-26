@@ -1,11 +1,11 @@
 import { readFile, lstat } from 'node:fs/promises';
 import { join } from 'node:path';
-import { digest, validateManifest } from '../../electron/content.mjs';
+import { digest, inspectManifest } from '../../electron/content.mjs';
 
 export async function contentReleasePlan(directory, publicKey) {
   const bytes = await readFile(join(directory, 'manifest.json'));
   const envelope = JSON.parse(bytes);
-  const manifest = validateManifest(envelope, publicKey, 2);
+  const manifest = inspectManifest(envelope, publicKey);
   if(manifest.game!=='bricks-war'||manifest.component!=='content'||manifest.channel!=='stable')throw Error('Content release identity required');
   const assets = new Map();
   for (const file of manifest.files) {

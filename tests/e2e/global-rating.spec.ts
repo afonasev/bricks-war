@@ -1,3 +1,4 @@
+import { openLocalLobby } from '../helpers/localLobby';
 import { expect, test, type Page } from '@playwright/test';
 import { mkdir, mkdtemp, rm } from 'node:fs/promises';
 import { spawn, type ChildProcess } from 'node:child_process';
@@ -36,7 +37,7 @@ async function setup(page: Page, width: number, height: number, gamepad = false)
     }
   }, { gamepad });
   await page.goto('/?muted=1&playtest-fast=20');
-  await page.getByRole('button', { name: /^Выживание/ }).click();
+  await openLocalLobby(page,'survival');
 }
 
 async function expectLayout(page: Page) {

@@ -12,7 +12,7 @@ import type {
   LockEventState,
   ClearPresentationState,
 } from '../domain/types';
-import { HIDDEN_ROWS, isManualController } from '../domain/types';
+import { BOARD_HEIGHT, HIDDEN_ROWS, isManualController } from '../domain/types';
 import { DEFAULT_GAME_TUNING, type GameTuning } from '../domain/gameTuning';
 import { DEFAULT_TILE_STYLE_SELECTION } from '../domain/tileStyles';
 import {
@@ -639,7 +639,8 @@ export class MatchEngine {
     const lockDeltaMs = Math.max(0, deltaMs - Math.max(0, maneuverConsumed - preparationConsumed));
     if (maneuverConsumed > preparationConsumed && lockDeltaMs === 0) return null;
     board.lockElapsedMs += lockDeltaMs;
-    if (board.lockElapsedMs < (this.options.tuning?.lockDelayMs ?? LOCK_DELAY_MS)) return null;
+    // Holding down commits contact; releasing before contact keeps ordinary grace.
+    if (!board.softDrop && board.lockElapsedMs < (this.options.tuning?.lockDelayMs ?? LOCK_DELAY_MS)) return null;
 
     const source = board.active.definition.source;
     const lockedGrid = board.grid.map((row) => [...row]);
@@ -1264,7 +1265,8 @@ export class MatchEngine {
           serial: this.state.anomalyTransitionSerial,
           phase: 'clearing', remainingMs: ANOMALY_ARRIVAL_BURN_MS, durationMs: ANOMALY_ARRIVAL_BURN_MS,
           levels: [level],
-          targets: this.state.participants.filter((p) => p.board.alive && p.board.active)
+          targets: this.state.participants.filter((p) => p.board.alive && p.board.active
+            && !pieceCells(p.board.active).some(({ y }) => y >= BOARD_HEIGHT - 2))
             .map((p) => ({ participantId: p.config.id, piece: structuredClone(p.board.active!) })),
         };
         for (const p of this.state.participants) { p.board.softDrop = false; p.board.softDropElapsedMs = 0; }
@@ -1276,7 +1278,9 @@ export class MatchEngine {
   private beginAnomalyBurnWhenReady(): void {
     const transition = this.state.anomalyTransition;
     if (!transition || this.pendingClears.size > 0 || this.state.cleanupEvents.length > 0 || this.state.shieldPresentations.length > 0) return;
-    transition.targets = this.state.participants.filter((p) => p.board.alive && p.board.active)
+    // Keep eligibility from the triggering step while pending clears finish.
+    const targetIds = new Set(transition.targets.map((target) => target.participantId));
+    transition.targets = this.state.participants.filter((p) => p.board.alive && p.board.active && targetIds.has(p.config.id))
       .map((p) => ({ participantId: p.config.id, piece: structuredClone(p.board.active!) }));
     transition.phase = 'burning';
     transition.remainingMs = transition.durationMs;
@@ -1302,6 +1306,8 @@ export class MatchEngine {
     let appeared = false;
     for (const participant of this.state.participants) {
       if (!participant.board.alive) continue;
+      // Non-target active pieces in the bottom two rows finish their normal turn.
+      if (participant.board.active && !transition.targets.some((target) => target.participantId === participant.config.id)) continue;
       participant.board.active = null;
       const anomaly = participant.board.pendingAnomalies[0];
       if (anomaly) {

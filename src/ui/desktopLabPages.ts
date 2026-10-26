@@ -1,3 +1,4 @@
+import { html as tr, text as localeText } from '../i18n/locale';
 import { isMobilePlayViewport } from './mobileSettings';
 
 interface LabPage { group: HTMLElement; card: HTMLElement | null; fields: HTMLElement[]; title: string }
@@ -26,8 +27,8 @@ export function configureDesktopLabPages(root: HTMLElement, onPageChange: () => 
     });
   });
   let page = Math.min(Number(content.dataset.labPage ?? 0), pages.length - 1);
-  const nav = document.createElement('nav'); nav.className = 'desktop-lab-pages'; nav.setAttribute('aria-label', 'Разделы лаборатории');
-  nav.innerHTML = '<button type="button" data-lab-previous data-ui-focus>← Предыдущий раздел</button><output aria-live="polite"></output><button type="button" data-lab-next data-ui-focus>Следующий раздел →</button>';
+  const nav = document.createElement('nav'); nav.className = 'desktop-lab-pages'; nav.setAttribute('aria-label', localeText('labPageNavAria'));
+  nav.innerHTML = `<button type="button" data-lab-previous data-ui-focus>${tr('labPagePrevious')}</button><output aria-live="polite"></output><button type="button" data-lab-next data-ui-focus>${tr('labPageNext')}</button>`;
   content.before(nav);
   const render = () => {
     const current = pages[page]; if (!current) return;

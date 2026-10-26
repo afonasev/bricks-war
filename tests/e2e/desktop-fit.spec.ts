@@ -1,3 +1,4 @@
+import { openLocalLobby } from '../helpers/localLobby';
 import { expect, test, type Page } from '@playwright/test';
 
 export async function expectDesktopFit(page: Page): Promise<void> {
@@ -33,7 +34,7 @@ test('four editable Survival names stay inside their cards through resizing', as
     localStorage.setItem('bricks-war:player-names:v1', JSON.stringify(Array(4).fill('Александр Великий')));
   });
   await page.goto('/?muted=1');
-  await page.getByRole('button',{name:/^Выживание/}).click();
+  await openLocalLobby(page,'survival');
   await page.evaluate(() => { (window as any).nameFitPads.forEach((pad: any) => { pad.buttons[3].pressed = true; }); });
   await expect(page.locator('[data-player-name]')).toHaveCount(4);
   await page.evaluate(() => { (window as any).nameFitPads.forEach((pad: any) => { pad.buttons[3].pressed = false; }); });
@@ -60,13 +61,32 @@ for (const [width,height] of ([[1920,1080],[2560,1440],[1440,960],[1366,768],[12
     await page.goto('/?muted=1');
     await expect(page.locator('.main-menu-screen')).toBeVisible();
     await expectDesktopFit(page);
-    for (const mode of ['Выживание','Битва','Командный бой']) {
-      await page.getByRole('button',{name:new RegExp(`^${mode}`)}).click();
+    for (const mode of ['Кто больше','Битва','Командный бой']) {
+      await openLocalLobby(page,mode);
       await expectDesktopFit(page);
-      await page.getByRole('combobox',{name:'Стиль участника 1',exact:true}).click();
+      await page.getByRole('button',{name:'Настроить участника 1',exact:true}).click();
+      await expect(page.getByRole('textbox',{name:'Новое имя участника 1'})).toHaveCount(0);
+      await expect(page.getByRole('heading',{name:'Стиль фигур',exact:true})).toBeVisible();
+      await expect(page.locator('[data-style]')).toHaveCount(7);
+      await expect(page.locator('[data-style="random"]')).toHaveAttribute('aria-pressed','true');
+      // Style choices live in a bounded scroll list. Verify every choice is fully
+      // reachable rather than treating masked offscreen rows as visible controls.
+      for (const option of await page.locator('[data-style]').all()) {
+        await option.scrollIntoViewIfNeeded();
+        const fits = await option.evaluate(el => {
+          const row = el.getBoundingClientRect(), list = el.parentElement!.getBoundingClientRect();
+          const card = el.closest('.lobby-card')!.getBoundingClientRect();
+          const footer = document.querySelector('.lobby-footer')!.getBoundingClientRect();
+          return row.left >= list.left && row.right <= list.right && row.top >= list.top - 1 && row.bottom <= list.bottom + 1
+            && list.top >= card.top && list.bottom <= card.bottom && card.bottom <= footer.top
+            && card.left >= 0 && card.right <= innerWidth && card.top >= 0 && card.bottom <= innerHeight
+            && el.scrollWidth <= el.clientWidth + 1;
+        });
+        expect(fits).toBe(true);
+      }
+      await page.locator('[data-cancel="0"]').click();
       await expectDesktopFit(page);
-      await page.keyboard.press('Escape');
-      await page.getByRole('button',{name:'← Главное меню',exact:true}).click();
+      await page.locator('[data-lobby-back]').click();
     }
     await page.getByRole('button',{name:/^Настройки/}).click(); await expectDesktopFit(page);
     await page.getByRole('button',{name:/^Подробнее об управлении/}).click(); await expectDesktopFit(page);
@@ -88,7 +108,7 @@ for (const [width,height] of ([[1920,1080],[2560,1440],[1440,960],[1366,768],[12
 
 test('compact style list keeps every option reachable with keyboard and pointer',async({page})=>{
   await page.setViewportSize({width:1280,height:480}); await page.goto('/?muted=1');
-  await page.getByRole('button',{name:/^Битва/}).click();
+  await openLocalLobby(page,'battle');
   const trigger=page.getByRole('combobox',{name:'Стиль участника 1',exact:true}); await trigger.click();
   const list=page.getByRole('listbox',{name:'Стиль участника 1',exact:true});
   await expect(list.locator('.menu-select-pages')).toHaveCount(0);
@@ -111,7 +131,7 @@ for (const [width,height] of [[1280,480],[800,620]] as const) {
       await page.setViewportSize({width,height});
       await page.addInitScript(()=> { localStorage.setItem('bricks-war:player-names:v1', JSON.stringify(Array(4).fill('WWWWWWWWWWWWWWWWWW'))); localStorage.setItem('bricks-war:solo-records:v1',JSON.stringify(Array.from({length:10},(_,i)=>({id:`r${i}`,name:`Александр Велики${i}`,elapsedMs:100000,lineScore:10000-i})))); });
       await page.goto('/?muted=1&playtest-fast=20&playtest-score=123456');
-      await page.getByRole('button',{name:new RegExp(`^${mode}`)}).click();
+      await openLocalLobby(page,mode);
       if (mode==='Битва') {
         await page.getByRole('combobox',{name:'Длительность матча',exact:true}).click();
         await page.getByRole('option',{name:'2 мин',exact:true}).click();
@@ -174,7 +194,7 @@ test('desktop compositions keep proportions and records form one column through 
   await page.setViewportSize({width:1920,height:1080});
   await page.addInitScript(() => localStorage.setItem('bricks-war:solo-records:v1',JSON.stringify(Array.from({length:10},(_,i)=>({id:`r${i}`,name:`Александр Велики${i}`,elapsedMs:600000,lineScore:10000-i,finishedAt:1780000000000,placedPieces:1000})))));
   await page.goto('/?muted=1');
-  await page.getByRole('button',{name:/^Выживание/}).click();
+  await openLocalLobby(page,'survival');
   const composition = () => page.evaluate(() => {
     const stage = document.querySelector('.desktop-menu-stage')!.getBoundingClientRect();
     const scale = stage.width / 1120;

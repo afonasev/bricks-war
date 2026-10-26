@@ -1,3 +1,4 @@
+import { openLocalLobby } from '../helpers/localLobby';
 import { test, expect } from '@playwright/test';
 import { mkdir, writeFile } from 'node:fs/promises';
 const out=process.env.BRICKS_PANEL_CAPTURE_DIR ?? 'evidence/toy-workshop-arena/playable-f11';
@@ -12,7 +13,7 @@ for(const scenario of [
   await page.setViewportSize(scenario);
   const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto('/?muted=1&playtest-board-events=1');
-  await page.getByRole('button',{name:new RegExp('^'+scenario.mode)}).click();
+  await openLocalLobby(page,scenario.mode);
   while(scenario.width>700 && await page.locator('[data-remove-slot]').count()>scenario.count)await page.locator('[data-remove-slot]').last().click();
   while(scenario.width>700 && await page.locator('[data-remove-slot]').count()<scenario.count)await page.getByRole('button',{name:'Добавить ИИ',exact:true}).first().click();
   await page.locator('#start-match').click();

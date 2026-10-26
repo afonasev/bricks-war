@@ -1,3 +1,4 @@
+import { translate, type Locale } from '../i18n/locale';
 import type { MatchVariant } from '../domain/types';
 
 export interface HudIdentity {
@@ -11,10 +12,10 @@ export function playerAccentForSlot(slotIndex: number): string {
   return PLAYER_ACCENTS[Math.min(3, Math.max(0, slotIndex))] ?? PLAYER_ACCENTS[0];
 }
 
-export function hudIdentityForParticipant(slotIndex: number, variant: MatchVariant): HudIdentity {
+export function hudIdentityForParticipant(slotIndex: number, variant: MatchVariant, locale: Locale = 'ru'): HudIdentity {
   if (variant === 'teams') {
     const firstTeam = slotIndex < 2;
-    return { palette: firstTeam ? 'team-1' : 'team-2', teamLabel: firstTeam ? 'СОЛНЦЕ' : 'НЕБО' };
+    return { palette: firstTeam ? 'team-1' : 'team-2', teamLabel: translate(locale, firstTeam ? 'teamSunShort' : 'teamSkyShort').toLocaleUpperCase(locale) };
   }
   const palette = (`slot-${Math.min(4, Math.max(1, slotIndex + 1))}`) as HudIdentity['palette'];
   return { palette, teamLabel: null };

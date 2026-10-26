@@ -1,3 +1,4 @@
+import { openLocalLobby } from '../helpers/localLobby';
 import { expect, test, type Page } from '@playwright/test';
 const key = 'bricks-war:gamepad-profiles:v2';
 const device = JSON.stringify(['Same Pad', 'standard', 16, 2]);
@@ -37,7 +38,7 @@ for (const mode of ['Выживание', 'Битва', 'Командный бо
   test(`Y joins and moves named players in ${mode}`, async ({ page }) => {
     if (mode === 'Выживание') await page.addInitScript(() => localStorage.setItem('bricks-war:slot-selections:v1', JSON.stringify(['human-1', 'human-2', 'off', 'off'])));
     await installPads(page, [], false);
-    await page.getByRole('button', { name: new RegExp(`^${mode}`) }).click();
+    await openLocalLobby(page, mode);
     if (mode !== 'Выживание') await emptySlot(page, 2);
     await press(page, 0);
     await expect(page.locator('[data-slot="2"]')).toHaveValue('gamepad-0');
@@ -66,7 +67,7 @@ for (const mode of ['Выживание', 'Битва', 'Командный бо
 
 test('requires explicit name choice for identical pads in reversed connection order and rechecks disconnect', async ({ page }) => {
   await installPads(page, [{ id: 'a', device, name: 'Александр Великий' }, { id: 'b', device, name: 'Второй игрок' }]);
-  await page.getByRole('button', { name: /^Битва/ }).click();
+  await openLocalLobby(page,'battle');
   await press(page, 1);
   await expect(page.getByRole('dialog')).toBeVisible();
   await expect(page.locator('[data-slot-card="3"].empty')).toBeVisible();
@@ -84,7 +85,7 @@ test('requires explicit name choice for identical pads in reversed connection or
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page.locator('[data-slot-card="2"].empty')).toBeVisible();
   await page.reload();
-  await page.getByRole('button', { name: /^Битва/ }).click();
+  await openLocalLobby(page,'battle');
   await expect(page.locator('[data-slot-card="3"].empty')).toBeVisible();
   await press(page, 0);
   await expect(page.getByRole('dialog')).toBeVisible();
@@ -94,7 +95,7 @@ test('requires explicit name choice for identical pads in reversed connection or
 
 test('preserves manual controller replacement name and forgets live assignment on reused index', async ({ page }) => {
   await installPads(page, [], false);
-  await page.getByRole('button', { name: /^Битва/ }).click();
+  await openLocalLobby(page,'battle');
   await page.getByLabel('Имя игрока 1').fill('Лена');
   await select(page, 'Участник 1', 'Геймпад 1');
   await expect(page.getByLabel('Имя игрока 1')).toHaveValue('Лена');
@@ -120,7 +121,7 @@ test('preserves manual controller replacement name and forgets live assignment o
 for (const blocked of [false, true]) {
   test(`uses deterministic names with ${blocked ? 'inaccessible' : 'malformed'} storage`, async ({ page }) => {
     await installPads(page, '{malformed', false, blocked);
-    await page.getByRole('button', { name: /^Битва/ }).click();
+    await openLocalLobby(page,'battle');
     await press(page, 0);
     await expect(page.getByLabel('Имя игрока 4')).toHaveValue('Игрок 4');
     await page.getByLabel('Имя игрока 4').fill('Имя в памяти');
@@ -133,7 +134,7 @@ for (const blocked of [false, true]) {
 test('phone solo ignores Y and keeps only the touch player', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await installPads(page);
-  await page.getByRole('button', { name: /^Выживание/ }).click();
+  await openLocalLobby(page,'survival');
   await page.getByLabel('Имя игрока 1').fill('Александр Великий');
   await press(page, 0);
   await expect(page.getByRole('dialog')).toHaveCount(0);
@@ -147,7 +148,7 @@ for (const width of [1440, 800, 390]) {
     await page.setViewportSize({ width, height: width === 390 ? 844 : 960 });
     await page.goto('/?muted=1');
     for (const mode of width === 390 ? ['Выживание', 'Битва'] : ['Выживание', 'Битва', 'Командный бой']) {
-      await page.getByRole('button', { name: new RegExp(`^${mode}`) }).click();
+      await openLocalLobby(page, mode);
       await page.getByLabel('Имя игрока 1').fill('ШШШШШШШШШШШШШШШШШШ');
       await expect.poll(async () => page.getByLabel('Имя игрока 1').evaluate((input) => {
         const el = input as HTMLInputElement;
@@ -181,7 +182,7 @@ for (const width of [1440, 800, 390]) {
 
 test('queues simultaneous saved-name choices and rechecks the destination before confirmation', async ({ page }) => {
   await installPads(page, [{ id: 'a', device, name: 'Первый игрок' }, { id: 'b', device, name: 'Второй игрок' }]);
-  await page.getByRole('button', { name: /^Битва/ }).click();
+  await openLocalLobby(page,'battle');
   await page.evaluate(() => { (window as any).rosterPads.forEach((pad: any) => { pad.buttons[3].pressed = true; }); });
   await expect(page.getByRole('dialog')).toContainText('Геймпад 1');
   await page.evaluate(() => { (window as any).rosterPads.forEach((pad: any) => { pad.buttons[3].pressed = false; }); });
@@ -206,7 +207,7 @@ test('queues simultaneous saved-name choices and rechecks the destination before
 
 test('gamepad selection always opens name choice, supports new names and durable deletion without renaming a live player', async ({ page }) => {
   await installPads(page, [{ id: 'a', device, name: 'Сохранённое имя' }]);
-  await page.getByRole('button', { name: /^Битва/ }).click();
+  await openLocalLobby(page,'battle');
   // First navigation from Back selects the keyboard player's name, even before Y joins.
   await press(page, 0, 13);
   await expect(page.getByRole('dialog')).toBeVisible();
@@ -232,7 +233,7 @@ test('gamepad selection always opens name choice, supports new names and durable
   await expect(page.getByLabel('Имя игрока 4')).toHaveValue('Сохранённое имя');
   expect(await page.evaluate(key => JSON.parse(localStorage.getItem(key)!).map((profile: any) => profile.name), key)).toEqual(['Новое имя игрока']);
   await page.reload();
-  await page.getByRole('button', { name: /^Битва/ }).click();
+  await openLocalLobby(page,'battle');
   await press(page, 0, 13);
   await expect(page.getByRole('button', { name: 'Сохранённое имя', exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Новое имя игрока', exact: true })).toBeVisible();
@@ -244,7 +245,7 @@ for (const size of [{ width: 1440, height: 720 }, { width: 1024, height: 600 }, 
   test(`reserves actual footer height at ${size.width}x${size.height}`, async ({ page }) => {
     await page.setViewportSize(size);
     await page.goto('/?muted=1');
-    await page.getByRole('button', { name: /^Битва/ }).click();
+    await openLocalLobby(page,'battle');
     await page.locator('.setup-scroll').evaluate(el => { el.scrollTop = el.scrollHeight; });
     const layout = await page.evaluate(() => {
       const content = document.querySelector('.setup-scroll')!.getBoundingClientRect();
@@ -261,7 +262,7 @@ for (const size of [{ width: 1440, height: 720 }, { width: 1024, height: 600 }, 
 test('saved-name pages preserve drafts and expose deletion and cancellation to gamepad', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 480 });
   await installPads(page, Array.from({ length: 100 }, (_, i) => ({ id: `profile-${i}`, device, name: `Сохранённый ${i}` })));
-  await page.getByRole('button', { name: /^Битва/ }).click();
+  await openLocalLobby(page,'battle');
   await press(page, 0, 13);
   await expect(page.getByRole('dialog')).toBeVisible();
   const input = page.locator('[data-profile-name]');
@@ -282,7 +283,7 @@ test('saved-name pages preserve drafts and expose deletion and cancellation to g
 
 test('name fields offer other-device and occupied names without sharing player profiles', async ({ page }) => {
   await installPads(page, [{ id: 'a', device, name: 'Анна' }, { id: 'b', device: 'Other pad', name: 'Борис' }]);
-  await page.getByRole('button', { name: /^Битва/ }).click();
+  await openLocalLobby(page,'battle');
   await press(page, 0);
   await page.getByRole('button', { name: 'Анна', exact: true }).click();
   await page.getByLabel('Имя игрока 1').hover();
@@ -296,23 +297,23 @@ test('name fields offer other-device and occupied names without sharing player p
   await page.getByRole('heading', { name: 'Битва', exact: true }).click();
   await expect(page.getByLabel('Имя игрока 4')).toHaveValue('Анна');
   await page.reload();
-  await page.getByRole('button', { name: /^Битва/ }).click();
+  await openLocalLobby(page,'battle');
   await press(page, 0, 13);
   await expect(page.getByRole('button', { name: 'Вера', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Сохранить', exact: true })).toBeVisible();
-  await page.screenshot({ path: 'evidence/reuse-player-names/chooser-wide.png' });
+  await page.screenshot({ path: `${process.env.BRICKS_CANDIDATE_EVIDENCE ?? 'evidence/reuse-player-names'}/chooser-wide.png` });
   await press(page, 0, 1);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.reload();
-  await page.getByRole('button', { name: /^Битва/ }).click();
+  await openLocalLobby(page,'battle');
   await expect(page.getByRole('dialog')).toHaveCount(0);
-  await page.screenshot({ path: 'evidence/reuse-player-names/phone.png' });
+  await page.screenshot({ path: `${process.env.BRICKS_CANDIDATE_EVIDENCE ?? 'evidence/reuse-player-names'}/phone.png` });
 });
 
 
 test('two live gamepad players reuse one name and later rename independently', async ({ page }) => {
   await installPads(page, [{ id: 'a', device, name: 'Анна' }]);
-  await page.getByRole('button', { name: /^Битва/ }).click();
+  await openLocalLobby(page,'battle');
   await press(page, 0);
   await page.getByRole('button', { name: 'Анна', exact: true }).click();
   await emptySlot(page, 2);
@@ -338,7 +339,7 @@ for (const mode of ['Выживание', 'Битва', 'Командный бо
       localStorage.setItem(key, JSON.stringify([{ id: 'mouse-saved', device, name: 'Аня' }]));
     }, { key, device });
     await page.goto('/?muted=1');
-    await page.getByRole('button', { name: new RegExp(`^${mode}`) }).click();
+    await openLocalLobby(page, mode);
     await page.getByLabel('Имя игрока 1').click();
     await expect(page.getByRole('dialog')).toBeVisible();
     await expect(page.getByRole('dialog')).not.toContainText('Геймпад');
@@ -358,7 +359,7 @@ for (const mode of ['Выживание', 'Битва', 'Командный бо
     await expect(page.getByLabel('Имя игрока 2')).toHaveValue('Аня');
     if (mode === 'Битва') {
       await page.getByLabel('Имя игрока 1').click();
-      await page.screenshot({ path: 'evidence/mouse-name-menu/desktop.png' });
+      await page.screenshot({ path: `${process.env.BRICKS_CANDIDATE_EVIDENCE ?? 'evidence/mouse-name-menu'}/desktop.png` });
       await page.getByRole('button', { name: 'Отмена', exact: true }).click();
     }
   });
@@ -367,13 +368,13 @@ for (const mode of ['Выживание', 'Битва', 'Командный бо
 test('phone pointer still edits a name directly and persists it', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/?muted=1');
-  await page.getByRole('button', { name: /^Битва/ }).click();
+  await openLocalLobby(page,'battle');
   await page.getByLabel('Имя игрока 1').click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await page.getByLabel('Имя игрока 1').fill('Лена');
   await page.getByRole('heading', { name: 'Битва', exact: true }).click();
   await page.reload();
-  await page.getByRole('button', { name: /^Битва/ }).click();
+  await openLocalLobby(page,'battle');
   await expect(page.getByLabel('Имя игрока 1')).toHaveValue('Лена');
-  await page.screenshot({ path: 'evidence/mouse-name-menu/phone.png' });
+  await page.screenshot({ path: `${process.env.BRICKS_CANDIDATE_EVIDENCE ?? 'evidence/mouse-name-menu'}/phone.png` });
 });

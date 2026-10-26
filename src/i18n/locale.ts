@@ -33,7 +33,14 @@ export function getLocale(): Locale { return current; }
 export function setLocale(locale: Locale, storage: LocaleStorage | null = browserLocaleStorage()): boolean {
   current = locale;
   if (typeof window !== 'undefined') (window as Window & { __bricksLocale?: unknown }).__bricksLocale = { locale, copy: catalogs[locale] };
-  if (typeof document !== 'undefined') { document.documentElement.lang = locale; document.title = text('title'); }
+  if (typeof document !== 'undefined') {
+    document.documentElement.lang = locale;
+    document.title = text('title');
+    const description = document.querySelector<HTMLMetaElement>('meta[name="description"]');
+    if (description) description.content = text('pwaManifestDescription');
+    const manifest = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
+    if (manifest) manifest.href = `./manifest-${locale}.webmanifest`;
+  }
   return saveLocale(locale, storage);
 }
 

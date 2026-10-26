@@ -1,3 +1,4 @@
+import { openLocalLobby } from '../helpers/localLobby';
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { mkdirSync } from 'node:fs';
@@ -24,7 +25,7 @@ async function finishBattle(page: Page): Promise<void> {
     }).observe(document, { childList: true, subtree: true });
   });
   await page.goto('/?muted=1&playtest-fast=20');
-  await page.getByRole('button', { name: /^Битва/ }).click();
+  await openLocalLobby(page,'battle');
   await page.getByRole('combobox', { name: 'Длительность матча', exact: true }).click();
   await page.getByRole('option', { name: '2 мин', exact: true }).click();
   await page.locator('#start-match').click();

@@ -221,7 +221,6 @@
   background: #eef2e8; white-space: normal; overflow-wrap: normal;
 }
 #app .rating-switch button[aria-pressed="true"] { color: white; background: #356346; }
-#app .rating-switch button:focus-visible, #app .rating-switch button.is-ui-selected { outline: 3px solid #edb23f; outline-offset: 1px; }
 #app .rating-local-content { display: contents; }
 #app .rating-local-content[hidden], #app .rating-global-content[hidden] { display: none !important; }
 #app .rating-global-content { min-height: 0; overflow: auto; }

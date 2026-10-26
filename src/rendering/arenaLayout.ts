@@ -1,5 +1,7 @@
 export const ARENA_CARD_GAP = 4;
 export const LOCAL_ARENA_CARD_GAP = 16;
+export const LOCAL_PEDESTAL_GAP = 32;
+export const LOCAL_PEDESTAL_OVERHANG = 8;
 export const ARENA_EDGE_PADDING = 4;
 export const ARENA_CARD_HEADER_HEIGHT = 52;
 export const ARENA_CARD_HORIZONTAL_PADDING = 4;
@@ -31,13 +33,24 @@ export function chooseMobileSoloLayout(
   const playfieldHeight = Math.max(0, height - controlsReservedHeight);
   const opponents = Math.max(0, participantCount - 1);
   const playerHeaderHeight = width > height ? 28 : 36;
-  if (width > height) {
-    const playerTop = ARENA_EDGE_PADDING;
-    const playerCell = Math.max(4, Math.floor((playfieldHeight - playerTop - playerHeaderHeight - ARENA_CARD_BOTTOM_PADDING - ARENA_EDGE_PADDING) / 20));
+  if (width > height && opponents === 3) {
+    // Keep the entire top strip clear for pause and timer. Landscape phones have
+    // enough width to keep the primary field large and arrange the AI boards in
+    // one compact row beside it.
+    const playerTop = controlsReservedHeight + ARENA_EDGE_PADDING;
+    const playerCell = Math.max(4, Math.floor((height - playerTop - playerHeaderHeight - ARENA_CARD_BOTTOM_PADDING - ARENA_EDGE_PADDING) / 20));
     const playerWidth = playerCell * 10 + ARENA_CARD_HORIZONTAL_PADDING;
     const playerHeight = playerHeaderHeight + playerCell * 20 + ARENA_CARD_BOTTOM_PADDING;
-    const groupGap = 14;
-    const groupWidth = (playerWidth * participantCount) + (groupGap * Math.max(0, participantCount - 1));
+    const playerGap = 12;
+    const opponentGap = 8;
+    const opponentCell = opponents
+      ? Math.max(3, Math.min(9, Math.floor(playerCell / 1.5), Math.floor((width - ARENA_EDGE_PADDING * 2 - playerWidth - playerGap - opponentGap * Math.max(0, opponents - 1)) / opponents / 10)))
+      : 0;
+    const opponentWidth = opponentCell * 10 + ARENA_CARD_HORIZONTAL_PADDING;
+    const opponentHeaderHeight = 52;
+    const opponentHeight = opponentHeaderHeight + opponentCell * 20 + ARENA_CARD_BOTTOM_PADDING;
+    const opponentRowWidth = opponents * opponentWidth + opponentGap * Math.max(0, opponents - 1);
+    const groupWidth = playerWidth + (opponents ? playerGap + opponentRowWidth : 0);
     const groupX = (width - groupWidth) / 2;
     const player: ArenaCardLayout = {
       x: groupX,
@@ -47,20 +60,38 @@ export function chooseMobileSoloLayout(
       cellSize: playerCell,
       headerHeight: playerHeaderHeight,
     };
-    const opponentGap = groupGap;
-    const opponentCell = opponents ? playerCell : 0;
-    const opponentWidth = opponentCell * 10 + ARENA_CARD_HORIZONTAL_PADDING;
-    const opponentHeight = playerHeaderHeight + opponentCell * 20 + ARENA_CARD_BOTTOM_PADDING;
     const opponentCards = Array.from({ length: opponents }, (_, index): ArenaCardLayout => {
       return {
-        x: groupX + playerWidth + opponentGap + index * (opponentWidth + opponentGap),
-        y: player.y,
+        x: groupX + playerWidth + playerGap + index * (opponentWidth + opponentGap),
+        y: player.y + Math.floor((playerHeight - opponentHeight) / 2),
         cardWidth: opponentWidth,
         cardHeight: opponentHeight,
         cellSize: opponentCell,
-        headerHeight: playerHeaderHeight,
+        headerHeight: opponentHeaderHeight,
       };
     });
+    return { mode: 'mobile-solo', columns: 1, rows: 1, slotWidth: width, slotHeight: playfieldHeight, cardWidth: playerWidth, cardHeight: playerHeight, cellSize: playerCell, participantCards: [player, ...opponentCards] };
+  }
+  if (width > height) {
+    const playerTop = ARENA_EDGE_PADDING;
+    const playerCell = Math.max(4, Math.floor((playfieldHeight - playerTop - playerHeaderHeight - ARENA_CARD_BOTTOM_PADDING - ARENA_EDGE_PADDING) / 20));
+    const playerWidth = playerCell * 10 + ARENA_CARD_HORIZONTAL_PADDING;
+    const playerHeight = playerHeaderHeight + playerCell * 20 + ARENA_CARD_BOTTOM_PADDING;
+    const groupGap = 14;
+    const groupWidth = (playerWidth * participantCount) + (groupGap * Math.max(0, participantCount - 1));
+    const groupX = (width - groupWidth) / 2;
+    const player: ArenaCardLayout = { x: groupX, y: playerTop, cardWidth: playerWidth, cardHeight: playerHeight, cellSize: playerCell, headerHeight: playerHeaderHeight };
+    const opponentCell = opponents ? playerCell : 0;
+    const opponentWidth = opponentCell * 10 + ARENA_CARD_HORIZONTAL_PADDING;
+    const opponentHeight = playerHeaderHeight + opponentCell * 20 + ARENA_CARD_BOTTOM_PADDING;
+    const opponentCards = Array.from({ length: opponents }, (_, index): ArenaCardLayout => ({
+      x: groupX + playerWidth + groupGap + index * (opponentWidth + groupGap),
+      y: player.y,
+      cardWidth: opponentWidth,
+      cardHeight: opponentHeight,
+      cellSize: opponentCell,
+      headerHeight: playerHeaderHeight,
+    }));
     return { mode: 'mobile-solo', columns: 1, rows: 1, slotWidth: width, slotHeight: playfieldHeight, cardWidth: playerWidth, cardHeight: playerHeight, cellSize: playerCell, participantCards: [player, ...opponentCards] };
   }
   const compact = playfieldHeight < 360;
@@ -127,6 +158,53 @@ export function chooseArenaLayout(width: number, height: number, participantCoun
   if (count <= 2) return horizontal;
   const grid = measureLayout(width, height, 2, 2, 'grid-2x2', gap, headerHeight, housingInset, housingHorizontalInset);
   return grid.cellSize > horizontal.cellSize ? grid : horizontal;
+}
+
+/** Tight local groups share exact canvas/DOM coordinates; slots must not spread fields apart. */
+export function chooseLocalArenaLayout(width: number, height: number, participantCount: number, headerHeight = ARENA_CARD_HEADER_HEIGHT): ArenaLayout {
+  const count = Math.max(1, Math.min(4, participantCount));
+  const horizontalEdge = 48;
+  const verticalEdge = 24;
+  const gap = LOCAL_PEDESTAL_GAP + LOCAL_PEDESTAL_OVERHANG * 2;
+  const measure = (columns: number, rows: number): ArenaLayout => {
+    const slotWidth = (width - horizontalEdge * 2 - gap * (columns - 1)) / columns;
+    const slotHeight = (height - verticalEdge * 2 - gap * (rows - 1)) / rows;
+    const cellSize = Math.max(1, Math.floor(Math.min(
+      (slotWidth - ARENA_CARD_HORIZONTAL_PADDING - LOCAL_PEDESTAL_OVERHANG * 2) / 10,
+      (slotHeight - headerHeight - ARENA_CARD_BOTTOM_PADDING - 16) / 20,
+    )));
+    const cardWidth = cellSize * 10 + ARENA_CARD_HORIZONTAL_PADDING;
+    const cardHeight = headerHeight + cellSize * 20 + ARENA_CARD_BOTTOM_PADDING;
+    const groupHeight = rows * cardHeight + (rows - 1) * gap;
+    const participantCards = Array.from({ length: count }, (_, index) => {
+      const row = Math.floor(index / columns);
+      const rowCount = Math.min(columns, count - row * columns);
+      const groupWidth = rowCount * cardWidth + (rowCount - 1) * gap;
+      return { x: (width - groupWidth) / 2 + (index % columns) * (cardWidth + gap),
+        y: (height - groupHeight) / 2 + row * (cardHeight + gap), cardWidth, cardHeight, cellSize, headerHeight };
+    });
+    return { mode: rows === 1 ? 'horizontal' : 'grid-2x2', columns, rows, slotWidth, slotHeight,
+      cardWidth, cardHeight, cellSize, gap, headerHeight, participantCards };
+  };
+  const horizontal = measure(count, 1);
+  const grid = measure(2, 2);
+  return count > 2 && grid.cellSize > horizontal.cellSize ? grid : horizontal;
+}
+
+/** Side artwork never competes with the enlarged fields or their pedestal overhang. */
+export function localArenaDecoration(width: number, cards: readonly ArenaCardLayout[]) {
+  const freeSide = cards.length ? Math.max(0, Math.min(
+    ...cards.map(card => card.x - LOCAL_PEDESTAL_OVERHANG),
+    ...cards.map(card => width - card.x - card.cardWidth - LOCAL_PEDESTAL_OVERHANG),
+  )) : 0;
+  const visible = freeSide >= Math.max(180, width * .12);
+  return {
+    freeSide,
+    sideWidth: Math.max(0, freeSide - LOCAL_PEDESTAL_GAP),
+    artWidth: Math.min(width * 2 / 3, freeSide * 3),
+    visible,
+    compactClock: !visible,
+  };
 }
 
 /** Network projection keeps ordinary own-field geometry and readable human miniatures. */

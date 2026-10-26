@@ -1,3 +1,4 @@
+import { openLocalLobby } from '../helpers/localLobby';
 import { expect, test, type Page } from '@playwright/test';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -11,7 +12,7 @@ if (screenshotRoot) mkdirSync(screenshotRoot, { recursive: true });
 async function captureSetup(page: Page, viewport: { width: number; height: number }, screenshot: string): Promise<void> {
   await page.setViewportSize(viewport);
   await page.goto('/?muted=1');
-  await page.getByRole('button', { name: /^Битва/ }).click();
+  await openLocalLobby(page,'battle');
   if (screenshotRoot) await page.screenshot({ path: join(screenshotRoot, screenshot), fullPage: true });
 }
 

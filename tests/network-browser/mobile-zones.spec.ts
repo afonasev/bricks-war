@@ -11,8 +11,8 @@ async function enter(page:Page) {
 }
 
 test('phone colored zones share viewport gestures without leaking Pause input',async({browser,baseURL})=>{
-  const hostContext=await browser.newContext({baseURL,viewport:{width:1600,height:900}});
-  const phoneContext=await browser.newContext({baseURL,viewport:{width:390,height:844}});
+  const hostContext=await browser.newContext({baseURL,locale:'ru-RU',viewport:{width:1600,height:900}});
+  const phoneContext=await browser.newContext({baseURL,locale:'ru-RU',viewport:{width:390,height:844}});
   await phoneContext.addInitScript(()=>{
     const audit=window as unknown as AuditWindow;audit.zoneInputs=[];audit.zonePhases=[];
     new MutationObserver(()=>{

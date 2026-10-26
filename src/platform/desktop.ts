@@ -1,8 +1,8 @@
 export interface DisplayPreferences { width: number; height: number; fullscreen: boolean; auto?: boolean; resolutions?: number[][]; }
 export interface DesktopUpdate {
   available: boolean; applying: boolean; error: boolean;
-  phase?: 'idle' | 'checking' | 'available' | 'downloading' | 'verifying' | 'paused' | 'ready' | 'error' | 'check-error' | 'download-error' | 'install-error';
-  progress?: number; version?: string; currentVersion?: string; shellVersion?: string; component?: string;
+  phase?: 'idle' | 'checking' | 'available' | 'downloading' | 'verifying' | 'paused' | 'ready' | 'error' | 'check-error' | 'download-error' | 'install-error' | 'shell-required';
+  progress?: number; version?: string; currentVersion?: string; shellVersion?: string; component?: string; requiresShell?: boolean;
 }
 export interface DesktopBridge {
   updateState(): Promise<DesktopUpdate>;
@@ -10,7 +10,7 @@ export interface DesktopBridge {
   download(): Promise<DesktopUpdate>;
   cancel(): Promise<DesktopUpdate>;
   setActivity(inMenu: boolean): Promise<DesktopUpdate>;
-  history(): Promise<{version:string; date:string|null; text:string; fallback:boolean; installed:boolean}[]>;
+  history(locale?: string): Promise<{version:string; date:string|null; text:string; fallback:boolean; installed:boolean; component?: 'shell'; notesUnavailable?: 'installed'|'release'}[]>;
   apply(): Promise<boolean>;
   setSafeMenu(safe: boolean): void;
   healthy(): Promise<void>;
