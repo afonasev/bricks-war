@@ -1849,6 +1849,13 @@ html { touch-action: pan-x pan-y; overscroll-behavior: none; }
 .release-history pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; font-size: .85rem; }
 .release-history button, .desktop-release-history, .desktop-cancel-download { min-height: 38px; padding: 8px 12px; border: 2px solid #9bb9d2; border-radius: 10px; color: #31577f; background: #fff; }
 .release-history [data-history-back] { flex-shrink: 0; }
+.release-notes { min-width: 0; }
+.release-notes figure { margin: 12px 0 18px; }
+.release-notes img { display: block; width: auto; max-width: 100%; height: auto; border: 1px solid #bfa376; border-radius: 8px; background: #fff9e9; }
+.release-notes img[hidden], .release-notes [hidden] { display: none; }
+.release-notes figcaption { margin-top: 6px; color: #59664c; font-size: .8rem; overflow-wrap: anywhere; }
+.release-notes figcaption:empty { display: none; }
+.release-notes .release-image-unavailable { padding: 12px; border: 1px dashed #bfa376; border-radius: 8px; color: #735d3c; background: #fff9e9; font-size: .85rem; }
 
 html:has(.settings-screen), body:has(.settings-screen) { height:100dvh; overflow:hidden; }
 #app .settings-screen { height:100dvh; min-height:0; display:flex; flex-direction:column; }

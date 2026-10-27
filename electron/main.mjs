@@ -11,6 +11,7 @@ import { ShellUpdate } from './shell-update.mjs';
 import { GithubUpdates } from './github-updates.mjs';
 import { gameUrl, startupMuted as isStartupMuted } from './startup.mjs';
 import { CONTENT_ABI } from './compatibility.mjs';
+import { releaseImageResponse } from './release-images.mjs';
 
 const ORIGIN = 'https://bricks.afonasev.tech';
 let restoredArgs = [];
@@ -86,6 +87,14 @@ app.whenReady().then(async () => {
   ses.protocol.handle('https', async request => {
     const url = new URL(request.url);
     if (url.origin !== ORIGIN) return new Response('Forbidden', { status: 403 });
+    if (url.pathname === '/__release-image') {
+      if (request.method !== 'GET' || !coordinator.inMenu) return new Response('Forbidden',{status:403});
+      try {
+        return await gate.run(signal => releaseImageResponse(url.searchParams.get('url') ?? '',
+          (value, options) => ses.fetch(value,{...options,bypassCustomProtocolHandlers:true}),
+          AbortSignal.any([signal,request.signal])), request.signal);
+      } catch { return new Response('Image unavailable',{status:502}); }
+    }
     if (API.get(url.pathname) === request.method) {
       const headers = new Headers(request.headers); headers.set('Origin', ORIGIN);
       return ses.fetch(request.url, { method: request.method, headers,

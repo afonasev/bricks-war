@@ -163,9 +163,10 @@ export function chooseArenaLayout(width: number, height: number, participantCoun
 /** Tight local groups share exact canvas/DOM coordinates; slots must not spread fields apart. */
 export function chooseLocalArenaLayout(width: number, height: number, participantCount: number, headerHeight = ARENA_CARD_HEADER_HEIGHT): ArenaLayout {
   const count = Math.max(1, Math.min(4, participantCount));
-  const horizontalEdge = 48;
+  const horizontalEdge = count === 4 ? 16 : 48;
   const verticalEdge = 24;
-  const gap = LOCAL_PEDESTAL_GAP + LOCAL_PEDESTAL_OVERHANG * 2;
+  const pedestalGap = count === 4 ? 12 : LOCAL_PEDESTAL_GAP;
+  const gap = pedestalGap + LOCAL_PEDESTAL_OVERHANG * 2;
   const measure = (columns: number, rows: number): ArenaLayout => {
     // Interior overhangs already belong to gap; reserve only the outer pair here.
     const slotWidth = (width - (horizontalEdge + LOCAL_PEDESTAL_OVERHANG) * 2 - gap * (columns - 1)) / columns;

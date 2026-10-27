@@ -175,7 +175,10 @@ describe('centered workshop group', () => {
       const cards = layout.participantCards!;
       const left = Math.min(...cards.map(c=>c.x-8));
       const right = Math.max(...cards.map(c=>c.x+c.cardWidth+8));
-      expect(left).toBeGreaterThan(32);
+      const horizontalEdge = count === 4 ? 16 : 48;
+      const pedestalGap = count === 4 ? 12 : 32;
+      const cardGap = pedestalGap + 16;
+      expect(left).toBeGreaterThanOrEqual(horizontalEdge);
       expect(width-right).toBe(left);
       for (const card of cards) {
         expect(card.y-4).toBeGreaterThanOrEqual(24);
@@ -184,9 +187,9 @@ describe('centered workshop group', () => {
         expect(card.cardHeight).toBe(header+layout.cellSize*20+4);
       }
       for (let i=1;i<cards.length;i++) if (cards[i]!.y===cards[i-1]!.y)
-        expect(cards[i]!.x-8-(cards[i-1]!.x+cards[i-1]!.cardWidth+8)).toBe(32);
-      const horizontalRoom = (width-96-16-48*(layout.columns-1))/layout.columns;
-      const verticalRoom = (height-48-48*(layout.rows-1))/layout.rows;
+        expect(cards[i]!.x-8-(cards[i-1]!.x+cards[i-1]!.cardWidth+8)).toBe(pedestalGap);
+      const horizontalRoom = (width-horizontalEdge*2-16-cardGap*(layout.columns-1))/layout.columns;
+      const verticalRoom = (height-48-cardGap*(layout.rows-1))/layout.rows;
       expect((layout.cellSize+1)*10+4>horizontalRoom || header+(layout.cellSize+1)*20+20>verticalRoom).toBe(true);
     }
   });

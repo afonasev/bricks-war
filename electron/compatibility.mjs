@@ -1,6 +1,6 @@
 // ABI 3 includes the rating HTTP bridge and coordinated application updates.
 export const CONTENT_ABI = 3;
-export const MIN_SHELL_RELEASE = '1.10.0';
+export const MIN_SHELL_RELEASE = '1.13.0';
 
 export function compareVersions(a, b) {
   const parse = value => { const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(value ?? ''); if (!match) throw Error('Invalid stable version'); return match.slice(1).map(Number); };

@@ -23,6 +23,14 @@ export function validateShell(envelope, key, platform, arch, version, systemVers
   return { ...manifest, file };
 }
 
+// Process-scoped policy permits our copied helper on default Windows clients.
+// Group Policy still wins; no machine/user execution policy is changed.
+export function shellHelperCommand(platform, helperPath, planPath, executable) {
+  return platform === 'win32'
+    ? ['powershell.exe', ['-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',helperPath,planPath]]
+    : [executable, [helperPath,planPath]];
+}
+
 /** Prepares packages only; activation runs outside the closing application. */
 export class ShellUpdate {
   constructor({ root, gate, fetcher, publicKey, version, platform = process.platform, arch = process.arch, executable = process.execPath, args = process.argv.slice(1), helper }) {
@@ -83,7 +91,8 @@ export class ShellUpdate {
     await writeFile(join(this.root,'shell-manifest.json'),JSON.stringify(envelope));
     this.controller.signal.throwIfAborted();
     if (this.platform === 'darwin') {
-      const stage = join(this.root,'staged'); await rm(stage,{recursive:true,force:true}); await mkdir(stage);
+      // Main-process fs is ASAR-aware; delete the physical extracted tree via the OS.
+      const stage = join(this.root,'staged'); await exec('/bin/rm',['-rf',stage]); await mkdir(stage);
       await exec('/usr/bin/ditto',['-x','-k',file,stage],{signal:this.controller.signal});
       const application = join(stage,'Bricks War.app');
       const identifier = (await exec('/usr/libexec/PlistBuddy',['-c','Print :CFBundleIdentifier',join(application,'Contents/Info.plist')])).stdout.trim();
@@ -119,7 +128,7 @@ export class ShellUpdate {
     await this.open();
     if (!this.ready) throw Error('Prepared shell no longer valid');
     if (this.platform === 'darwin') {
-      const stage = join(this.root,'activation'); await rm(stage,{recursive:true,force:true}); await mkdir(stage);
+      const stage = join(this.root,'activation'); await exec('/bin/rm',['-rf',stage]); await mkdir(stage);
       await exec('/usr/bin/ditto',['-x','-k',this.ready.file,stage]);
       this.ready.application = join(stage,'Bricks War.app');
     }
@@ -129,7 +138,8 @@ export class ShellUpdate {
     await writeFile(join(this.root,'apply.json'),JSON.stringify(plan));
     await writeFile(join(this.root,'launch-args.json'),JSON.stringify({version:plan.version,args:this.args}));
     await rm(join(this.root,'helper-started'),{force:true});
-    const child = this.platform === 'win32' ? spawn('powershell.exe',['-NoProfile','-File',helperPath,join(this.root,'apply.json')],{detached:true,stdio:'ignore',windowsHide:true}) : spawn(this.executable,[helperPath,join(this.root,'apply.json')],{detached:true,stdio:'ignore',env:{...process.env,ELECTRON_RUN_AS_NODE:'1'}}); this.helperPid=child.pid; child.on('error',()=>{}); child.unref();
+    const [command, args] = shellHelperCommand(this.platform,helperPath,join(this.root,'apply.json'),this.executable);
+    const child = spawn(command,args,{detached:true,stdio:'ignore',windowsHide:true,...(this.platform === 'darwin' ? {env:{...process.env,ELECTRON_RUN_AS_NODE:'1'}} : {})}); this.helperPid=child.pid; child.on('error',()=>{}); child.unref();
     for(let attempt=0;attempt<30;attempt++){try{if((await readFile(join(this.root,'helper-started'),'utf8')).trim()===String(process.pid))return true;}catch{}await new Promise(resolve=>setTimeout(resolve,100));}
     await recordShellFailure(this.root,plan.version,'helper-start-failed');
     await rm(join(this.root,'ready.json'),{force:true});

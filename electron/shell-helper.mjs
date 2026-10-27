@@ -45,6 +45,9 @@ export async function replaceApplication(plan, operations) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href && process.argv[2]) {
+  // This external helper manipulates physical bundles, including app.asar files.
+  // Electron's virtual ASAR filesystem must not intercept recursive removal.
+  process.noAsar = true;
   const plan = JSON.parse(await readFile(process.argv[2],'utf8'));
   const quote = value => `'${String(value).replaceAll("'", "'\\''")}'`;
   const exists = async path => { try { await access(path); return true; } catch { return false; } };

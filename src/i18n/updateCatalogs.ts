@@ -42,6 +42,7 @@ export const updateEn = {
   "historyUnavailable": "History is unavailable right now. You can keep playing.",
   "historyNotesUnavailable": "Release notes are unavailable.",
   "historyInstalledUnavailable": "Notes for the installed version are unavailable on GitHub Releases.",
+  "historyImageUnavailable": "Image unavailable.",
   "shellIdentity": "Shell {version}"
 } as const;
 export const updateRu = {
@@ -87,6 +88,7 @@ export const updateRu = {
   "historyUnavailable": "История сейчас недоступна. Можно продолжить играть.",
   "historyNotesUnavailable": "Описание этой версии недоступно.",
   "historyInstalledUnavailable": "Описание установленной версии недоступно в GitHub Releases.",
+  "historyImageUnavailable": "Изображение недоступно.",
   "shellIdentity": "Оболочка {version}"
 } satisfies Record<keyof typeof updateEn, string>;
 export const updateFr = {
@@ -132,6 +134,7 @@ export const updateFr = {
   "historyUnavailable": "L’historique est indisponible pour le moment. Vous pouvez continuer à jouer.",
   "historyNotesUnavailable": "Les notes de version sont indisponibles.",
   "historyInstalledUnavailable": "Les notes de la version installée sont indisponibles sur GitHub Releases.",
+  "historyImageUnavailable": "Image indisponible.",
   "shellIdentity": "Application {version}"
 } satisfies Record<keyof typeof updateEn, string>;
 export const updateDe = {
@@ -177,6 +180,7 @@ export const updateDe = {
   "historyUnavailable": "Der Verlauf ist derzeit nicht verfügbar. Du kannst weiterspielen.",
   "historyNotesUnavailable": "Versionshinweise sind nicht verfügbar.",
   "historyInstalledUnavailable": "Hinweise zur installierten Version sind auf GitHub Releases nicht verfügbar.",
+  "historyImageUnavailable": "Bild nicht verfügbar.",
   "shellIdentity": "Anwendung {version}"
 } satisfies Record<keyof typeof updateEn, string>;
 export const updateEs = {
@@ -222,6 +226,7 @@ export const updateEs = {
   "historyUnavailable": "El historial no está disponible ahora. Puedes seguir jugando.",
   "historyNotesUnavailable": "Las notas de esta versión no están disponibles.",
   "historyInstalledUnavailable": "Las notas de la versión instalada no están disponibles en GitHub Releases.",
+  "historyImageUnavailable": "Imagen no disponible.",
   "shellIdentity": "Aplicación {version}"
 } satisfies Record<keyof typeof updateEn, string>;
 export const updateJa = {
@@ -267,6 +272,7 @@ export const updateJa = {
   "historyUnavailable": "現在、履歴を表示できません。そのまま遊べます。",
   "historyNotesUnavailable": "リリースノートはありません。",
   "historyInstalledUnavailable": "インストール済みバージョンの説明は GitHub Releases にありません。",
+  "historyImageUnavailable": "画像を表示できません。",
   "shellIdentity": "アプリ {version}"
 } satisfies Record<keyof typeof updateEn, string>;
 export const updateZhHans = {
@@ -312,5 +318,6 @@ export const updateZhHans = {
   "historyUnavailable": "暂时无法显示历史，可以继续游戏。",
   "historyNotesUnavailable": "此版本的说明不可用。",
   "historyInstalledUnavailable": "GitHub Releases 上没有已安装版本的说明。",
+  "historyImageUnavailable": "图片暂时无法显示。",
   "shellIdentity": "外壳 {version}"
 } satisfies Record<keyof typeof updateEn, string>;

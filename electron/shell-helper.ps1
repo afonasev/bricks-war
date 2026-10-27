@@ -52,7 +52,7 @@ try {
     $quote = { param($s) "'" + $s.Replace("'","''") + "'" }
     $sourceLiteral = & $quote $backup; $targetLiteral = & $quote $target
     "`$ErrorActionPreference='Stop'; Remove-Item -LiteralPath $targetLiteral -Recurse -Force; Copy-Item -LiteralPath $sourceLiteral -Destination $targetLiteral -Recurse -Force" | Set-Content -LiteralPath $restore -Encoding UTF8
-    Start-Process powershell.exe -ArgumentList @('-NoProfile','-File',('"'+$restore+'"')) -Verb RunAs -Wait
+    Start-Process powershell.exe -ArgumentList @('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',('"'+$restore+'"')) -Verb RunAs -Wait
   }
   Start-Process -FilePath ([string]$plan.executable) -ArgumentList $arguments
 }

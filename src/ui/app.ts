@@ -80,6 +80,7 @@ import { GamepadProfiles, gamepadDescription } from './gamepadProfiles';
 import { type SlotSelection } from './slotPersistence';
 import { releaseMetadataMarkup } from './releaseMetadata';
 import { webReleaseHistory, type ReleaseHistoryRow } from './releaseHistory';
+import { releaseNotesElement } from './releaseNotes';
 import { loadGameTuning, resetGameTuning, saveGameTuning } from './gameTuningPersistence';
 import { PlayerEventRegionLatch } from './playerEventPlacement';
 import { participantLevelUpNoticeKey } from './hudInvalidation';
@@ -1798,7 +1799,7 @@ export class BricksWarApp {
         const article = document.createElement('article'); const heading = document.createElement('h3');
         const version = row.version;
         heading.textContent = `${version}${row.installed ? ' · ' + localeText('historyInstalled') : ''}${row.date ? ' · ' + new Date(row.date).toLocaleDateString(getLocale()) : ''}`;
-        const notes = document.createElement('pre'); notes.textContent = row.notesUnavailable === 'installed' ? localeText('historyInstalledUnavailable') : row.notesUnavailable === 'release' ? localeText('historyNotesUnavailable') : row.text; article.append(heading,notes);
+        const notes = releaseNotesElement(row.notesUnavailable === 'installed' ? localeText('historyInstalledUnavailable') : row.notesUnavailable === 'release' ? localeText('historyNotesUnavailable') : row.text, localeText('historyImageUnavailable'), Boolean(desktop)); article.append(heading,notes);
         if (row.fallback) { const fallback = document.createElement('p'); fallback.textContent = localeText('historyFallback'); article.append(fallback); }
         list.append(article);
       }

@@ -4,7 +4,7 @@ import {join} from 'node:path';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { sign,generateKeyPairSync,createHash } from 'node:crypto';
-import {ShellUpdate,validateShell} from '../../electron/shell-update.mjs';
+import {ShellUpdate,validateShell,shellHelperCommand} from '../../electron/shell-update.mjs';
 import {replaceApplication,applicationEnvironment,recordShellFailure,failedShellVersions} from '../../electron/shell-helper.mjs';
 const keys=generateKeyPairSync('ed25519');
 function envelope(overrides={}) { const payload=JSON.stringify({schema:1,game:'bricks-war',component:'shell',channel:'stable',updaterAbi:1,contentSequence:1,version:'2.0.0',files:[{name:'Bricks-War-2.0.0-mac-universal.zip',platform:'darwin',arch:'universal',minimumOS:'13.0.0',size:100,sha256:'a'.repeat(64)}],...overrides});return {payload,signature:sign(null,Buffer.from(payload),keys.privateKey).toString('base64')}; }
@@ -69,4 +69,14 @@ test('coordinated shell preparation cannot advertise readiness until all content
 test('signed shell capability metadata cannot contain an invalid ABI',()=>{
  for(const contentAbi of [0,-1,1.5,'3'])assert.throws(()=>validateShell(envelope({contentAbi}),keys.publicKey,'darwin','arm64','1.0.0'),/content ABI/);
  assert.equal(validateShell(envelope({contentAbi:3}),keys.publicKey,'darwin','arm64','1.0.0').contentAbi,3);
+});
+
+
+test('Windows helper launch permits only its process script and preserves spaced paths as arguments',async()=>{
+ const helper='C:\\Users\\Game Player\\shell-helper.ps1',plan='C:\\Users\\Game Player\\apply.json';
+ assert.deepEqual(shellHelperCommand('win32',helper,plan),['powershell.exe',['-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',helper,plan]]);
+ const recovery=await readFile(new URL('../../electron/shell-helper.ps1',import.meta.url),'utf8');
+ assert.match(recovery, /'-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File'/);
+ assert.doesNotMatch(recovery,/Set-ExecutionPolicy/);
+ assert.deepEqual(shellHelperCommand('darwin','/profile/helper.mjs','/profile/apply.json','/Applications/Bricks War.app/Contents/MacOS/Bricks War'),['/Applications/Bricks War.app/Contents/MacOS/Bricks War',['/profile/helper.mjs','/profile/apply.json']]);
 });

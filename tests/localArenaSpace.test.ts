@@ -38,8 +38,9 @@ describe('local decor and clock share actual free-side geometry', () => {
       const cards = layout.participantCards!;
       const decor = localArenaDecoration(width, cards);
       for (const card of cards) {
-        expect(card.x - 8 - decor.sideWidth).toBeGreaterThanOrEqual(32 - 1e-9);
-        expect(width - decor.sideWidth - card.x - card.cardWidth - 8).toBeGreaterThanOrEqual(32 - 1e-9);
+        const clearance = count === 4 && !decor.visible ? 16 : 32;
+        expect(card.x - 8 - decor.sideWidth).toBeGreaterThanOrEqual(clearance - 1e-9);
+        expect(width - decor.sideWidth - card.x - card.cardWidth - 8).toBeGreaterThanOrEqual(clearance - 1e-9);
         expect(card.y - 4).toBeGreaterThanOrEqual(24);
         expect(card.y + card.cardHeight + 12).toBeLessThanOrEqual(height);
         // Compact plaque is at most 24px high, above the housing.
@@ -51,14 +52,14 @@ describe('local decor and clock share actual free-side geometry', () => {
 });
 
 
-describe('local pedestal overhang is reserved once', () => {
-  it.each([[1440,960,29,42],[1920,1080,41,48],[1280,720,25,30]])('grows four width-limited fields without shrinking two at %ix%i', (width,height,fourCell,twoCell) => {
+describe('approved tighter four-player pedestal spacing', () => {
+  it.each([[1440,960,32,42],[1920,1080,44,48],[1280,720,28,30]])('grows four width-limited fields without shrinking two at %ix%i', (width,height,fourCell,twoCell) => {
     const four=chooseLocalArenaLayout(width,height,4);
     expect(four.cellSize).toBe(fourCell);
     expect(chooseLocalArenaLayout(width,height,2).cellSize).toBe(twoCell);
     const cards=four.participantCards!;
-    expect(cards[0]!.x-8).toBeGreaterThanOrEqual(48);
-    expect(width-cards[3]!.x-cards[3]!.cardWidth-8).toBeGreaterThanOrEqual(48);
-    for(let i=1;i<cards.length;i++)expect(cards[i]!.x-8-(cards[i-1]!.x+cards[i-1]!.cardWidth+8)).toBe(32);
+    expect(cards[0]!.x-8).toBeGreaterThanOrEqual(16);
+    expect(width-cards[3]!.x-cards[3]!.cardWidth-8).toBeGreaterThanOrEqual(16);
+    for(let i=1;i<cards.length;i++)expect(cards[i]!.x-8-(cards[i-1]!.x+cards[i-1]!.cardWidth+8)).toBe(12);
   });
 });
