@@ -185,9 +185,9 @@ describe('centered workshop group', () => {
       }
       for (let i=1;i<cards.length;i++) if (cards[i]!.y===cards[i-1]!.y)
         expect(cards[i]!.x-8-(cards[i-1]!.x+cards[i-1]!.cardWidth+8)).toBe(32);
-      const horizontalRoom = (width-96-48*(layout.columns-1))/layout.columns;
+      const horizontalRoom = (width-96-16-48*(layout.columns-1))/layout.columns;
       const verticalRoom = (height-48-48*(layout.rows-1))/layout.rows;
-      expect((layout.cellSize+1)*10+20>horizontalRoom || header+(layout.cellSize+1)*20+20>verticalRoom).toBe(true);
+      expect((layout.cellSize+1)*10+4>horizontalRoom || header+(layout.cellSize+1)*20+20>verticalRoom).toBe(true);
     }
   });
 });

@@ -1,0 +1,39 @@
+/* Card geometry belongs to the viewport grid, never to its current editor. */
+#app[data-layout] .unified-lobby { --lobby-card-height:350px; }
+@media(min-width:761px) and (min-height:601px) and (max-height:800px) {
+  #app[data-layout] .unified-lobby { --lobby-card-height:330px; }
+}
+@media(min-width:761px) and (max-height:600px) {
+  #app[data-layout] .unified-lobby { --lobby-card-height:244px; }
+}
+@media(max-width:760px) {
+  #app[data-layout] .unified-lobby { --lobby-card-height:352px; }
+}
+#app[data-layout] .unified-lobby .lobby-cards { grid-auto-rows:var(--lobby-card-height); }
+#app[data-layout] .unified-lobby .lobby-card[class][data-lobby-slot] {
+  width:100%; min-width:0; max-width:100%;
+  height:var(--lobby-card-height);
+  min-height:var(--lobby-card-height);
+  max-height:var(--lobby-card-height);
+  align-self:start;
+}
+/* Reserve equal action tracks so virtual-keyboard badges cannot squeeze text. */
+#app[data-layout] .unified-lobby .lobby-editor-hint button { flex:1 1 0; justify-content:center; }
+
+/* Random is marked inside the upper centre block, not at the piece junction. */
+#app[data-layout] .unified-lobby .random-piece { container-type:inline-size; }
+#app[data-layout] .unified-lobby .lobby-piece.random-piece > b {
+  left:33.333%; top:0; width:33.333%; height:50%;
+  display:grid; place-items:center;
+  margin:0; padding:0; line-height:1; text-align:center;
+  font-size:22cqw;
+}
+
+/* Mirrored vector chevrons share the same centre; font baselines do not apply. */
+#app[data-layout] .unified-lobby .lobby-wheel :is([data-wheel-up],[data-wheel-down]) {
+  display:grid; place-items:center; line-height:1;
+}
+#app[data-layout] .unified-lobby .lobby-wheel-chevron {
+  display:block; width:14px; height:10px; pointer-events:none;
+  fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round;
+}

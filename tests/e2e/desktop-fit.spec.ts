@@ -68,7 +68,9 @@ for (const [width,height] of ([[1920,1080],[2560,1440],[1440,960],[1366,768],[12
       await expect(page.getByRole('textbox',{name:'Новое имя участника 1'})).toHaveCount(0);
       await expect(page.getByRole('heading',{name:'Стиль фигур',exact:true})).toBeVisible();
       await expect(page.locator('[data-style]')).toHaveCount(7);
-      await expect(page.locator('[data-style="random"]')).toHaveAttribute('aria-pressed','true');
+      await expect(page.locator('[data-style="random"]')).toHaveAttribute('data-default-choice','true');
+      await expect(page.locator('[data-style="random"]')).toBeFocused();
+      await expect(page.locator('.lobby-theme-list [aria-pressed]')).toHaveCount(0);
       // Style choices live in a bounded scroll list. Verify every choice is fully
       // reachable rather than treating masked offscreen rows as visible controls.
       for (const option of await page.locator('[data-style]').all()) {

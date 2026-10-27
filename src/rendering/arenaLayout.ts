@@ -167,10 +167,11 @@ export function chooseLocalArenaLayout(width: number, height: number, participan
   const verticalEdge = 24;
   const gap = LOCAL_PEDESTAL_GAP + LOCAL_PEDESTAL_OVERHANG * 2;
   const measure = (columns: number, rows: number): ArenaLayout => {
-    const slotWidth = (width - horizontalEdge * 2 - gap * (columns - 1)) / columns;
+    // Interior overhangs already belong to gap; reserve only the outer pair here.
+    const slotWidth = (width - (horizontalEdge + LOCAL_PEDESTAL_OVERHANG) * 2 - gap * (columns - 1)) / columns;
     const slotHeight = (height - verticalEdge * 2 - gap * (rows - 1)) / rows;
     const cellSize = Math.max(1, Math.floor(Math.min(
-      (slotWidth - ARENA_CARD_HORIZONTAL_PADDING - LOCAL_PEDESTAL_OVERHANG * 2) / 10,
+      (slotWidth - ARENA_CARD_HORIZONTAL_PADDING) / 10,
       (slotHeight - headerHeight - ARENA_CARD_BOTTOM_PADDING - 16) / 20,
     )));
     const cardWidth = cellSize * 10 + ARENA_CARD_HORIZONTAL_PADDING;

@@ -82,7 +82,12 @@ def run_command(command, directory, label, env=None):
 
 
 def local_qa_port():
-    value = os.environ.get('BRICKS_LOCAL_QA_PORT', '4187')
+    value = os.environ.get('BRICKS_LOCAL_QA_PORT')
+    if value is None:
+        # OS chooses a free loopback port; strict startup detects any later race.
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
+            listener.bind(('127.0.0.1', 0))
+            return listener.getsockname()[1]
     if not re.fullmatch(r'[0-9]+', value) or not 1 <= int(value) <= 65535:
         raise ValueError('BRICKS_LOCAL_QA_PORT must be an integer from 1 to 65535')
     return int(value)
@@ -144,7 +149,8 @@ def main():
                 raise ValueError('Build failed')
         if args.route in ['ui', 'full']:
             report_path = directory / 'browser.json'
-            env = {**os.environ, 'PLAYWRIGHT_JSON_OUTPUT_FILE': str(report_path)}
+            env = {**os.environ, 'BRICKS_LOCAL_QA_PORT': str(port),
+                   'PLAYWRIGHT_JSON_OUTPUT_FILE': str(report_path)}
             config = 'playwright.smoke.config.ts' if args.route == 'ui' else 'playwright.config.ts'
             cmd = ['node', 'node_modules/@playwright/test/cli.js', 'test', '-c', config, '--reporter=list,json']
             check = run_command(cmd, directory, 'browser', env); state['checks'].append(check)

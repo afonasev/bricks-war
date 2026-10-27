@@ -1,6 +1,11 @@
 import { getLocale, type Locale } from './locale';
 // New lobby vocabulary follows the existing seven-language preference. Keys are the approved Russian copy.
 const rows: Record<string, readonly string[]> = {
+    'Гость': ['Guest','Invité','Gast','Invitado','访客','ゲスト'],
+    'Создать новое': ['Create new','Créer un nom','Neu erstellen','Crear nuevo','新建姓名','新規作成'],
+    'Предыдущее': ['Previous','Précédent','Zurück','Anterior','上一个','前へ'],
+    'Следующее': ['Next','Suivant','Weiter','Siguiente','下一个','次へ'],
+    'Выбрать': ['Select','Choisir','Auswählen','Elegir','选择','選択'],
     'Удерживать — удалить имя': ['Hold to delete name','Maintenir pour supprimer le nom','Halten zum Löschen des Namens','Mantén para borrar el nombre','长按删除姓名','長押しで名前を削除'],
     'Изменить': ['Change','Modifier','Ändern','Cambiar','更改','変更'],
     'Отменить': ['Cancel','Annuler','Abbrechen','Cancelar','取消','取消'],

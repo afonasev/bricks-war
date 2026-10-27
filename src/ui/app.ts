@@ -280,6 +280,12 @@ export class BricksWarApp {
       changeMode: mode => this.navigate(mode, 'main-menu'),
       commit: (slot, draft) => this.commitLobbyCard(slot, draft),
       remove: slot => this.setSlot(slot, 'off'),
+      move: (from,to) => {
+        const swap = <T,>(values: T[]) => { const value=values[from]!; values[from]=values[to]!; values[to]=value; };
+        swap(this.slots); swap(this.playerNames); swap(this.slotTileStyles); swap(this.slotProfiles);
+        savePlayerNames(this.playerNames);
+        this.renderSetup();
+      },
       start: () => this.startMatch(), back: () => this.navigateBack(), validate: () => { this.showValidation(); },
       settings: () => this.modeSettingsMarkup(), rules: () => this.selectedMode === 'survival'
         ? `<ul>${(['ruleNoAttacks','rulePressure','ruleAnomalies','ruleShields','ruleIndependent'] as const).map(k => `<li>${tr(k)}</li>`).join('')}</ul>`
@@ -409,11 +415,13 @@ export class BricksWarApp {
   private navigate(screen: AppScreen, parent?: AppScreen): void {
     this.rememberFocus();
     if (screen === 'survival' || screen === 'battle' || screen === 'team-battle') {
+      if (!this.lobby.active()) this.lobby.enter(this.enteringLobbyPad);
       if (!this.lobbyEntered) {
         this.slots[0] = this.enteringLobbyPad !== null ? `gamepad-${this.enteringLobbyPad}` : isMobilePlayViewport() ? 'human-1' : 'human-2';
         if (this.enteringLobbyPad !== null) { const live = this.liveGamepads.get(this.enteringLobbyPad); if (live) this.slotPadTokens.set(this.enteringLobbyPad,live.token); }
         this.lobbyEntered = true; this.enteringLobbyPad = null;
       }
+      this.enteringLobbyPad = null;
       this.lobbyRosters.switch(this.selectedMode, screen, this.slots, this.playerNames, this.slotTileStyles);
       this.selectedMode = screen;
     }
@@ -719,7 +727,8 @@ export class BricksWarApp {
     this.audio.enterMenu();
     this.lobby.render();
     this.bindMenuAudioUnlock();
-    this.activateMenuFocus(this.router.current());
+    this.menuFocus.suspend();
+    this.updateDesktopLayout();
   }
 
   private commitLobbyCard(slot: number, draft: CardDraft): void {

@@ -2,6 +2,8 @@ import { openLocalLobby } from '../helpers/localLobby';
 import { expect, test } from '@playwright/test';
 
 test.beforeEach(async ({ page }) => {
+  // This touch-only scenario must not inherit physical controllers from the QA host.
+  await page.addInitScript(() => Object.defineProperty(navigator, 'getGamepads', { value: () => [] }));
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/?muted=1');
   await page.evaluate(() => {

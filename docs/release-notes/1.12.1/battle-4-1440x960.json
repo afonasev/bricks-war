@@ -1,0 +1,189 @@
+{
+  "source": "codex/lobby-input-ownership 1.12.1 prepared",
+  "width": 1440,
+  "height": 960,
+  "mode": "battle",
+  "count": 4,
+  "viewport": {
+    "w": 1440,
+    "h": 960,
+    "dpr": 1
+  },
+  "arena": {
+    "x": 0,
+    "y": 0,
+    "w": 1440,
+    "h": 960,
+    "left": 0,
+    "right": 1440,
+    "top": 0,
+    "bottom": 960
+  },
+  "arenaClasses": "arena-screen premium-surface has-compact-arena-clock",
+  "stage": {
+    "x": 0,
+    "y": 0,
+    "w": 1440,
+    "h": 960,
+    "left": 0,
+    "right": 1440,
+    "top": 0,
+    "bottom": 960
+  },
+  "grid": {
+    "x": 0,
+    "y": 0,
+    "w": 1440,
+    "h": 960,
+    "left": 0,
+    "right": 1440,
+    "top": 0,
+    "bottom": 960
+  },
+  "gridAttributes": {
+    "id": "hud-grid",
+    "class": "hud-grid",
+    "aria-live": "polite",
+    "data-count": "4",
+    "data-layout": "horizontal",
+    "data-cell-size": "29",
+    "style": "--arena-card-gap: 48px; --hud-scale: 1; --solo-hud-scale: 0.65; --arena-header-height: 52px; --arena-columns: 4; --arena-rows: 1; --arena-card-width: 294px; --arena-card-height: 636px;"
+  },
+  "cards": [
+    {
+      "x": 60,
+      "y": 162,
+      "w": 294,
+      "h": 636,
+      "left": 60,
+      "right": 354,
+      "top": 162,
+      "bottom": 798
+    },
+    {
+      "x": 402,
+      "y": 162,
+      "w": 294,
+      "h": 636,
+      "left": 402,
+      "right": 696,
+      "top": 162,
+      "bottom": 798
+    },
+    {
+      "x": 744,
+      "y": 162,
+      "w": 294,
+      "h": 636,
+      "left": 744,
+      "right": 1038,
+      "top": 162,
+      "bottom": 798
+    },
+    {
+      "x": 1086,
+      "y": 162,
+      "w": 294,
+      "h": 636,
+      "left": 1086,
+      "right": 1380,
+      "top": 162,
+      "bottom": 798
+    }
+  ],
+  "housing": [
+    {
+      "x": 56,
+      "y": 158,
+      "w": 302,
+      "h": 644,
+      "left": 56,
+      "right": 358,
+      "top": 158,
+      "bottom": 802
+    },
+    {
+      "x": 52,
+      "y": 796,
+      "w": 310,
+      "h": 14,
+      "left": 52,
+      "right": 362,
+      "top": 796,
+      "bottom": 810
+    },
+    {
+      "x": 398,
+      "y": 158,
+      "w": 302,
+      "h": 644,
+      "left": 398,
+      "right": 700,
+      "top": 158,
+      "bottom": 802
+    },
+    {
+      "x": 394,
+      "y": 796,
+      "w": 310,
+      "h": 14,
+      "left": 394,
+      "right": 704,
+      "top": 796,
+      "bottom": 810
+    },
+    {
+      "x": 740,
+      "y": 158,
+      "w": 302,
+      "h": 644,
+      "left": 740,
+      "right": 1042,
+      "top": 158,
+      "bottom": 802
+    },
+    {
+      "x": 736,
+      "y": 796,
+      "w": 310,
+      "h": 14,
+      "left": 736,
+      "right": 1046,
+      "top": 796,
+      "bottom": 810
+    },
+    {
+      "x": 1082,
+      "y": 158,
+      "w": 302,
+      "h": 644,
+      "left": 1082,
+      "right": 1384,
+      "top": 158,
+      "bottom": 802
+    },
+    {
+      "x": 1078,
+      "y": 796,
+      "w": 310,
+      "h": 14,
+      "left": 1078,
+      "right": 1388,
+      "top": 796,
+      "bottom": 810
+    }
+  ],
+  "cell": 29,
+  "gaps": {
+    "left": 52,
+    "right": 52,
+    "top": 158,
+    "bottom": 150
+  },
+  "stageStyle": {
+    "width": 1440,
+    "height": 960,
+    "padding": "0px",
+    "transform": "none"
+  }
+}

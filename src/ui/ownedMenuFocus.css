@@ -1,0 +1,108 @@
+/* The approved sage navigation treatment belongs only to these two screens.
+   Stored choices and player identity colours remain independent of focus. */
+#app[data-layout] :is(.main-menu-screen,.unified-lobby) {
+  --menu-focus-fill:#edf2df;
+  --menu-focus-ink:#344c2d;
+  --menu-focus-line:#829764;
+  --menu-hover-fill:#f3f6eb;
+}
+
+/* Replace idle gradients, not merely the colour underneath them. Inset rings
+   keep compact lists and screen edges free from clipped/overlapping outlines. */
+#app[data-layout] :is(.main-menu-screen,.unified-lobby)
+  :is(button,input,select,[data-edit]):not(:disabled):not(.lobby-mode,.lobby-help,.lobby-card,.lobby-add-bot,.lobby-remove):is(:focus-visible,.pad-selected,[class*="-target"]),
+#app[data-layout]:is([data-input-mode="keyboard"],[data-input-mode="gamepad"]) .main-menu-screen .mode-choice.is-ui-selected {
+  outline:none!important;
+  background:var(--menu-focus-fill)!important;
+  color:var(--menu-focus-ink)!important;
+  box-shadow:inset 0 0 0 2px var(--menu-focus-line)!important;
+  filter:none;
+}
+#app[data-layout] .main-menu-screen .mode-choice:is(:focus-visible,.is-ui-selected) :is(strong,small,span) {
+  color:var(--menu-focus-ink);
+}
+
+/* Pointer hover is a lighter version of the same treatment. */
+#app[data-layout][data-input-mode="pointer"] :is(.main-menu-screen,.unified-lobby)
+  :is(button,[data-edit]:not(:has(button:hover))):not(:disabled):not(.lobby-mode,.lobby-card,.lobby-add-bot,.lobby-remove):hover {
+  background:var(--menu-hover-fill)!important;
+  box-shadow:inset 0 0 0 1px #b6c09b!important;
+  filter:none;
+}
+#app[data-layout] .unified-lobby .lobby-cycle::before { background:var(--menu-hover-fill); }
+
+/* The mode artwork remains visible; its caption carries the focus colour. */
+#app[data-layout] .unified-lobby .lobby-mode:is(:focus-visible,[class*="-target"]),
+#app[data-layout][data-input-mode="pointer"] .unified-lobby .lobby-mode:hover {
+  background:var(--mode-art) center 48%/cover!important;
+}
+#app[data-layout] .unified-lobby .lobby-mode:is(:focus-visible,[class*="-target"]) {
+  box-shadow:inset 0 0 0 3px var(--menu-focus-line)!important;
+}
+#app[data-layout] .unified-lobby .lobby-mode:is(:focus-visible,[class*="-target"]) > span {
+  background:var(--menu-focus-fill);
+  color:var(--menu-focus-ink);
+}
+#app[data-layout][data-input-mode="pointer"] .unified-lobby .lobby-mode:hover > span { background:var(--menu-hover-fill); }
+
+/* Cards keep their player/slot colour. The whole card frames its primary
+   action; Y/Join and editor choices remain separate controls. */
+#app[data-layout] .unified-lobby .lobby-card[class][data-lobby-slot] {
+  --card-surface:linear-gradient(145deg,#fffff5,var(--pale));
+  background:var(--card-surface)!important;
+  box-shadow:var(--card-navigation-shadow,inset 0 2px white,0 5px 8px #67451e26)!important;
+}
+#app[data-layout] .unified-lobby .lobby-card.is-empty { --card-surface:linear-gradient(#fffef4bb,var(--pale)); }
+#app[data-layout] .unified-lobby .lobby-add-bot:is(:focus-visible,[class*="-target"],:hover) {
+  outline:none!important;
+  background:transparent!important;
+  box-shadow:none!important;
+  color:var(--deep)!important;
+  filter:none;
+}
+#app[data-layout] .unified-lobby .lobby-card[data-edit]:is(:focus-visible,[class*="-target"]),
+#app[data-layout] .unified-lobby .lobby-card:has(> .lobby-add-bot:is(:focus-visible,[class*="-target"])) {
+  --card-navigation-shadow:inset 0 0 0 3px #344c2d,inset 0 0 0 5px #fffdf0,0 5px 8px #67451e26;
+  outline:none!important;
+  border-radius:17px;
+}
+#app[data-layout][data-input-mode="pointer"] .unified-lobby .lobby-card[data-edit]:not(:has(button:hover)):hover,
+#app[data-layout][data-input-mode="pointer"] .unified-lobby .lobby-card:has(> .lobby-add-bot:hover) {
+  --card-surface:linear-gradient(145deg,#fffbea,var(--pale));
+  --card-navigation-shadow:inset 0 0 0 2px var(--deep),0 5px 8px #67451e26;
+}
+
+/* Keep the idle current-name track distinct from the navigation cursor. */
+#app[data-layout] .unified-lobby .lobby-wheel-option.is-current:not(:focus-visible):not(.pad-selected) {
+  background:#f1e6cc!important;
+  box-shadow:none!important;
+}
+#app[data-layout] .unified-lobby .lobby-wheel-option:is(:focus-visible,.pad-selected) { border-radius:9px; }
+
+/* Round controls retain their shape, with the stronger approved help ring. */
+#app[data-layout] .unified-lobby :is(.lobby-help,.lobby-remove):is(:focus-visible,[class*="-target"]) { border-radius:50%!important; }
+#app[data-layout] .unified-lobby .lobby-help:is(:focus-visible,[class*="-target"]) {
+  background:#e4ecd4!important;
+  border-color:var(--menu-focus-line);
+  box-shadow:0 0 0 3px #b6c09b80,inset 0 0 0 1px var(--menu-focus-line)!important;
+}
+
+/* Small editor actions need breathing room inside the same focus ring. */
+#app[data-layout] .unified-lobby .lobby-editor-hint button { padding:3px 6px; border-radius:8px; }
+
+/* The delete glyph has no permanent disc; only hold progress draws an arc. */
+#app[data-layout] .unified-lobby .lobby-card .lobby-remove {
+  background:transparent!important; border:0; box-shadow:none!important;
+  outline:none!important; filter:none;
+}
+#app[data-layout] .unified-lobby .lobby-remove::after { background:transparent!important; box-shadow:none!important; }
+#app[data-layout] .unified-lobby .lobby-remove:focus-visible {
+  color:var(--menu-focus-ink)!important; text-decoration:underline; text-underline-offset:3px;
+}
+#app[data-layout][data-input-mode="pointer"] .unified-lobby .lobby-remove:hover { color:#344c2d; }
+#app[data-layout] .unified-lobby .lobby-remove::before {
+  content:''; position:absolute; inset:0; border-radius:50%; pointer-events:none;
+  background:conic-gradient(#3b9ec5 calc(var(--remove-progress,0)*1turn),transparent 0);
+  mask:radial-gradient(farthest-side,transparent calc(100% - 3px),#000 calc(100% - 2px));
+  opacity:clamp(0,calc(var(--remove-progress,0)*100),1);
+}

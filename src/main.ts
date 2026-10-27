@@ -11,6 +11,8 @@ import { clientUpdate } from './pwa/clientUpdate';
 import { startAfterLoading } from './ui/startupLoading';
 import './ui/workshopMenus.css';
 import './ui/inputGlyph.css';
+import './ui/ownedMenuFocus.css';
+import './ui/lobbyCardGeometry.css';
 
 const root = document.querySelector<HTMLElement>('#app');
 if (!root) throw new Error('App root is missing');

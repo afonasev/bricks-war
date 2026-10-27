@@ -15,13 +15,13 @@ for (const [width,height,native,locale] of [[1440,960,false,'ru'],[1280,480,fals
   await expect(main.locator('.mode-menu > button')).toHaveCount(native?4:3);await expect(main.locator('.mode-icon svg')).toHaveCount(native?4:3);
   expect(await main.evaluate(e=>{const app=e.closest('#app')!;return getComputedStyle(app.getAttribute('data-layout')==='desktop'?app:e).backgroundImage;})).toContain('maple.webp');
   await page.keyboard.press('ArrowDown');await page.keyboard.press('ArrowUp');
-  await expect(page.locator('[data-play-entry]')).toHaveCSS('background-color','rgb(139, 212, 246)');
+  await expect(page.locator('[data-play-entry]')).toHaveCSS('background-color','rgb(237, 242, 223)');
   await expect(page.locator('[data-play-entry]')).toHaveCSS('outline-style','none');
   if(await page.locator('#app').getAttribute('data-layout')==='desktop') await expect.poll(()=>page.locator('.menu-workshop-art').evaluate((e:HTMLImageElement)=>e.complete&&e.naturalWidth>0)).toBe(true);
   await page.screenshot({path:`${out}/main-${width}-${height}-${locale}-native${native}.png`});
   const before=await page.locator('[data-play-entry]').boundingBox();await page.mouse.move(0,0);await page.locator('[data-play-entry]').hover();
   await expect(page.locator('#app')).toHaveAttribute('data-input-mode','pointer');
-  await expect(page.locator('[data-play-entry]')).toHaveCSS('background-color','rgb(245, 234, 210)');await expect(page.locator('[data-play-entry]')).toHaveCSS('outline-style','none');expect(await page.locator('[data-play-entry]').boundingBox()).toEqual(before);
+  await expect(page.locator('[data-play-entry]')).toHaveCSS('background-color','rgb(243, 246, 235)');await expect(page.locator('[data-play-entry]')).toHaveCSS('outline-style','none');expect(await page.locator('[data-play-entry]').boundingBox()).toEqual(before);
   await page.locator('[data-destination="settings"]').click();
   const settings=page.locator('.workshop-menu.settings-screen');await expect(settings).toBeVisible();expect(await settings.evaluate(e=>{const app=e.closest('#app')!;return getComputedStyle(app.getAttribute('data-layout')==='desktop'?app:e).backgroundImage;})).toContain('maple.webp');
   await expect(page.locator('#master-volume,#music-volume,#effects-volume')).toHaveCount(3);await expect(page.locator('#calm-effects')).toHaveCount(1);await expect(page.locator('#desktop-resolution')).toHaveCount(native?1:0);
