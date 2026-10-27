@@ -492,7 +492,7 @@ export class UnifiedLobby {
                 options.scrollTop -= bounds.top - item.top;
         }
     }
-    private padTargets(): HTMLElement[] { return Array.from(this.root.querySelectorAll<HTMLElement>('.lobby-settings button, .lobby-settings select, [data-edit], [data-join], [data-bot], [data-lobby-back], #start-match')).filter(e => !(e as HTMLButtonElement).disabled); }
+    private padTargets(): HTMLElement[] { return Array.from(this.root.querySelectorAll<HTMLElement>('.lobby-settings button, .lobby-settings select, [data-edit], [data-join], [data-bot], [data-lobby-back], #start-match')).filter(e => !(e as HTMLButtonElement).disabled && e.getClientRects().length > 0); }
     private highlight(owner: number, cursor: number): void {
         const targets = this.padTargets();
         this.root.querySelectorAll<HTMLElement>(`.pad-${owner}, .pad-${owner}-target`).forEach(e => e.classList.remove(`pad-${owner}`, `pad-${owner}-target`));

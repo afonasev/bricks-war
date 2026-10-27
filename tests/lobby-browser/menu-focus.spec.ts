@@ -1,6 +1,6 @@
 import {test,expect,type Page,type Locator} from '@playwright/test';
 const out=process.env.BRICKS_LOBBY_EVIDENCE??'evidence/refine-owned-lobby-controls/F3/runtime';
-const sage='rgb(237, 242, 223)', hover='rgb(243, 246, 235)';
+const sage='rgb(237, 242, 223)', hover='rgb(243, 246, 235)', variantA='rgb(220, 233, 199)';
 async function boot(page:Page){
  await page.addInitScript(()=>{
   localStorage.setItem('bricks-war:language:v1','ru');
@@ -14,7 +14,8 @@ async function pulse(page:Page,button:number,guest=false){await page.evaluate(({
 async function focus(_page:Page,control:Locator,fill=sage){
  const position=()=>control.evaluate(e=>{const r=e.getBoundingClientRect();return {x:r.x+scrollX,y:r.y+scrollY,width:r.width,height:r.height}});
  const before=await position();await control.press('Shift');await expect(control).toBeFocused();
- if(await control.evaluate(e=>e.matches('[data-remove]'))){await expect(control).toHaveCSS('background-color','rgba(0, 0, 0, 0)');await expect(control).toHaveCSS('box-shadow','none');await expect(control).toHaveCSS('text-decoration-line','underline');}
+ if(await control.evaluate(e=>e.matches('.lobby-cycle'))){expect(await control.evaluate(e=>getComputedStyle(e,'::before').backgroundColor)).toBe(variantA);expect(await control.evaluate(e=>getComputedStyle(e,'::before').opacity)).toBe('1');}
+ else if(await control.evaluate(e=>e.matches('[data-remove]'))){await expect(control).toHaveCSS('background-color','rgba(0, 0, 0, 0)');await expect(control).toHaveCSS('box-shadow','none');await expect(control).toHaveCSS('text-decoration-line','underline');}
  else if(await control.evaluate(e=>e.matches('[data-edit],[data-bot]'))){
   const card=control.locator('xpath=ancestor-or-self::*[contains(@class,"lobby-card")][1]');
   await expect(card).toHaveCSS('background-image',/linear-gradient/);
@@ -32,13 +33,13 @@ for(const [width,height] of [[1440,960],[1280,480],[390,844]] as const)test(`sag
  await page.keyboard.press('ArrowUp');await page.keyboard.press('ArrowUp');await expect(page.locator('[data-play-entry]')).toBeFocused();await expect(page.locator('[data-play-entry]')).toHaveCSS('background-color',sage);await shot(page,`main-keyboard-${width}`);
  await page.mouse.move(0,0);await page.locator('[data-play-entry]').hover();await expect(page.locator('[data-play-entry]')).toHaveCSS('background-color',hover);await shot(page,`main-mouse-${width}`);
  await page.locator('[data-play-entry]').click();
- const mode=page.locator('[data-cycle-mode]');const art=await mode.evaluate(e=>getComputedStyle(e).backgroundImage);const before=await mode.boundingBox();await mode.press('Shift');await expect(mode).toHaveCSS('background-image',art);expect(art).toContain('url(');expect(await mode.boundingBox()).toEqual(before);await expect(mode.locator('span')).toHaveCSS('background-color',sage);await shot(page,`mode-keyboard-${width}`);
+ const mode=page.locator('[data-cycle-mode]');const art=await mode.evaluate(e=>getComputedStyle(e).backgroundImage);const before=await mode.boundingBox();await mode.press('Shift');await expect(mode).toHaveCSS('background-image',art);expect(art).toContain('url(');expect(await mode.boundingBox()).toEqual(before);await expect(mode.locator('span')).toHaveCSS('background-color',variantA);await shot(page,`mode-keyboard-${width}`);
  for(const id of ['match-duration','attack-mode','battle-difficulty'])await focus(page,page.locator('#'+id));
- await focus(page,page.locator('.lobby-help'),'rgb(228, 236, 212)');await expect(page.locator('.lobby-help')).toHaveCSS('border-radius','50%');
+ await focus(page,page.locator('.lobby-help'),variantA);await expect(page.locator('.lobby-help')).toHaveCSS('border-radius','50%');
  await focus(page,page.locator('[data-edit="0"]'));await shot(page,`card-keyboard-${width}`);
  await focus(page,page.locator('[data-remove="0"]'));await expect(page.locator('[data-remove="0"]')).toHaveCSS('border-radius','50%');
  await focus(page,page.locator('[data-bot]').first());await shot(page,`bot-keyboard-${width}`);
- await focus(page,page.locator('[data-join]').first());await expect(page.locator('[data-join]').first().locator('..')).not.toHaveCSS('box-shadow',/rgb\(52, 76, 45\).*3px/);await shot(page,`join-keyboard-${width}`);
+ if(width===390)await expect(page.locator('[data-join]').first()).toBeHidden();else{ await focus(page,page.locator('[data-join]').first());await expect(page.locator('[data-join]').first().locator('..')).not.toHaveCSS('box-shadow',/rgb\(52, 76, 45\).*3px/);await shot(page,`join-keyboard-${width}`); }
  await focus(page,page.locator('[data-lobby-back]'));
  await page.locator('[data-bot]').first().click();for(const level of await page.locator('[data-level]').all())await focus(page,level);const activeLevel=page.locator('[data-level][data-default-choice="true"]');await expect(activeLevel).toHaveCSS('background-color','rgb(255, 253, 240)');await expect(activeLevel).toHaveCSS('box-shadow','none');expect(await activeLevel.evaluate(e=>getComputedStyle(e,'::after').content)).toBe('none');await shot(page,`bot-editor-${width}`);
  await page.locator('[data-level="medium"]').click();await focus(page,page.locator('#start-match'));await shot(page,`start-keyboard-${width}`);
@@ -50,7 +51,7 @@ for(const [width,height] of [[1440,960],[1280,480],[390,844]] as const)test(`sag
 });
 test('pad index four uses the same focus on main, globals, bot actions and theme editor',async({page})=>{
  await boot(page);await pulse(page,13);await expect(page.locator('.main-menu-screen .is-ui-selected')).toHaveCSS('background-color',sage);await shot(page,'main-pad');await pulse(page,12);await pulse(page,0);await expect(page.locator('.unified-lobby')).toHaveAttribute('data-menu-owner','gamepad-4');
- await pulse(page,15);await expect(page.locator('#match-duration')).toHaveClass(/pad-4-target/);await expect(page.locator('#match-duration')).toHaveCSS('background-color',sage);await shot(page,'parameter-pad');
+ await pulse(page,15);await expect(page.locator('#match-duration')).toHaveClass(/pad-4-target/);expect(await page.locator('#match-duration').evaluate(e=>getComputedStyle(e,'::before').backgroundColor)).toBe(variantA);await shot(page,'parameter-pad');
  await pulse(page,2);await expect(page.locator('.pad-selected')).toHaveCSS('background-color',sage);await expect(page.locator('[class*="pad-4-target"]')).toHaveCount(0);await shot(page,'bot-editor-pad');await pulse(page,0);
  await page.evaluate(()=>{(window as any).focusPad.buttons[3].pressed=true});await page.waitForTimeout(850);await page.evaluate(()=>{(window as any).focusPad.buttons[3].pressed=false});await expect(page.locator('.lobby-theme-wheel')).toBeVisible();await expect(page.locator('[data-wheel-center].pad-selected')).toHaveCSS('background-color',sage);await expect(page.locator('[class*="pad-4-target"]')).toHaveCount(0);await shot(page,'theme-wheel-pad');
  await pulse(page,3,true);await expect(page.locator('.lobby-name-wheel .pad-selected')).toHaveCSS('background-color',sage);await shot(page,'name-wheel-pad');await pulse(page,12,true);await pulse(page,0,true);await expect(page.locator('.lobby-name-keys .pad-selected')).toHaveCSS('background-color',sage);await shot(page,'virtual-keys-pad');
@@ -58,13 +59,14 @@ test('pad index four uses the same focus on main, globals, bot actions and theme
 
 for(const width of [1440,390])test(`pointer hover uses the sage family without moving controls ${width}`,async({page})=>{
  await page.setViewportSize({width,height:960});await boot(page);await page.locator('[data-play-entry]').click();
- for(const selector of ['#match-duration','.lobby-help','[data-edit="0"]','[data-remove="0"]','[data-bot]','[data-join]','[data-lobby-back]']){
+ for(const selector of ['#match-duration','.lobby-help','[data-edit="0"]','[data-remove="0"]','[data-bot]',...(width===390?[]:['[data-join]']),'[data-lobby-back]']){
   const control=page.locator(selector).first();await control.scrollIntoViewIfNeeded();const before=await control.boundingBox();await control.hover();
-  if(await control.evaluate(e=>e.matches('[data-remove]'))){await expect(control).toHaveCSS('background-color','rgba(0, 0, 0, 0)');await expect(control).toHaveCSS('box-shadow','none');}
+  if(await control.evaluate(e=>e.matches('.lobby-cycle'))){expect(await control.evaluate(e=>getComputedStyle(e,'::before').backgroundColor)).toBe(variantA);expect(await control.evaluate(e=>getComputedStyle(e,'::before').opacity)).toBe('1');}
+ else if(await control.evaluate(e=>e.matches('[data-remove]'))){await expect(control).toHaveCSS('background-color','rgba(0, 0, 0, 0)');await expect(control).toHaveCSS('box-shadow','none');}
   else if(await control.evaluate(e=>e.matches('[data-edit],[data-bot]'))){
    const card=control.locator('xpath=ancestor-or-self::*[contains(@class,"lobby-card")][1]');await expect(card).toHaveCSS('background-image',/linear-gradient/);expect(await card.evaluate(e=>getComputedStyle(e).backgroundColor)).not.toBe(hover);await expect(card).toHaveCSS('box-shadow',/2px.*inset/);
    if(await control.getAttribute('data-bot')!==null)await expect(control).toHaveCSS('background-color','rgba(0, 0, 0, 0)');
-  }else{await expect(control).toHaveCSS('background-color',hover);await expect(control).toHaveCSS('background-image','none');}
+  }else{await expect(control).toHaveCSS('background-color',await control.evaluate(e=>e.matches('.lobby-help'))?variantA:hover);await expect(control).toHaveCSS('background-image','none');}
   expect(await control.boundingBox()).toEqual(before);
  }
  await page.locator('[data-bot]').first().hover();await shot(page,`bot-mouse-${width}`);

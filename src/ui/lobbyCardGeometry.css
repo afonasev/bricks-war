@@ -1,4 +1,4 @@
-/* Card geometry belongs to the viewport grid, never to its current editor. */
+/* Desktop cards keep stable grid tracks; phone resting cards fit their content. */
 #app[data-layout] .unified-lobby { --lobby-card-height:350px; }
 @media(min-width:761px) and (min-height:601px) and (max-height:800px) {
   #app[data-layout] .unified-lobby { --lobby-card-height:330px; }
@@ -16,6 +16,13 @@
   min-height:var(--lobby-card-height);
   max-height:var(--lobby-card-height);
   align-self:start;
+}
+/* Phone cards do not reserve an editor-sized blank surface at rest. */
+#app[data-layout="mobile"] .unified-lobby .lobby-cards { grid-auto-rows:auto; }
+#app[data-layout="mobile"] .unified-lobby .lobby-card[class][data-lobby-slot]:not(.is-editing) {
+  height:auto;
+  min-height:0;
+  max-height:none;
 }
 /* Reserve equal action tracks so virtual-keyboard badges cannot squeeze text. */
 #app[data-layout] .unified-lobby .lobby-editor-hint button { flex:1 1 0; justify-content:center; }

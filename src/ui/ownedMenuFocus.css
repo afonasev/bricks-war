@@ -10,7 +10,7 @@
 /* Replace idle gradients, not merely the colour underneath them. Inset rings
    keep compact lists and screen edges free from clipped/overlapping outlines. */
 #app[data-layout] :is(.main-menu-screen,.unified-lobby)
-  :is(button,input,select,[data-edit]):not(:disabled):not(.lobby-mode,.lobby-help,.lobby-card,.lobby-add-bot,.lobby-remove):is(:focus-visible,.pad-selected,[class*="-target"]),
+  :is(button,input,select,[data-edit]):not(:disabled):not(.lobby-mode,.lobby-help,.lobby-cycle,.lobby-card,.lobby-add-bot,.lobby-remove):is(:focus-visible,.pad-selected,[class*="-target"]),
 #app[data-layout]:is([data-input-mode="keyboard"],[data-input-mode="gamepad"]) .main-menu-screen .mode-choice.is-ui-selected {
   outline:none!important;
   background:var(--menu-focus-fill)!important;
@@ -24,26 +24,64 @@
 
 /* Pointer hover is a lighter version of the same treatment. */
 #app[data-layout][data-input-mode="pointer"] :is(.main-menu-screen,.unified-lobby)
-  :is(button,[data-edit]:not(:has(button:hover))):not(:disabled):not(.lobby-mode,.lobby-card,.lobby-add-bot,.lobby-remove):hover {
+  :is(button,[data-edit]:not(:has(button:hover))):not(:disabled):not(.lobby-mode,.lobby-help,.lobby-cycle,.lobby-card,.lobby-add-bot,.lobby-remove):hover {
   background:var(--menu-hover-fill)!important;
   box-shadow:inset 0 0 0 1px #b6c09b!important;
   filter:none;
 }
 #app[data-layout] .unified-lobby .lobby-cycle::before { background:var(--menu-hover-fill); }
 
-/* The mode artwork remains visible; its caption carries the focus colour. */
-#app[data-layout] .unified-lobby .lobby-mode:is(:focus-visible,[class*="-target"]),
-#app[data-layout][data-input-mode="pointer"] .unified-lobby .lobby-mode:hover {
+/* One approved sage treatment for pointer hover and keyboard/controller focus.
+   Input-mode guards keep a parked pointer or stale pad class from lighting a
+   second target. Stored values and control geometry stay independent. */
+#app[data-layout] .unified-lobby[data-screen] :is(.lobby-cycle,.lobby-mode,.lobby-help) {
+  --lobby-interaction-fill:#dce9c7;
+  --lobby-interaction-line:#6b874c;
+}
+#app[data-layout][data-input-mode="pointer"] .unified-lobby[data-screen] :is(.lobby-cycle,.lobby-mode,.lobby-help)[class]:hover,
+#app[data-layout]:is([data-input-mode="keyboard"],[data-input-mode="gamepad"]) .unified-lobby[data-screen] :is(.lobby-cycle,.lobby-mode,.lobby-help)[class]:is(:focus-visible,.pad-selected,[class*="-target"]) {
+  color:var(--menu-focus-ink)!important;
+  filter:none!important;
+}
+#app[data-layout][data-input-mode="pointer"] .unified-lobby[data-screen] .lobby-cycle[class]:hover,
+#app[data-layout]:is([data-input-mode="keyboard"],[data-input-mode="gamepad"]) .unified-lobby[data-screen] .lobby-cycle[class]:is(:focus-visible,.pad-selected,[class*="-target"]) {
+  background:transparent!important;
+  border-color:transparent!important;
+  border-radius:8px!important;
+  box-shadow:none!important;
+}
+#app[data-layout][data-input-mode="pointer"] .unified-lobby[data-screen] .lobby-cycle[class]:hover::before,
+#app[data-layout]:is([data-input-mode="keyboard"],[data-input-mode="gamepad"]) .unified-lobby[data-screen] .lobby-cycle[class]:is(:focus-visible,.pad-selected,[class*="-target"])::before {
+  inset:-4px -8px;
+  border-radius:8px;
+  background:var(--lobby-interaction-fill);
+  box-shadow:inset 0 0 0 2px var(--lobby-interaction-line);
+  opacity:1;
+}
+#app[data-layout][data-input-mode="pointer"] .unified-lobby[data-screen] .lobby-mode[class]:hover,
+#app[data-layout]:is([data-input-mode="keyboard"],[data-input-mode="gamepad"]) .unified-lobby[data-screen] .lobby-mode[class]:is(:focus-visible,.pad-selected,[class*="-target"]) {
   background:var(--mode-art) center 48%/cover!important;
+  border-radius:13px!important;
+  border-color:var(--lobby-interaction-line)!important;
+  box-shadow:inset 0 0 0 3px var(--lobby-interaction-line)!important;
 }
-#app[data-layout] .unified-lobby .lobby-mode:is(:focus-visible,[class*="-target"]) {
-  box-shadow:inset 0 0 0 3px var(--menu-focus-line)!important;
+#app[data-layout][data-input-mode="pointer"] .unified-lobby[data-screen] .lobby-mode[class]:hover::after,
+#app[data-layout]:is([data-input-mode="keyboard"],[data-input-mode="gamepad"]) .unified-lobby[data-screen] .lobby-mode[class]:is(:focus-visible,.pad-selected,[class*="-target"])::after {
+  content:''; position:absolute; inset:0; border-radius:inherit;
+  box-shadow:inset 0 0 0 2px var(--lobby-interaction-line); pointer-events:none;
 }
-#app[data-layout] .unified-lobby .lobby-mode:is(:focus-visible,[class*="-target"]) > span {
-  background:var(--menu-focus-fill);
+#app[data-layout][data-input-mode="pointer"] .unified-lobby[data-screen] .lobby-mode[class]:hover > span,
+#app[data-layout]:is([data-input-mode="keyboard"],[data-input-mode="gamepad"]) .unified-lobby[data-screen] .lobby-mode[class]:is(:focus-visible,.pad-selected,[class*="-target"]) > span {
+  background:var(--lobby-interaction-fill);
   color:var(--menu-focus-ink);
 }
-#app[data-layout][data-input-mode="pointer"] .unified-lobby .lobby-mode:hover > span { background:var(--menu-hover-fill); }
+#app[data-layout][data-input-mode="pointer"] .unified-lobby[data-screen] .lobby-help[class]:hover,
+#app[data-layout]:is([data-input-mode="keyboard"],[data-input-mode="gamepad"]) .unified-lobby[data-screen] .lobby-help[class]:is(:focus-visible,.pad-selected,[class*="-target"]) {
+  background:var(--lobby-interaction-fill)!important;
+  border-color:var(--lobby-interaction-line);
+  border-radius:50%!important;
+  box-shadow:inset 0 0 0 2px var(--lobby-interaction-line)!important;
+}
 
 /* Cards keep their player/slot colour. The whole card frames its primary
    action; Y/Join and editor choices remain separate controls. */
@@ -81,12 +119,6 @@
 
 /* Round controls retain their shape, with the stronger approved help ring. */
 #app[data-layout] .unified-lobby :is(.lobby-help,.lobby-remove):is(:focus-visible,[class*="-target"]) { border-radius:50%!important; }
-#app[data-layout] .unified-lobby .lobby-help:is(:focus-visible,[class*="-target"]) {
-  background:#e4ecd4!important;
-  border-color:var(--menu-focus-line);
-  box-shadow:0 0 0 3px #b6c09b80,inset 0 0 0 1px var(--menu-focus-line)!important;
-}
-
 /* Small editor actions need breathing room inside the same focus ring. */
 #app[data-layout] .unified-lobby .lobby-editor-hint button { padding:3px 6px; border-radius:8px; }
 
