@@ -528,9 +528,27 @@ kbd { min-width: 28px; padding: 6px 7px; border: 1px solid var(--line); border-b
 .shield-slot.is-burning svg { stroke: #d85e17; }
 @keyframes shield-gain { 0% { transform: scale(.72); filter: drop-shadow(0 0 0 #1bcff0); } 45% { transform: scale(1.18); filter: drop-shadow(0 0 10px #1bcff0); } 100% { transform: scale(1); filter: drop-shadow(0 1px 0 #0d5361); } }
 @keyframes shield-burn { 0%, 34% { transform: scale(1); opacity: 1; filter: drop-shadow(0 0 6px #ff8a2c); } 35% { transform: scale(1.14); opacity: .75; } 48% { transform: scale(.92); opacity: 1; } 100% { transform: scale(.7); opacity: .12; filter: drop-shadow(0 0 14px #ff7626); } }
-.hud-card.is-out { opacity: 0.68; }
+.hud-card.is-out .hud-stats,
+.hud-card.is-out .shield-inventory,
+.hud-card.is-out .hud-next-piece { opacity: 0.68; }
 .hud-card.has-shield { outline: 2px solid #45d7e8; outline-offset: 2px; }
-.out-label { position: absolute; inset: 42px 0 0; display: grid; place-items: center; color: var(--coral); font: 900 clamp(1rem, 2vw, 1.8rem) ui-monospace, monospace; letter-spacing: 0.12em; }
+/* Variant C: the status belongs to the board, above the inactive wash. */
+.hud-card .out-plaque {
+  --plaque-font: var(--out-font-size, 24px);
+  position: absolute; z-index: 6; left: 50%;
+  top: calc((100% + var(--out-header-height, var(--arena-header-height, 52px))) / 2);
+  transform: translate(-50%, -50%); display: flex; align-items: center; justify-content: center;
+  gap: calc(var(--plaque-font) / 3); width: max-content; max-width: calc(100% - 12px);
+  padding: calc(var(--plaque-font) * .5) calc(var(--plaque-font) * .7);
+  border: 2px solid #aa594c; border-radius: 5px;
+  background: #fff0e6; color: #8b332c; box-shadow: 0 3px 9px #67342d25;
+  font: 900 var(--plaque-font)/1.1 "Trebuchet MS", sans-serif;
+  text-align: center; pointer-events: none;
+}
+.hud-card .out-plaque > span { color: inherit; font: inherit; letter-spacing: normal; }
+.hud-card .out-plaque > .out-plaque-symbol { flex: 0 0 auto; font-weight: 400; }
+.hud-card .out-plaque-text { min-width: 0; overflow-wrap: anywhere; hyphens: auto; text-wrap: balance; text-transform: capitalize; }
+.mobile-solo-arena .mobile-ai-card .out-plaque { flex-wrap: wrap; padding: 5px 6px; border-width: 1px; border-radius: 4px; }
 .conflict-chip { position: absolute; z-index: 5; top: 58px; left: 10px; padding: 3px 7px; border-radius: 999px; font: 900 0.55rem ui-monospace, monospace; letter-spacing: 0.08em; box-shadow: 0 2px 0 rgba(35, 75, 52, .18); }
 .conflict-chip.is-send { color: #206f3c; background: rgba(182, 243, 193, 0.92); }
 .conflict-chip.is-incoming { color: #a2253e; background: rgba(255, 218, 224, 0.95); }
@@ -2224,3 +2242,18 @@ html:has(.settings-screen), body:has(.settings-screen) { height:100dvh; overflow
 #app #pause-menu-panel .pause-actions button { width: 100%; min-height: 44px; margin: 0; padding: 8px 14px; font-size: 17px; line-height: 1.2; }
 /* Persistent phone menu hints fit the established compact footer budget. */
 #app[data-layout="mobile"] .main-menu-screen .release-footer-action .input-badge { height:28px; width:28px; min-width:28px; flex-basis:28px; padding-inline:3px; }
+
+/* Phone AI headings keep names and score inside their existing header. */
+#app .mobile-solo-arena .mobile-ai-card { padding: 3px 4px; }
+#app .mobile-solo-arena .mobile-ai-card .hud-identity {
+  display: grid; grid-template-columns: 12px minmax(0, 1fr);
+  gap: 1px 2px; height: auto; align-items: center; justify-content: start;
+}
+#app .mobile-solo-arena .mobile-ai-card .controller-icon { width: 12px; height: 10px; }
+#app .mobile-solo-arena .mobile-ai-card .hud-identity strong {
+  font-size: 8px; line-height: 1.1; white-space: normal; overflow: visible;
+}
+#app .mobile-solo-arena .mobile-ai-card .hud-stats {
+  height: auto; margin: 1px 0 0; justify-content: start;
+}
+#app .mobile-solo-arena .mobile-ai-card .hud-stats b { font-size: 7px; line-height: 1.1; }

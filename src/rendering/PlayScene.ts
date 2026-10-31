@@ -479,10 +479,6 @@ export class PlayScene extends Phaser.Scene {
       }
     }
 
-    if (!participant.board.alive) {
-      this.staticGraphics.fillStyle(0xdfeaf2, 0.72);
-      this.staticGraphics.fillRect(boardX, boardY, boardWidth, boardHeight);
-    }
   }
 
   private drawBoardCard(
@@ -499,6 +495,13 @@ export class PlayScene extends Phaser.Scene {
     const boardHeight = cellSize * VISIBLE_HEIGHT;
     const boardX = cardX + (cardWidth - boardWidth) / 2;
     const boardY = cardY + headerHeight + Math.max(0, (cardHeight - headerHeight - boardHeight) / 2);
+    if (!participant.board.alive) {
+      // Dynamic graphics sit above the cached tile images; the static layer does not.
+      this.graphics.fillStyle(0xdfeaf2, 0.78);
+      this.graphics.fillRect(boardX, boardY, boardWidth, boardHeight);
+      this.fireBands.get(participant.config.id)?.image.setVisible(false);
+      return;
+    }
     const conflict = conflictPresentationForParticipant(this.runtime.engine.state, participant.config.id);
     const shield = shieldPresentationForParticipant(this.runtime.engine.state, participant.config.id);
     const originalGraphics = this.graphics;

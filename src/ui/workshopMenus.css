@@ -122,3 +122,6 @@
 }
 
 #app[data-layout] .workshop-menu.settings-screen .settings-utility [data-reset-preferences] > .input-reset { display:inline-flex; font:700 14px/1 'Trebuchet MS',sans-serif; letter-spacing:normal; text-align:center; }
+
+/* Version and credits need dark ink on the exposed wood, independent of panel metadata. */
+#app[data-layout] .workshop-menu.main-menu-screen .release-metadata { color:#33200f; -webkit-text-stroke:1.5px #fffaf0; paint-order:stroke fill; }
