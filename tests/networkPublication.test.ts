@@ -1,3 +1,4 @@
+import { startPreparedMatch } from './helpers/networkArena';
 import {it,expect} from 'vitest';
 import {RoomService} from '../server/rooms';
 import {SnapshotPublisher} from '../server/publication';
@@ -19,7 +20,7 @@ it('shared publication reconstructs every seat identically and refreshes frozen 
     }
     return publication;
   };
-  check();service.command(room,links[0]!.seat,links[0]!.epoch,{type:'start'});check();
+  check();startPreparedMatch(service,room,links[0]!.seat,links[0]!.epoch);check();
   service.disconnect(room,links[4]!.seat,links[4]!.epoch);const revision=room.revision;const first=check();now+=1000;const second=check();
   expect(room.revision).toBe(revision);expect(second.snapshotId).not.toBe(first.snapshotId);
   for(const p of room.engine!.state.participants)room.engine!.eliminate(p.config.id);service.advance();check();

@@ -1,3 +1,8 @@
+export const GLOBAL_RATING_RULESET = 'survival-pressure-v2';
+
+/** Keep the previous ruleset snapshot intact when the new service is activated. */
+export function ratingSnapshotPath(base: string): string { return `${base}.${GLOBAL_RATING_RULESET}`; }
+
 export interface RatingAttempt {
   name: string;
   lineScore: number;

@@ -1,3 +1,5 @@
+import { chooseLobbyStyle } from '../helpers/lobbyStyle';
+import { GLOBAL_RATING_RULESET } from '../../src/domain/globalRating';
 import { openLocalLobby } from '../helpers/localLobby';
 import { expect, test, type Page } from '@playwright/test';
 import { mkdir, mkdtemp, rm } from 'node:fs/promises';
@@ -8,14 +10,14 @@ import { join } from 'node:path';
 test.describe.configure({ mode: 'serial' });
 const port = Number(process.env.BRICKS_NETWORK_PORT ?? 4391);
 const origin = `http://127.0.0.1:${port}`;
-const evidence = 'evidence/add-global-survival-rating/screenshots';
+const evidence = process.env.BRICKS_RATING_EVIDENCE_DIR ?? 'evidence/add-global-survival-rating/screenshots';
 let runtime: ChildProcess;
 let directory: string;
 test.beforeAll(async () => {
   directory = await mkdtemp(join(tmpdir(), 'bricks-rating-browser-'));
   runtime = spawn(process.execPath, ['--import', 'tsx', 'server/main.ts'], { env: { ...process.env, BRICKS_NETWORK_PORT: String(port), BRICKS_RATING_FILE: join(directory, 'rating.json') }, stdio: ['ignore', 'pipe', 'pipe'] });
   await new Promise<void>((resolve, reject) => { runtime.stdout!.once('data', () => resolve()); runtime.once('exit', code => reject(new Error(`Server exited ${code}`))); runtime.once('error', reject); });
-  const submit = async (attempts: unknown[]) => { const response = await fetch(`${origin}/api/network/rating-submit`, { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify({ attempts }) }); expect(response.ok).toBe(true); };
+  const submit = async (attempts: unknown[]) => { const response = await fetch(`${origin}/api/network/rating-submit`, { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify({ attempts, ruleset: GLOBAL_RATING_RULESET }) }); expect(response.ok).toBe(true); };
   for (let i = 0; i < 12; i++) await submit([{ name: `Лидер ${i + 1}`, lineScore: 10000 - i * 100, elapsedMs: 300000, finishedAt: 1700000000000 }]);
   await submit([{ name: 'Алексей', lineScore: 500, elapsedMs: 60000, finishedAt: 1700000000000 }, { name: 'Лена', lineScore: 400, elapsedMs: 50000, finishedAt: 1700000000000 }]);
   await mkdir(evidence, { recursive: true });
@@ -37,7 +39,37 @@ async function setup(page: Page, width: number, height: number, gamepad = false)
     }
   }, { gamepad });
   await page.goto('/?muted=1&playtest-fast=20');
-  await openLocalLobby(page,'survival');
+  if (gamepad) {
+    await expect(page.locator('[data-play-entry]')).toBeVisible();
+    await ratingPadPress(page, 0);
+    await expect(page.locator('.unified-lobby')).toBeVisible();
+    await expect(page.locator('[data-edit="0"] [data-controller="gamepad"]')).toHaveCount(1);
+    // The owning pad starts on the mode control; cycle Battle → Teams → Survival.
+    await ratingPadPress(page, 0); await ratingPadPress(page, 0);
+    await expect(page.locator('.unified-lobby')).toHaveAttribute('data-mode','survival');
+  } else await openLocalLobby(page,'survival');
+  // The unified lobby starts with one human; join the second through its current public editor.
+  if (width !== 390) {
+    if (gamepad) await page.keyboard.press('w'); else await page.locator('[data-join]').first().click();
+    await page.locator('[data-create-name]').click();
+    await page.locator('[data-typing-name]').fill('Лена');
+    await page.locator('[data-typed-done]').click();
+    await chooseLobbyStyle(page, 'classic');
+  }
+}
+
+async function ratingPadPress(page: Page, button: number) {
+  await page.evaluate(b => { (window as any).ratingTestPad.buttons[b] = {pressed:true,value:1}; }, button);
+  await page.waitForTimeout(110);
+  await page.evaluate(b => { (window as any).ratingTestPad.buttons[b] = {pressed:false,value:0}; }, button);
+  await page.waitForTimeout(110);
+}
+
+async function openRating(page: Page, gamepad = false) {
+  if (!(await page.locator('[data-rating="global"]:visible').count())) {
+    if (gamepad) { await ratingPadPress(page,15); await ratingPadPress(page,0); }
+    else await page.locator('[data-open-rating]').click();
+  }
 }
 
 async function expectLayout(page: Page) {
@@ -72,15 +104,17 @@ async function expectLayout(page: Page) {
 for (const [width, height, gamepad] of [[1440, 960, false], [390, 844, false], [1600, 900, true]] as const) {
   test(`additional rating, real ranks and local records preserved ${width}`, async ({ page }) => {
     await setup(page, width, height, gamepad);
+    await openRating(page,gamepad);
     await expect(page.locator('.rating-local-content')).toContainText('LegacyOnly');
     if (gamepad) {
-      // Pointer hover establishes the current menu item, then actual pad A activates it.
-      await page.getByRole('button', { name: 'Глобальный рейтинг', exact: true }).hover();
+      // The global tab sits directly below the top-right close control; move down, then actual A.
+      await ratingPadPress(page,13);
+      await expect(page.locator('[data-rating="global"]:visible')).toBeFocused();
       await page.evaluate(() => { (window as any).ratingTestPad.buttons[0] = { pressed: true, touched: true, value: 1 }; });
-      await expect(page.getByRole('button', { name: 'Глобальный рейтинг', exact: true })).toHaveAttribute('aria-pressed', 'true');
+      await expect(page.locator('[data-rating="global"]:visible')).toHaveAttribute('aria-pressed', 'true');
       await page.evaluate(() => { (window as any).ratingTestPad.buttons[0] = { pressed: false, touched: false, value: 0 }; });
-    } else await page.getByRole('button', { name: 'Глобальный рейтинг', exact: true }).click();
-    const rows = page.locator('.global-rating-list li');
+    } else await page.locator('[data-rating="global"]:visible').click();
+    const rows = page.locator('.global-rating-list:visible li');
     await expect(rows).toHaveCount(width === 390 ? 11 : 12);
     await expect(rows.nth(10)).toContainText('#13');
     await expect(rows.nth(10)).toContainText('Алексей');
@@ -88,8 +122,9 @@ for (const [width, height, gamepad] of [[1440, 960, false], [390, 844, false], [
     await expect(page.locator('.rating-global-content')).not.toContainText('LegacyOnly');
     await expectLayout(page);
     await page.screenshot({ path: `${evidence}/setup-global-${width}.png` });
-    await page.getByRole('button', { name: 'Локальный рейтинг', exact: true }).click();
-    await expect(page.locator('.rating-local-content ol')).toBeVisible();
+    if (gamepad) { await ratingPadPress(page,14); await ratingPadPress(page,0); }
+    else await page.locator('[data-rating="local"]:visible').click();
+    await expect(page.locator('.rating-local-content:visible ol')).toBeVisible();
     await expect(page.locator('.rating-local-content')).toContainText('LegacyOnly');
   });
 }
@@ -112,18 +147,18 @@ test('new completed match queues every participant offline, survives reload and 
   await page.keyboard.down('s'); await page.keyboard.down('ArrowDown');
   await expect(page.locator('.results-panel')).toBeVisible({ timeout: 36000 });
   await page.keyboard.up('s'); await page.keyboard.up('ArrowDown');
-  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('bricks-war:global-rating-outbox:v1') ?? '[]').length)).toBe(2);
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('bricks-war:global-rating-outbox:survival-pressure-v2') ?? '[]').length)).toBe(2);
   await expect(page.locator('#play-again')).toBeEnabled();
   expect(await page.evaluate(() => (window as any).ratingGuardView)).toBe('local');
-  await page.getByRole('button', { name: 'Глобальный рейтинг', exact: true }).click();
-  await expect(page.locator('.global-rating-list li')).toHaveCount(12);
+  await page.locator('[data-rating="global"]:visible').click();
+  await expect(page.locator('.global-rating-list:visible li')).toHaveCount(12);
   await expectLayout(page);
   await page.screenshot({ path: `${evidence}/results-global-1440.png` });
   await page.reload();
-  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('bricks-war:global-rating-outbox:v1') ?? '[]').length)).toBe(2);
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('bricks-war:global-rating-outbox:survival-pressure-v2') ?? '[]').length)).toBe(2);
   unavailable = false;
   await page.evaluate(() => window.dispatchEvent(new Event('online')));
-  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('bricks-war:global-rating-outbox:v1') ?? '[]').length)).toBe(0);
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('bricks-war:global-rating-outbox:survival-pressure-v2') ?? '[]').length)).toBe(0);
   expect((await (await fetch(`${origin}/api/network/rating`)).json()).top.some((a: { name: string }) => a.name === 'LegacyOnly')).toBe(false);
 });
 
@@ -133,8 +168,8 @@ test('phone results switch remains usable and shows the real extra rank', async 
   await page.locator('#start-match').click();
   await expect(page.locator('.results-panel')).toBeVisible({ timeout: 36000 });
   await expect(page.locator('#play-again')).toBeEnabled();
-  await page.getByRole('button', { name: 'Глобальный рейтинг', exact: true }).click();
-  await expect(page.locator('.global-rating-list li')).toHaveCount(11);
+  await page.locator('[data-rating="global"]:visible').click();
+  await expect(page.locator('.global-rating-list:visible li')).toHaveCount(11);
   await expectLayout(page);
   await page.screenshot({ path: `${evidence}/results-global-390.png` });
 });

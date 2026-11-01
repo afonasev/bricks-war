@@ -462,7 +462,7 @@ export class PlayScene extends Phaser.Scene {
     const settling = this.runtime.engine.state.clearPresentations.some((event) => (
       event.participantId === participant.config.id
     ));
-    const reflecting = shieldPresentationForParticipant(this.runtime.engine.state, participant.config.id) || (this.runtime.engine.state.attackQueues[participant.config.id]?.[0]?.phase === 'rise' && (this.runtime.engine.state.attackQueues[participant.config.id]?.[0]?.riseRows ?? 0) > 0);
+    const reflecting = shieldPresentationForParticipant(this.runtime.engine.state, participant.config.id) || this.runtime.engine.state.attackQueues[participant.config.id]?.some(e => e.phase === 'rise' && e.riseRows > 0);
     for (let y = 0; y < VISIBLE_HEIGHT && !settling && !reflecting; y += 1) {
       for (let x = 0; x < BOARD_WIDTH; x += 1) {
         const kind = participant.board.grid[y + HIDDEN_ROWS]?.[x];
@@ -506,7 +506,7 @@ export class PlayScene extends Phaser.Scene {
     const shield = shieldPresentationForParticipant(this.runtime.engine.state, participant.config.id);
     const originalGraphics = this.graphics;
     const lift = 0;
-    const rise = this.runtime.engine.state.attackQueues[participant.config.id]?.[0];
+    const rise = this.runtime.engine.state.attackQueues[participant.config.id]?.find(e => e.phase === 'rise' && e.riseRows > 0);
     const riseOffset = rise?.phase === 'rise' && rise.riseRows > 0 ? rise.riseRows * cellSize * Math.min(1,rise.remainingMs/600) : 0;
     const figureY = boardY - lift + riseOffset;
     if (shield || riseOffset > 0) {

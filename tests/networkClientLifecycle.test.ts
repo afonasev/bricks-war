@@ -1,3 +1,4 @@
+import { startPreparedMatch } from './helpers/networkArena';
 import {it,expect,vi} from 'vitest';
 import {NetworkMatchSession} from '../src/network/client';
 import {RoomService} from '../server/rooms';
@@ -7,7 +8,7 @@ it('spawn clears only piece prediction; held release and repeat timing survive o
   let now=0;const service=new RoomService(()=>now);const a=await service.create('Room','Host'),b=await service.join(a.roomId,'Other');
   const links=[a,b].map(c=>service.connect(c,PROTOCOL_VERSION,RULES_VERSION));const host=links[0]!;
   for(const l of links){service.command(l.room,l.seat,l.epoch,{type:'ack',revision:l.room.revision,visible:true});service.command(l.room,l.seat,l.epoch,{type:'ready',ready:true});}
-  service.command(host.room,host.seat,host.epoch,{type:'start'});
+  startPreparedMatch(service,host.room,host.seat,host.epoch);
   for(let i=0;i<260;i++){now+=1000/60;for(const seat of host.room.seats)seat.lastHealth=now;service.advance();}
   vi.stubGlobal('document',{hidden:false});vi.stubGlobal('WebSocket',{OPEN:1});
   const session=new NetworkMatchSession(a);const raw=session as unknown as {confirm:(s:unknown)=>void;socket:unknown};
@@ -28,7 +29,7 @@ async function playingSession() {
   const a=await service.create('Recovery','Host'),b=await service.join(a.roomId,'Guest');
   const links=[a,b].map(c=>service.connect(c,PROTOCOL_VERSION,RULES_VERSION));const guest=links[1]!;
   for(const l of links){service.command(l.room,l.seat,l.epoch,{type:'ack',revision:l.room.revision,visible:true});service.command(l.room,l.seat,l.epoch,{type:'ready',ready:true});}
-  service.command(links[0]!.room,links[0]!.seat,links[0]!.epoch,{type:'start'});
+  startPreparedMatch(service,links[0]!.room,links[0]!.seat,links[0]!.epoch);
   for(let i=0;i<260;i++){now+=1000/60;for(const seat of guest.room.seats)seat.lastHealth=now;service.advance();}
   vi.stubGlobal('document',{hidden:false});vi.stubGlobal('WebSocket',{OPEN:1});
   const clock=vi.spyOn(performance,'now').mockImplementation(()=>now);
@@ -142,4 +143,18 @@ it('does not replay pending prediction or held controls over an authoritative ar
     expect(f.sent).toHaveLength(sent);
     f.raw.confirm(snapshot);expect(f.session.state.participants[0]!.board.active).toEqual(pose);
   } finally {f.cleanup();}
+});
+
+it('resends current arena readiness after recovery and never acknowledges a stale match',async()=>{
+ const f=await playingSession();
+ try{
+  const snapshot=f.service.snapshot(f.guest.room,f.guest.seat);snapshot.preparing=[snapshot.ownId];
+  f.raw.confirm(snapshot);f.sent.length=0;f.session.arenaPrepared('stale-match');expect(f.sent).toEqual([]);
+  f.session.arenaPrepared(snapshot.matchId!);expect(f.sent).toEqual([{type:'arena-prepared',matchId:snapshot.matchId}]);
+  f.sent.length=0;const recovering=structuredClone(snapshot);recovering.revision++;recovering.seats.find(s=>s.id===recovering.ownId)!.connected=false;
+  f.raw.confirm(recovering);expect(f.sent.filter(c=>c.type==='arena-prepared')).toEqual([]);
+  f.sent.length=0;const restored=structuredClone(snapshot);restored.revision+=2;f.raw.confirm(restored);
+  expect(f.sent).toContainEqual({type:'arena-prepared',matchId:snapshot.matchId});
+  f.sent.length=0;restored.revision++;restored.preparing=[];f.raw.confirm(restored);expect(f.sent).toEqual([]);
+ }finally{f.cleanup();}
 });

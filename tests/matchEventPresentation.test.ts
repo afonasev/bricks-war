@@ -55,7 +55,7 @@ describe('match event presentation', () => {
     expect(globalMatchEvent(engine.state, DEFAULT_GAME_TUNING.messages)).toMatchObject({
       kind: 'final-push',
       title: 'Фаза давления',
-      detail: 'Серый ряд каждые 15 → 5 секунд',
+      detail: 'Серый ряд каждые 15 → 5 → 1 секунд',
     });
   });
 

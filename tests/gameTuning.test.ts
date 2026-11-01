@@ -46,7 +46,7 @@ describe('debug game-design tuning', () => {
     tuning.pressureIntervalMs = 5_000;
     tuning.battleDifficulties.normal.piecesPerLevel = 4;
     const engine = new MatchEngine(humanPair(), 77, 2, {}, tuning);
-    expect(engine.state.countdownMs).toBe(3_000);
+    expect(engine.state.countdownMs).toBe(1_000);
     expect(engine.state.gravityIntervalMs).toBe(640);
     expect(engine.state.pressureStartMs).toBe(72_000);
     expect(engine.state.nextPressureAtMs).toBe(77_000);

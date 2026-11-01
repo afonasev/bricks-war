@@ -1,9 +1,10 @@
+import { ratingSnapshotPath } from '../src/domain/globalRating';
 import { createNetworkServer } from './http';
 import { GlobalRatingStore } from './globalRating';
 import { resolve } from 'node:path';
 const port = Number(process.env.BRICKS_NETWORK_PORT ?? 4190);
 const origins = (process.env.BRICKS_NETWORK_ORIGINS ?? '').split(',').filter(Boolean);
-const rating = new GlobalRatingStore(resolve(process.env.BRICKS_RATING_FILE ?? 'data/global-rating.json'));
+const rating = new GlobalRatingStore(ratingSnapshotPath(resolve(process.env.BRICKS_RATING_FILE ?? 'data/global-rating.json')));
 // Read before accepting traffic: corrupt storage must never silently reset rankings.
 await rating.read([]);
 const runtime = createNetworkServer(undefined, origins, undefined, process.env.BRICKS_NETWORK_TRUST_PROXY === '1', rating);

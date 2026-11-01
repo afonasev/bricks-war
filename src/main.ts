@@ -13,6 +13,7 @@ import './ui/workshopMenus.css';
 import './ui/inputGlyph.css';
 import './ui/ownedMenuFocus.css';
 import './ui/lobbyCardGeometry.css';
+import './ui/arenaIdentity.css';
 
 const root = document.querySelector<HTMLElement>('#app');
 if (!root) throw new Error('App root is missing');

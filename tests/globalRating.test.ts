@@ -1,10 +1,11 @@
+import { GLOBAL_RATING_RULESET } from '../src/domain/globalRating';
 import { afterEach, expect, it } from 'vitest';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { GlobalRatingStore } from '../server/globalRating';
 import { createNetworkServer } from '../server/http';
-import { isRatingAttempt, type RatingAttempt } from '../src/domain/globalRating';
+import { ratingSnapshotPath, isRatingAttempt, type RatingAttempt } from '../src/domain/globalRating';
 
 const attempt = (name: string, lineScore: number): RatingAttempt => ({ name, lineScore, elapsedMs: 1000, finishedAt: 1700000000000 });
 const directories: string[] = [];
@@ -51,7 +52,7 @@ it('real HTTP reads/submits without disturbing network health; rejects foreign o
   const runtime = createNetworkServer();
   await new Promise<void>(resolve => runtime.server.listen(0, '127.0.0.1', resolve));
   const origin = `http://127.0.0.1:${(runtime.server.address() as { port: number }).port}`;
-  const post = (attempts: unknown, source = origin) => fetch(`${origin}/api/network/rating-submit`, { method: 'POST', headers: { Origin: source, 'Content-Type': 'application/json' }, body: JSON.stringify({ attempts }) });
+  const post = (attempts: unknown, source = origin) => fetch(`${origin}/api/network/rating-submit`, { method: 'POST', headers: { Origin: source, 'Content-Type': 'application/json' }, body: JSON.stringify({ attempts, ruleset: GLOBAL_RATING_RULESET }) });
   try {
     expect((await post([attempt('A', 100)], 'https://foreign.invalid')).status).toBe(400);
     expect((await post([attempt('A', 100), attempt('B', 200)])).status).toBe(200);
@@ -72,8 +73,32 @@ it('HTTP reports storage failure without leaking paths or acknowledging the scor
   try {
     const read = await fetch(`${origin}/api/network/rating`);
     expect(read.status).toBe(503); expect(await read.text()).not.toContain(dir);
-    const write = await fetch(`${origin}/api/network/rating-submit`, { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify({ attempts: [attempt('A', 5)] }) });
+    const write = await fetch(`${origin}/api/network/rating-submit`, { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify({ attempts: [attempt('A', 5)], ruleset: GLOBAL_RATING_RULESET }) });
     expect(write.status).toBe(503); expect(await write.text()).not.toContain(dir);
     expect(await readFile(file, 'utf8')).toBe('{broken');
+  } finally { await runtime.close(); }
+});
+
+it('starts a fresh ruleset snapshot without rewriting old global records', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'bricks-rating-reset-')); directories.push(dir);
+  const oldFile = join(dir,'rating.json');
+  await new GlobalRatingStore(oldFile).submit([attempt('OldRules',99999)]);
+  const original = await readFile(oldFile,'utf8');
+  const current = new GlobalRatingStore(ratingSnapshotPath(oldFile));
+  expect(await current.read([])).toEqual({top:[],own:[]});
+  await current.submit([attempt('NewRules',100)]);
+  expect((await new GlobalRatingStore(ratingSnapshotPath(oldFile)).read([])).top.map(a=>a.name)).toEqual(['NewRules']);
+  expect(await readFile(oldFile,'utf8')).toBe(original);
+});
+it('rejects previous and missing ruleset submissions through real HTTP after global reset', async () => {
+  const runtime = createNetworkServer();
+  await new Promise<void>(resolve=>runtime.server.listen(0,'127.0.0.1',resolve));
+  const origin = `http://127.0.0.1:${(runtime.server.address() as {port:number}).port}`;
+  try {
+    for (const ruleset of [undefined,'old-rules']) {
+      const response=await fetch(`${origin}/api/network/rating-submit`,{method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},body:JSON.stringify({attempts:[attempt('LegacyOffline',99999)],ruleset})});
+      expect(response.status).toBe(400);expect((await response.json()).code).toBe('rating-ruleset');
+    }
+    expect(await (await fetch(`${origin}/api/network/rating`)).json()).toEqual({top:[],own:[],ruleset:GLOBAL_RATING_RULESET});
   } finally { await runtime.close(); }
 });

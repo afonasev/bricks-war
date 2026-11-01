@@ -5,7 +5,7 @@ import { RoomService, RoomError, type Room, type Seat } from './rooms';
 import { SnapshotPublisher } from './publication';
 import { MAX_INPUT_BYTES, MAX_SNAPSHOT_BYTES, type ClientCommand } from '../src/network/protocol';
 import { GlobalRatingStore } from './globalRating';
-import { isRatingAttempt } from '../src/domain/globalRating';
+import { GLOBAL_RATING_RULESET, isRatingAttempt } from '../src/domain/globalRating';
 
 interface Link { socket: WebSocket; room: Room; seat: Seat; epoch: number; revision: number; snapshotAcks: boolean; outstanding: string[]; coalesced: boolean }
 export interface CycleMetrics {durationMs:number;publicationMs:number;wireBytes:number;maxBufferedBytes:number;schedulerLagMs:number}
@@ -44,7 +44,7 @@ export function createNetworkServer(service = new RoomService(), allowedOrigins:
         const names = url.searchParams.getAll('name');
         if (names.length > 4 || names.some(n => n.length > 80)) throw new RoomError('rating', 'Некорректные имена.');
         const result = await rating.read(names).catch(() => { throw new RoomError('rating-storage', 'Рейтинг временно недоступен.'); });
-        response.end(JSON.stringify(result)); return;
+        response.end(JSON.stringify({...result, ruleset: GLOBAL_RATING_RULESET})); return;
       }
       if (!allow(request)) throw new RoomError('origin', 'Недопустимый источник запроса.');
       if (request.method !== 'POST') throw new RoomError('method', 'Ожидается POST.');
@@ -57,6 +57,7 @@ export function createNetworkServer(service = new RoomService(), allowedOrigins:
       }
       throttle(`write:${networkClientAddress(request, trustProxy)}`, 30);
       if (url.pathname === '/api/network/rating-submit') {
+        if (payload?.ruleset !== GLOBAL_RATING_RULESET) throw new RoomError('rating-ruleset', 'Обновите игру: правила рейтинга изменились.');
         if (!Array.isArray(payload?.attempts) || payload.attempts.length < 1 || payload.attempts.length > 4 || !payload.attempts.every(isRatingAttempt)) {
           throw new RoomError('rating', 'Некорректный результат.');
         }

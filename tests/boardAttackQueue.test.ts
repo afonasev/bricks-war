@@ -35,9 +35,11 @@ describe('per recipient FIFO',()=>{
  it('preserves two staggered blocks in the durable resolution ledger',()=>{
   const e=fixture(),t=new AudioEventTracker();t.sync(e.state);
   e.enqueueBoardAttack('p2',1,'pressure');advance(e,500);e.enqueueBoardAttack('p3',1,'pressure');
-  e.state.attackQueues.p2![0]!.defended=true;e.state.attackQueues.p3![0]!.defended=true;
-  advance(e,3000);expect(e.state.attackQueues.p2![0]).toMatchObject({defended:true,phase:'rise'});
+  e.state.attackQueues.p2![0]!.defended=true;e.step(FIXED_STEP_MS);advance(e,500-FIXED_STEP_MS);
+  e.state.attackQueues.p3![0]!.defended=true;
+  e.step(FIXED_STEP_MS);expect(e.state.attackQueues.p2![0]).toMatchObject({defended:true,phase:'rise'});
   expect(e.state.attackQueues.p2![0]!.remainingMs).toBeCloseTo(600);
+  expect(e.state.attackQueues.p3![0]).toMatchObject({defended:true,phase:'rise',remainingMs:1100});
   expect(t.sync(e.state).filter(e=>e.type==='active-defense')).toHaveLength(2);
   expect(t.sync(e.state).filter(e=>e.type==='active-defense')).toHaveLength(0);
  });
@@ -49,10 +51,20 @@ describe('per recipient FIFO',()=>{
   advance(e,600);expect(e.state.attackQueues.p2![0]!.remainingMs).toBe(3000);expect(e.state.shieldInventorySerial).toBe(1);
  });
  it('a real active clear blocks only the current event, including pressure',()=>{
-  const e=fixture();e.enqueueBoardAttack('p2',1,'pressure');e.enqueueBoardAttack('p2',3,'conflict','p1');
-  prepareClearPlaytest(e.state.participants[1]!.board,'normal',1);advance(e,3000);
+  const e=fixture(),t=new AudioEventTracker();t.sync(e.state);
+  e.enqueueBoardAttack('p2',1,'pressure');e.enqueueBoardAttack('p2',3,'conflict','p1');
+  t.sync(e.state);prepareClearPlaytest(e.state.participants[1]!.board,'normal',1);e.step(FIXED_STEP_MS);
+  expect(e.state.attackQueues.p2![0]).toMatchObject({phase:'rise',remainingMs:1100});
+  expect(e.state.pendingConflict?.incomingRows.p2).toBeUndefined();
+  expect(t.sync(e.state).filter(e=>e.type==='active-defense')).toHaveLength(1);
+  expect(t.sync(e.state).filter(e=>e.type==='active-defense')).toHaveLength(0);
+  const restored=MatchEngine.restore(JSON.parse(JSON.stringify(e.checkpoint())));
+  e.pause('manual');advance(e,500);expect(e.state.attackQueues.p2![0]!.remainingMs).toBe(1100);e.resume('manual');
+  advance(e,1099);advance(restored,1099);expect(restored.checkpoint()).toEqual(e.checkpoint());
   expect(gray(e)).toBe(0);expect(e.state.attackQueues.p2![0]!.defended).toBe(true);expect(e.state.attackQueues.p2![1]!.defended).toBe(false);
-  advance(e,1100);advance(e,3000);expect(gray(e)).toBe(3);
+  advance(e,1);expect(e.state.attackQueues.p2![0]).toMatchObject({phase:'warning',remainingMs:3000,defended:false});
+  advance(e,3000);expect(gray(e)).toBe(3);
+  expect(t.sync(e.state).filter(e=>e.type==='active-defense')).toHaveLength(0);
  });
  it('checkpoint and own prediction retain all lifecycle phases deterministically',()=>{
   for(const phase of ['warning','shield','rise'] as const){const e=fixture();e.state.participants[1]!.shieldCount=1;e.enqueueBoardAttack('p2',3,'conflict','p1');e.enqueueBoardAttack('p2',1,'pressure');

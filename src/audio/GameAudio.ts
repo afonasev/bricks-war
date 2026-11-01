@@ -1,3 +1,4 @@
+import { nearestAttackWarning } from '../simulation/attackQueue';
 import {BOARD_EVENT_ASSETS, type BoardEventSound} from './boardEventAssets';
 import { shieldEnergyBuffer } from './shieldEnergy';
 import type { MatchState } from '../domain/types';
@@ -279,7 +280,7 @@ export class GameAudio {
     }
     this.syncArrivalFire(state);
     const events = this.networkAnomalyTracker.sync(state);
-    if (!baseline) for (const event of events) if (event.type === 'anomaly-spawn' || event.type === 'anomaly-success') this.playEvent(event);
+    if (!baseline) for (const event of events) if (event.type === 'anomaly-spawn' || event.type === 'anomaly-success' || event.type === 'round-start') this.playEvent(event);
   }
 
   /** Syncs recorded match music independently from SFX event history. */
@@ -335,7 +336,7 @@ export class GameAudio {
       this.warningVoice=null;this.warningPaused=true;
     }else if(this.warningPaused){
       this.warningPaused=false;
-      const head=Object.values(state.attackQueues).map(q=>q[0]).find(e=>e?.phase==='warning');
+      const head=Object.values(state.attackQueues).map(q=>nearestAttackWarning(q)).find(e=>e);
       if(head&&this.context)this.playBoardSound('warning',this.context.currentTime+.008,0,(3000-head.remainingMs)/1000);
     }
     for (const event of events) if ((!warningFrozen || (event.type !== 'attack-warning' && event.type !== 'pressure')) && (!this.networkAudio || (event.type !== 'anomaly-success' && event.type !== 'anomaly-spawn'))) this.playEvent(event);

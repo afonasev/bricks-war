@@ -31,7 +31,7 @@ test('phone Battle setup and natural Results identify touch control', async ({ p
   await expect(loading).toBeVisible({ timeout: 15_000 });
   await expect(loading).toHaveCount(0, { timeout: 15_000 });
   await expect(page.locator('.arena-screen')).toBeVisible();
-  await expect(page.locator('#countdown')).toHaveText('3');
+  await expect(page.locator('#countdown')).toHaveText('Готовы?');
   await expect(page.locator('canvas')).toHaveCount(1);
 
   const downZone = page.locator('.mobile-touch-zone-down');

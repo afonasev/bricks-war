@@ -10,15 +10,18 @@ import type { FooterActionKey } from './gamepadFooterHints';
 import { html as tr, text as localeText, setLocale, getLocale, translate as localeTranslate, LOCALES, type Locale } from '../i18n/locale';
 import { languageSettingsMarkup } from '../i18n/selector';
 import { WORKSHOP_THEME_TEXTURES } from '../rendering/workshopSprites';
+import { readyTitleMarkup, localizeReadyTitle } from './readyPresentation';
 import { footerResetButtonMarkup, gamepadFaceLabels, gamepadFooterAction, gamepadFooterHintsMarkup, showGamepadFooterHints } from './gamepadFooterHints';
 import { MatchLoading } from './matchLoading';
 import { prepareAnomalyArrivalPlaytest } from './anomalyArrivalPlaytest';
 import { rulesScreenMarkup, bindRulesScreen } from './visualRules';
 import './visualRules.css';
 import { desktop, installerDownload, type DisplayPreferences } from '../platform/desktop';
+import { bindMenuAudio } from './menuAudio';
+import { faceGlyph } from './inputGlyph';
+import { configureSectionShell } from './sectionShell';
 import { shieldInventoryMarkup, shieldInventoryKey } from './shieldInventory';
 import { configureDesktopStage } from './desktopStage';
-import { configureDesktopLabPages } from './desktopLabPages';
 import { nextPiecePreviewMarkup } from './nextPiecePreview';
 import { NetworkApp } from '../network/app';
 import { LocalMatchSession } from '../sessions/matchSession';
@@ -56,7 +59,7 @@ import {
 } from '../domain/gameTuning';
 import { DEFAULT_TILE_STYLE_SELECTION } from '../domain/tileStyles';
 import { PlayScene } from '../rendering/PlayScene';
-import { localArenaDecoration, type ArenaLayout } from '../rendering/arenaLayout';
+import { localArenaDecoration, localTeamSurfaceDivider, type ArenaLayout } from '../rendering/arenaLayout';
 import { DEFAULT_DURATION_MINUTES, FINAL_PUSH_PULSE_MS, LEVEL_UP_PULSE_MS, MatchEngine, validateDurationMinutes, validateMatchOptions, validateParticipants, validateSurvivalParticipants } from '../simulation/match';
 import { scoreLeaderIds, teamIdForSlot, teamLeaderIds, teamScores } from '../simulation/competition';
 import { formatClock, formatDuration, formatPieces, matchClockPresentation } from './format';
@@ -84,7 +87,7 @@ import { releaseNotesElement } from './releaseNotes';
 import { loadGameTuning, resetGameTuning, saveGameTuning } from './gameTuningPersistence';
 import { PlayerEventRegionLatch } from './playerEventPlacement';
 import { participantLevelUpNoticeKey } from './hudInvalidation';
-import { saveSurvivalRecords } from './soloRecords';
+import { resetSoloRecords, saveSurvivalRecords } from './soloRecords';
 import { RatingPanels } from './ratingPanel';
 import { recordDateMarkup } from './recordDate';
 import { MenuFocusController } from './menuNavigation';
@@ -311,9 +314,8 @@ export class BricksWarApp {
     configureDesktopStage(this.root);
     this.lobby?.resize();
     // Viewport-sized overlays must stay outside the scaled desktop composition.
-    const modalBackdrop = this.root.querySelector('[data-ai-choice], [data-release-history]')?.parentElement;
+    const modalBackdrop = this.root.querySelector('[data-ai-choice]')?.parentElement;
     if (modalBackdrop) this.root.append(modalBackdrop);
-    configureDesktopLabPages(this.root, () => this.menuFocus.activate(this.router.current()));
   };
 
   start(): void {
@@ -360,6 +362,7 @@ export class BricksWarApp {
       hint.textContent = native.hint; hint.hidden = !native.hint;
       button.setAttribute('aria-label', [native.label, native.hint].filter(Boolean).join('. '));
       this.menuFocus.reconcileItems();
+      this.restoreHistoryFocus();
       return;
     }
     button.hidden = !presentation.visible;
@@ -373,9 +376,26 @@ export class BricksWarApp {
     this.menuFocus.reconcileItems();
   }
 
+  private historyRequest: AbortController | null = null;
+  private historyParent: AppScreen = 'settings';
+  private historyLauncherSelector = '#open-release-history';
+  private historyFocusPending: { selector: string; screen: AppScreen } | null = null;
+  private restoreHistoryFocus(): void {
+    const pending = this.historyFocusPending;
+    if (!pending || pending.screen !== this.router.current()) return;
+    const launcher = this.root.querySelector<HTMLButtonElement>(pending.selector);
+    if (!launcher || launcher.hidden || !launcher.getClientRects().length) return;
+    const items = Array.from(this.root.querySelectorAll<HTMLElement>('[data-ui-focus]:not([disabled])')).filter(item => item.getClientRects().length > 0 && !item.closest('[hidden], [inert], [aria-hidden="true"]'));
+    this.menuFocus.activate(this.router.current(), Math.max(0, items.indexOf(launcher)));
+    launcher.focus({ preventScroll: true });
+    this.historyFocusPending = null;
+  }
+
   private rulesCleanup: (() => void) | null = null;
 
   private renderCurrentScreen(): void {
+    this.historyRequest?.abort();
+    this.historyRequest = null;
     this.rulesCleanup?.();
     this.rulesCleanup = null;
     const screen = this.router.current();
@@ -387,6 +407,7 @@ export class BricksWarApp {
     else if (screen === 'settings') this.renderSettings();
     else if (screen === 'controls') this.renderControls();
     else if (screen === 'rules') this.renderRules();
+    else if (screen === 'history') void this.renderReleaseHistory();
   }
 
   private readonly menuScroll = new Map<string, number[]>();
@@ -403,6 +424,7 @@ export class BricksWarApp {
   }
 
   private activateMenuFocus(screen: AppScreen): void {
+    configureSectionShell(this.root, screen, screen === 'settings' || screen === 'history' && this.historyParent === 'main-menu');
     this.updateDesktopLayout();
     if (!this.lobby.active()) enhanceMenuSelects(this.root);
     this.root.querySelectorAll<HTMLElement>('button:not(.menu-select-option), input, textarea, select:not([hidden])').forEach((element) => {
@@ -414,6 +436,7 @@ export class BricksWarApp {
   }
 
   private navigate(screen: AppScreen, parent?: AppScreen): void {
+    this.historyFocusPending = null;
     this.rememberFocus();
     if (screen === 'survival' || screen === 'battle' || screen === 'team-battle') {
       if (!this.lobby.active()) this.lobby.enter(this.enteringLobbyPad);
@@ -433,7 +456,6 @@ export class BricksWarApp {
 
   private navigateBack(): void {
     if (this.lobby.active()) { if (this.lobby.back()) return; this.lobby.leave(); }
-    const historyClose = this.root.querySelector<HTMLButtonElement>('[data-history-back]'); if (historyClose) { historyClose.click(); return; }
     const displayCancel = this.root.querySelector<HTMLButtonElement>('[data-display-no]');
     if (displayCancel) { displayCancel.click(); return; }
     if (this.matchLoading) {
@@ -462,10 +484,15 @@ export class BricksWarApp {
       }
       return;
     }
+    const historyReturn = this.router.current() === 'history' ? this.historyLauncherSelector : null;
     this.rememberFocus();
     if (this.router.back()) {
       this.audio.playUiFeedback('back');
       this.renderCurrentScreen();
+      if (historyReturn) {
+        this.historyFocusPending = { selector: historyReturn, screen: this.router.current() };
+        this.restoreHistoryFocus();
+      }
     }
   }
 
@@ -476,7 +503,6 @@ export class BricksWarApp {
     this.destroyGame();
     this.countdownReady = false;
     this.audio.enterMenu();
-    const mobile = isMobilePlayViewport();
     const installHint = shouldShowIosInstallHint() || isLocalPlaytestFlag('pwa-install-hint')
       ? `<aside class="pwa-install-hint" role="status"><span aria-hidden="true">⇧</span><p>${tr('pwaInstallBeforeShare')}<b>${tr('pwaShareAction')}</b>${tr('pwaInstallBetweenActions')}<b>${tr('pwaAddToHomeScreen')}</b>${tr('pwaInstallAfterActions')}</p><button type="button" data-dismiss-pwa-hint aria-label="${tr('pwaInstallDismissAria')}">×</button></aside>`
       : '';
@@ -510,7 +536,7 @@ export class BricksWarApp {
             <div id="showcase-content" class="showcase-content" aria-hidden="true">${mainMenuPreviewMarkup('play')}</div>
           </aside>
         </section>
-        ${releaseFooterMarkup({ confirm: mobile ? 'open' : 'select', metadata: true })}
+        ${releaseFooterMarkup({ metadata: true })}
       </main>
     `;
     this.root.querySelectorAll<HTMLButtonElement>('[data-destination]').forEach((button) => {
@@ -572,7 +598,7 @@ export class BricksWarApp {
     const mobile = isMobilePlayViewport();
     this.root.innerHTML = `
       <main class="release-screen premium-surface settings-screen workshop-menu" data-screen="settings">
-        <header class="release-heading"><button class="screen-back" id="settings-back" type="button">← ${tr('back')}</button><img class="settings-brand" src="${conceptLogoUrl}" alt="Bricks War" /><div><h1>${tr('settings')}</h1></div></header>
+        <header class="release-heading"><button class="screen-back" id="settings-back" type="button">${faceGlyph('back')}<span>← ${tr('back')}</span></button><img class="settings-brand" src="${conceptLogoUrl}" alt="Bricks War" /><div><h1>${tr('settings')}</h1></div></header>
         <section class="settings-list" aria-label="${tr('settingsAria')}"><div class="settings-columns settings-left-column">
           <section class="release-panel settings-section settings-audio-section"><header><span class="settings-icon" aria-hidden="true">♪</span><div><p class="eyebrow">${tr('sound')}</p><h2>${tr('soundTitle')}</h2></div></header>${this.setupAudioMarkup()}</section>
           ${isLocalPlaytestFlag('audio-prototypes') ? this.audioPrototypeGalleryMarkup() : ''}
@@ -589,15 +615,37 @@ export class BricksWarApp {
 
           <button class="release-panel settings-action settings-navigation" id="open-release-history" type="button"><span><strong>${tr('releaseHistory')}</strong></span></button>
           ${footerResetButtonMarkup('footer-reset settings-action settings-navigation')}
+          <button class="release-panel settings-action settings-navigation" id="reset-local-records" type="button"><span><strong>${tr('resetLocalRecords')}</strong></span></button>
           <button class="release-panel settings-action settings-navigation" id="open-settings-lab" type="button">${settingsActionIcon('lab')}<span><strong>${tr('lab')}</strong><small>${tr('labHint')}</small></span><b>›</b></button>
 
           </nav>
+          <section class="release-panel record-reset-confirm" data-record-reset-confirm hidden aria-labelledby="record-reset-question">
+            <h2 id="record-reset-question">${tr('resetLocalRecordsQuestion')}</h2>
+            <p>${tr('resetLocalRecordsHint')}</p>
+            <div><button type="button" data-record-reset-cancel>${tr('keyboardCancel')}</button><button type="button" data-record-reset-accept>${tr('resetLocalRecordsConfirm')}</button></div>
+          </section>
+          <output data-record-reset-status role="status" aria-live="polite"></output>
           <output data-preferences-status role="status"></output>
         </div>
-        ${releaseFooterMarkup({ confirm: 'select', back: 'back' })}
+        ${releaseFooterMarkup({})}
       </main>
     `;
     this.root.querySelector('#settings-back')?.addEventListener('click', () => this.navigateBack());
+    const resetButton = this.root.querySelector<HTMLButtonElement>('#reset-local-records')!;
+    const resetConfirmation = this.root.querySelector<HTMLElement>('[data-record-reset-confirm]')!;
+    const resetStatus = this.root.querySelector<HTMLOutputElement>('[data-record-reset-status]')!;
+    const closeReset = () => { resetConfirmation.hidden = true; this.menuFocus.activate('settings'); resetButton.focus(); };
+    resetButton.addEventListener('click', () => {
+      resetConfirmation.hidden = false;
+      resetStatus.textContent = '';
+      this.menuFocus.activate('settings');
+      this.root.querySelector<HTMLButtonElement>('[data-record-reset-cancel]')?.focus();
+    });
+    this.root.querySelector('[data-record-reset-cancel]')?.addEventListener('click', closeReset);
+    this.root.querySelector('[data-record-reset-accept]')?.addEventListener('click', () => {
+      resetStatus.textContent = resetSoloRecords() ? tr('resetLocalRecordsDone') : tr('resetLocalRecordsFailed');
+      closeReset();
+    });
     this.root.querySelector('#open-rules')?.addEventListener('click', () => this.navigate('rules'));
     this.root.querySelector('#open-controls')?.addEventListener('click', () => this.navigate('controls'));
     this.root.querySelector('#open-settings-lab')?.addEventListener('click', () => this.navigate('laboratory'));
@@ -648,7 +696,7 @@ export class BricksWarApp {
       this.root.innerHTML = `
         <main class="release-screen premium-surface phone-controls-screen" data-screen="controls" data-phone-controls-help>
           <header class="release-heading phone-controls-heading">
-            <button class="screen-back" id="controls-back" type="button">← ${tr('back')}</button>
+            <button class="screen-back" id="controls-back" type="button">${faceGlyph('back')}<span>← ${tr('back')}</span></button>
             <div><p class="eyebrow">${tr('phoneControlsEyebrow')}</p><h1>${tr('phoneControlsTitle')}</h1></div>
           </header>
           <p class="phone-controls-intro">${tr('phoneControlsIntro')}</p>
@@ -666,7 +714,6 @@ export class BricksWarApp {
             </figure>
             <aside class="phone-controls-pause"><span aria-hidden="true">Ⅱ</span><div><h2>${tr('phoneControlsPauseTitle')}</h2><p>${tr('phoneControlsPauseHint')}</p></div></aside>
           </div>
-          ${releaseFooterMarkup({})}
         </main>
       `;
       this.root.querySelector('#controls-back')?.addEventListener('click', () => this.navigateBack());
@@ -703,18 +750,16 @@ export class BricksWarApp {
     };
     this.root.innerHTML = `
       <main class="release-screen premium-surface controls-screen" data-screen="controls">
-        <header class="release-heading"><button class="screen-back" id="controls-back" type="button">← ${tr('settings')}</button><div><p class="eyebrow">${tr('controlsFixedScheme')}</p><h1>${tr('controls')}</h1></div></header>
+        <header class="release-heading"><button class="screen-back" id="controls-back" type="button">${faceGlyph('back')}<span>← ${tr('settings')}</span></button><div><p class="eyebrow">${tr('controlsFixedScheme')}</p><h1>${tr('controls')}</h1></div></header>
         <div class="controls-reference">
           <section class="gamepad-reference" aria-label="${tr('controlsGamepadDiagram')}">
             ${gamepadControlsArtworkMarkup()}
-            <p class="controls-family-note">${tr('controlsFamilyNote')}</p>
           </section>
           <section class="keyboard-reference">
             ${keyboardReferenceCard(localeText('controlsKeyboard', { index: 1 }), 'wasd', ['W', 'A', 'S', 'D'])}
             ${keyboardReferenceCard(localeText('controlsKeyboard', { index: 2 }), 'arrows', ['↑', '←', '↓', '→'])}
           </section>
         </div>
-        ${releaseFooterMarkup({ back: 'back' })}
       </main>
     `;
     this.root.querySelector('#controls-back')?.addEventListener('click', () => this.navigateBack());
@@ -890,7 +935,7 @@ export class BricksWarApp {
       return;
     }
     this.root.innerHTML = `
-      <main class="release-screen premium-surface debug-lab-screen" data-screen="laboratory">
+      <main class="release-screen premium-surface debug-lab-screen laboratory-single-page" data-screen="laboratory">
         <header class="debug-lab-header release-heading">
           <button id="close-debug-lab" class="screen-back" type="button">${tr('labBack')}</button>
           <div><p class="eyebrow">${tr('labLocalEyebrow')}</p><h1>${tr('labTitle')}</h1></div>
@@ -899,28 +944,28 @@ export class BricksWarApp {
             <button id="reset-debug-tuning" type="button">${tr('labReset')}</button>
             <button id="save-debug-tuning" class="debug-save-button" type="button">${tr('labSave')}</button>
             ${releaseTuningSaveEnabled() ? `<button id="save-release-tuning" class="debug-release-save-button" type="button">${tr('labSaveRelease')}</button>` : ''}
-            <output id="debug-save-status" role="status">${tr('labDeviceOnly')}</output>
+            <output id="debug-save-status" role="status" data-idle>${tr('labDeviceOnly')}</output>
           </div>
         </header>
         <div class="debug-lab-content">
           ${TUNING_GROUPS.map((group, index) => `
-            <section class="debug-group">
+            <section class="debug-group" data-lab-group="${index === 0 ? 'movement' : 'rhythm'}">
               <div class="debug-group-heading"><h2>${tr(index === 0 ? 'labMovementTitle' : 'labMatchRhythmTitle')}</h2><p>${tr(index === 0 ? 'labMovementDescription' : 'labMatchRhythmDescription')}</p></div>
               <div class="debug-fields">${group.fields.map((field) => this.debugScalarFieldMarkup(field)).join('')}</div>
             </section>
           `).join('')}
-          <section class="debug-group">
+          <section class="debug-group" data-lab-group="battle">
             <div class="debug-group-heading"><h2>${tr('labBattleTitle')}</h2><p>${tr('labBattleDescription')}</p></div>
             <div class="debug-ai-grid">${(['family', 'normal', 'sport'] as const).map((difficulty) => this.debugBattleDifficultyCardMarkup(difficulty)).join('')}</div>
           </section>
-          <section class="debug-group">
+          <section class="debug-group" data-lab-group="ai">
             <div class="debug-group-heading"><h2>${tr('labAiTitle')}</h2><p>${tr('labAiDescription')}</p></div>
             <div class="debug-ai-grid">
               ${(['easy', 'medium', 'hard', 'expert'] as const).map((difficulty) => this.debugAiCardMarkup(difficulty)).join('')}
             </div>
           </section>
-          <section class="debug-group"><div class="debug-group-heading"><h2>${tr('labTiltTitle')}</h2><p>${tr('labTiltDescription')}</p></div><div class="debug-fields">${this.mobileTiltFieldsMarkup()}</div></section>
-          <section class="debug-group">
+          <section class="debug-group" data-lab-group="tilt"><div class="debug-group-heading"><h2>${tr('labTiltTitle')}</h2><p>${tr('labTiltDescription')}</p></div><div class="debug-fields">${this.mobileTiltFieldsMarkup()}</div></section>
+          <section class="debug-group" data-lab-group="messages">
             <div class="debug-group-heading"><h2>${tr('labMessagesTitle')}</h2><p>${tr('labMessagesDescription', { level:'{level}', senders:'{senders}', rows:'{rows}' })}</p></div>
             <div class="debug-fields debug-message-fields">${MESSAGE_TEMPLATE_KEYS.map((key) => this.debugMessageFieldMarkup(key)).join('')}</div>
           </section>
@@ -983,14 +1028,17 @@ export class BricksWarApp {
   private bindDebugTuning(): void {
     this.root.querySelector('#close-debug-lab')?.addEventListener('click', () => this.navigateBack());
     this.root.querySelector<HTMLButtonElement>('#save-debug-tuning')?.addEventListener('click', () => {
+      this.root.querySelector('#debug-save-status')?.removeAttribute('data-idle');
       void this.saveDebugTuning();
     });
     this.root.querySelector<HTMLButtonElement>('#save-release-tuning')?.addEventListener('click', () => {
+      this.root.querySelector('#debug-save-status')?.removeAttribute('data-idle');
       void this.saveReleaseTuning();
     });
     this.root.querySelector('#reset-debug-tuning')?.addEventListener('click', () => {
       this.audio.playUiSelect();
       const status = this.root.querySelector<HTMLOutputElement>('#debug-save-status');
+      status?.removeAttribute('data-idle');
       if (!resetGameTuning()) {
         if (status) status.textContent = status.value = localeText('labResetFailed');
         return;
@@ -1223,13 +1271,13 @@ export class BricksWarApp {
     }
 
     this.root.innerHTML = `
-      <main class="arena-screen premium-surface${mobileMatch ? ' mobile-solo-arena' : ''}" data-battle-difficulty="${engine.state.options.battleDifficulty}" data-soft-drop="${engine.state.options.softDrop}" data-pressure="${engine.state.options.pressure}" data-conflict="${engine.state.options.conflictEnabled ? 'on' : 'off'}" data-debug-tuning="${activeTuning ? 'on' : 'off'}" data-tile-styles="${engine.state.participants.map((participant) => participant.resolvedTileStyle).join(',')}" data-pressure-start-ms="${engine.state.pressureStartMs}" data-gravity-interval-ms="${engine.state.gravityIntervalMs}" data-soft-drop-interval-ms="${engine.state.options.softDropIntervalMs}">
+      <main class="arena-screen premium-surface${mobileMatch ? ' mobile-solo-arena' : ''}" data-match-variant="${engine.state.options.matchVariant}" data-battle-difficulty="${engine.state.options.battleDifficulty}" data-soft-drop="${engine.state.options.softDrop}" data-pressure="${engine.state.options.pressure}" data-conflict="${engine.state.options.conflictEnabled ? 'on' : 'off'}" data-debug-tuning="${activeTuning ? 'on' : 'off'}" data-tile-styles="${engine.state.participants.map((participant) => participant.resolvedTileStyle).join(',')}" data-pressure-start-ms="${engine.state.pressureStartMs}" data-gravity-interval-ms="${engine.state.gravityIntervalMs}" data-soft-drop-interval-ms="${engine.state.options.softDropIntervalMs}">
         ${mobileMatch ? '' : `<div class="arena-backdrop" aria-hidden="true"><div class="arena-foliage"></div></div><div id="round-timer" class="round-timer" aria-label="${initialClock.ariaLabel}"><span id="match-clock" class="round-timer-value">${formatClock(initialClock.milliseconds)}</span></div>`}
         <div class="game-stage" id="game-stage">
           <div id="game-canvas" class="game-canvas"></div>
           <div id="hud-grid" class="hud-grid" aria-live="polite"></div>
           <div id="arena-event-layer" class="arena-event-layer" aria-live="assertive"><div id="arena-event-notice" class="match-event-plaque arena-event-notice" hidden></div></div>
-          <div id="countdown" class="countdown" aria-label="${tr('countdownAria')}" hidden>3</div>
+          <div id="countdown" class="countdown" role="status" hidden>${readyTitleMarkup()}</div>
           <div id="pause-overlay" class="pause-overlay" role="dialog" aria-modal="true" aria-labelledby="pause-title" hidden>
             <section id="pause-menu-panel" class="pause-panel">
               <span id="pause-title">${tr('pausedTitle')}</span>
@@ -1495,6 +1543,13 @@ export class BricksWarApp {
     hud.style.setProperty('--solo-hud-scale', String((layout.headerHeight ?? 80) / 80));
     hud.style.setProperty('--arena-header-height', `${layout.headerHeight ?? 52}px`);
     if (arena && !arena.classList.contains('network-arena') && layout.participantCards) {
+      const divider = arena.dataset.matchVariant === 'teams' ? localTeamSurfaceDivider(layout.participantCards) : null;
+      arena.classList.toggle('has-team-surface', Boolean(divider));
+      if (divider) {
+        const offset = hud.getBoundingClientRect()[divider.axis === 'x' ? 'left' : 'top'] - arena.getBoundingClientRect()[divider.axis === 'x' ? 'left' : 'top'];
+        arena.style.setProperty('--team-surface-split', `${offset + divider.position}px`);
+        arena.style.setProperty('--team-surface-direction', divider.axis === 'x' ? '90deg' : '180deg');
+      }
       const decoration = localArenaDecoration(hud.clientWidth, layout.participantCards);
       arena.style.setProperty('--arena-free-side', `${decoration.sideWidth}px`);
       arena.style.setProperty('--arena-art-width', `${decoration.artWidth}px`);
@@ -1571,21 +1626,21 @@ export class BricksWarApp {
           ? this.playerEventRegions.resolve(participant.config.id, noticeEventKey, participant.board.grid, participant.board.active)
           : null;
         if (!noticeEventKey) this.playerEventRegions.release(participant.config.id);
-        const identity = hudIdentityForParticipant(index, state.options.matchVariant, getLocale());
+        const identity = hudIdentityForParticipant(index, state.options.matchVariant, getLocale(), participant.config.teamId);
         const shieldInventory = shieldInventoryMarkup(participant, state, getLocale());
         const compactMobileAi = isMobilePlayViewport() && participant.config.controller === 'ai';
         const mobilePlayer = mobileSoloMatch && index === 0;
         const mobileCard = this.latestArenaLayout?.participantCards?.[index];
         const mobileStyle = mobileCard ? `--mobile-x:${mobileCard.x}px;--mobile-y:${mobileCard.y}px;--mobile-width:${mobileCard.cardWidth}px;--mobile-height:${mobileCard.cardHeight}px;--out-header-height:${mobileCard.headerHeight ?? this.latestArenaLayout?.headerHeight ?? 52}px;--out-font-size:${Math.max(10, Math.min(24, Math.round(mobileCard.cardWidth / 11)))}px;` : '';
         const identityLabel = participant.config.controller === 'ai' ? (compactMobileAi ? this.aiRoleLabel(participant.config) : `${this.participantDisplayName(participant.config)} · ${this.aiRoleLabel(participant.config)}`) : this.participantDisplayName(participant.config);
-        const identityMarkup = `<div class="hud-identity">${controllerIcon(participant.config.controller, getLocale())}<strong class="${leaderIds.has(participant.config.id) ? 'is-leader' : ''}">${escapeHtml(identityLabel)}</strong>${identity.teamLabel ? `<i class="hud-team">${identity.teamLabel}</i>` : ''}</div>`;
+        const identityMarkup = `<div class="hud-identity">${controllerIcon(participant.config.controller, getLocale())}<strong class="${leaderIds.has(participant.config.id) ? 'is-leader' : ''}">${escapeHtml(identityLabel)}</strong></div>`;
         const statsMarkup = `<div class="hud-stats"><b>${tr('pointsCount', { count: participant.score.toLocaleString(getLocale()) })}</b><span>${formatPieces(participant.placedPieces, getLocale())}</span></div>`;
         const mobilePlayerMarkup = mobilePlayer
           ? `<div class="mobile-player-summary">${identityMarkup}${statsMarkup}</div>${shieldInventory}${nextPiecePreviewMarkup(participant.board.nextPiece, getLocale())}`
           : mobileSoloMatch ? `${identityMarkup}${statsMarkup}${shieldInventory}${compactMobileAi ? '' : nextPiecePreviewMarkup(participant.board.nextPiece, getLocale())}`
           : `<div class="desktop-field-heading">${identityMarkup}${statsMarkup}${shieldInventory}${nextPiecePreviewMarkup(participant.board.nextPiece, getLocale())}</div>`;
         return `
-        <article class="hud-card ${mobileSoloMatch && index === 0 ? 'mobile-player-card' : ''} ${compactMobileAi ? 'mobile-ai-card' : ''} hud-palette-${identity.palette} ${participant.board.alive ? '' : 'is-out'} ${participant.board.active?.definition.source === 'anomaly' ? 'has-active-anomaly' : ''} ${senderRows ? 'is-conflict-sender' : ''} ${incomingRows ? 'is-conflict-target' : ''} ${impactRows ? 'is-conflict-impact' : ''} ${defended || shieldBlocked ? 'is-conflict-defense' : ''} ${cleanupRows ? 'is-cleaning' : ''} ${participant.shieldReady ? 'has-shield' : ''} ${participantEvent ? 'has-player-event' : ''}" style="--preview-atlas:url('${WORKSHOP_THEME_TEXTURES[participant.resolvedTileStyle].url}');--player-name-color:${playerAccentForSlot(index)};--sender-color:${senderAccent};${mobileStyle}" data-team="${identity.teamLabel ? identity.palette : ''}" data-tile-style="${participant.resolvedTileStyle}" data-next-piece="${participant.board.nextPiece.id}" data-active-y="${participant.board.active?.y ?? ''}" data-attack-rows="${senderRows}" data-incoming-rows="${incomingRows || impactRows}" data-event-kind="${participantEvent?.kind ?? ''}" data-shield-remaining-ms="${state.shieldPresentations.find(e => e.participantId === participant.config.id)?.remainingMs ?? 0}" data-shield-debt="${state.shieldPresentations.filter(e => e.participantId === participant.config.id).reduce((n,e) => n + e.deferredImpacts.reduce((m,i) => m + i.rows, 0), 0)}" data-gray-rows="${participant.board.grid.filter(row => row.some(cell => cell === 'garbage')).length}">
+        <article class="hud-card ${mobileSoloMatch && index === 0 ? 'mobile-player-card' : ''} ${compactMobileAi ? 'mobile-ai-card' : ''} hud-palette-${identity.palette} ${participant.board.alive ? '' : 'is-out'} ${participant.board.active?.definition.source === 'anomaly' ? 'has-active-anomaly' : ''} ${senderRows ? 'is-conflict-sender' : ''} ${incomingRows ? 'is-conflict-target' : ''} ${impactRows ? 'is-conflict-impact' : ''} ${defended || shieldBlocked ? 'is-conflict-defense' : ''} ${cleanupRows ? 'is-cleaning' : ''} ${participant.shieldReady ? 'has-shield' : ''} ${participantEvent ? 'has-player-event' : ''}" style="--preview-atlas:url('${WORKSHOP_THEME_TEXTURES[participant.resolvedTileStyle].url}');--player-name-color:${playerAccentForSlot(index)};--sender-color:${senderAccent};${mobileStyle}" data-team="${identity.palette.startsWith('team-') ? identity.palette : ''}" data-tile-style="${participant.resolvedTileStyle}" data-next-piece="${participant.board.nextPiece.id}" data-active-y="${participant.board.active?.y ?? ''}" data-attack-rows="${senderRows}" data-incoming-rows="${incomingRows || impactRows}" data-event-kind="${participantEvent?.kind ?? ''}" data-shield-remaining-ms="${state.shieldPresentations.find(e => e.participantId === participant.config.id)?.remainingMs ?? 0}" data-shield-debt="${state.shieldPresentations.filter(e => e.participantId === participant.config.id).reduce((n,e) => n + e.deferredImpacts.reduce((m,i) => m + i.rows, 0), 0)}" data-gray-rows="${participant.board.grid.filter(row => row.some(cell => cell === 'garbage')).length}">
           <div class="wood-panel-shell" aria-hidden="true"></div><div class="wood-panel-foot" aria-hidden="true"></div>
           ${mobilePlayerMarkup}
           ${participant.board.alive ? '' : `<b class="out-plaque"><span class="out-plaque-symbol" aria-hidden="true">×</span><span class="out-plaque-text" lang="${getLocale()}">${tr('eliminated').toLocaleLowerCase(getLocale())}</span></b>`}
@@ -1610,7 +1665,7 @@ export class BricksWarApp {
     const countdown = this.root.querySelector<HTMLElement>('#countdown');
     if (countdown) {
       countdown.hidden = state.phase !== 'countdown' || !this.countdownReady;
-      countdown.textContent = String(Math.max(1, Math.ceil(state.countdownMs / 1000)));
+      localizeReadyTitle(countdown);
     }
     const pause = this.root.querySelector<HTMLElement>('#pause-overlay');
     const manuallyPaused = state.pauseReasons.includes('manual');
@@ -1775,21 +1830,20 @@ export class BricksWarApp {
     this.activateMenuFocus('results');
   }
 
-  private async showReleaseHistory(launcher: HTMLButtonElement): Promise<void> {
-    if (this.root.querySelector('[data-release-history]')) return;
-    const screen = this.router.current();
-    const request = new AbortController();
-    const backdrop = document.createElement('div'); backdrop.className = 'profile-choice-backdrop';
-    backdrop.innerHTML = `<section class="release-panel release-history" data-release-history role="dialog" aria-modal="true" aria-labelledby="release-history-title"><h2 id="release-history-title">${tr('releaseHistory')}</h2><p role="status">${tr('historyLoading')}</p><div class="release-history-list" data-history-scroll data-ui-focus tabindex="0" role="region" aria-labelledby="release-history-title"></div><button type="button" data-history-back data-ui-focus>${tr('historyClose')}</button><footer class="preferences-guidance-footer">${gamepadFooterHintsMarkup()}</footer></section>`;
-    const close = () => {
-      request.abort(); backdrop.remove(); this.activateMenuFocus(screen);
-      const items = Array.from(this.root.querySelectorAll<HTMLElement>(`[data-screen="${screen}"] [data-ui-focus]:not([disabled])`))
-        .filter(item => item.getClientRects().length > 0 && !item.hidden && !item.closest('[hidden]'));
-      this.menuFocus.activate(screen, Math.max(0, items.indexOf(launcher)));
-      if (items.includes(launcher)) launcher.focus({ preventScroll: true });
-    };
-    backdrop.querySelector('[data-history-back]')?.addEventListener('click', close);
-    this.root.append(backdrop); this.activateMenuFocus(screen);
+  private async showReleaseHistory(_launcher: HTMLButtonElement): Promise<void> {
+    this.historyParent = this.router.current();
+    this.historyLauncherSelector = _launcher.id ? `#${_launcher.id}` : '.desktop-release-history';
+    this.navigate('history', this.historyParent);
+  }
+
+  private async renderReleaseHistory(): Promise<void> {
+    this.destroyGame(); this.audio.enterMenu();
+    this.historyRequest?.abort();
+    const request = new AbortController(); this.historyRequest = request;
+    this.root.innerHTML = `<main class="release-screen premium-surface history-screen" data-screen="history" data-release-history><header><h1 id="release-history-title">${tr('releaseHistory')}</h1></header><p role="status">${tr('historyLoading')}</p><div class="release-history-list" data-history-scroll data-ui-focus tabindex="0" role="region" aria-labelledby="release-history-title"></div><button type="button" data-history-back data-ui-focus>${tr('back')}</button></main>`;
+    const backdrop = this.root.querySelector<HTMLElement>('[data-release-history]')!;
+    backdrop.querySelector('[data-history-back]')?.addEventListener('click', () => this.navigateBack());
+    this.activateMenuFocus('history');
     try {
       const rows: ReleaseHistoryRow[] = desktop ? await desktop.history(getLocale()) : await webReleaseHistory(getLocale(),request.signal);
       if (!backdrop.isConnected) return;
@@ -1851,7 +1905,7 @@ export class BricksWarApp {
     if (!panel.hasAttribute('data-network-preferences')) this.root.querySelector('#pause-overlay')?.setAttribute('aria-labelledby', 'pause-settings-title');
     panel.innerHTML = `<h2 id="pause-settings-title">${tr('settings')}</h2><div class="pause-preferences-scroll"><div class="pause-preferences-columns"><div class="pause-preferences-column">${languageSettingsMarkup()}<section class="release-panel pause-preferences-card pause-audio-card"><h3>${tr('soundTitle')}</h3>${this.setupAudioMarkup()}</section></div><div class="pause-preferences-column"><section class="release-panel pause-preferences-card pause-display-card"><h3>${tr('display')}</h3>
       ${desktop ? `<label class="settings-action"><span>${tr('resolution')}</span><select data-pause-resolution><option value="auto" ${this.desktopDisplay.auto ? 'selected' : ''}>${tr('resolutionAuto')}</option>${(this.desktopDisplay.resolutions ?? [[1280,720]]).map(([w,h]) => `<option value="${w}x${h}" ${!this.desktopDisplay.auto && w === this.desktopDisplay.width && h === this.desktopDisplay.height ? 'selected' : ''}>${w} × ${h}</option>`).join('')}</select></label><label class="settings-action"><span>${tr('windowMode')}</span><select data-pause-window><option value="windowed" ${!this.desktopDisplay.fullscreen ? 'selected' : ''}>${tr('windowed')}</option><option value="fullscreen" ${this.desktopDisplay.fullscreen ? 'selected' : ''}>${tr('fullscreen')}</option></select></label>` : `<button type="button" data-pause-fullscreen>${tr('fullscreen')}</button>`}
-      <label class="settings-action"><span>${tr('calm')}</span><input data-pause-calm type="checkbox" ${this.releaseSettings.calmEffects ? 'checked' : ''} /></label>${this.displayPreferencesMarkup()}</section>${this.stickPreferencesMarkup()}</div></div></div><div class="pause-preferences-actions"><button id="pause-settings-back" ${panel.hasAttribute('data-network-preferences') ? 'data-network-prefs-back' : ''} type="button">← ${tr('backPause')}</button>${footerResetButtonMarkup()}</div><footer class="preferences-guidance-footer"><div class="release-footer-actions">${gamepadFooterAction('select', 'confirm')}${gamepadFooterAction('back', 'back')}</div><output data-preferences-status role="status"></output></footer>`;
+      <label class="settings-action"><span>${tr('calm')}</span><input data-pause-calm type="checkbox" ${this.releaseSettings.calmEffects ? 'checked' : ''} /></label>${this.displayPreferencesMarkup()}</section>${this.stickPreferencesMarkup()}</div></div></div><div class="pause-preferences-actions"><button id="pause-settings-back" ${panel.hasAttribute('data-network-preferences') ? 'data-network-prefs-back' : ''} type="button">${faceGlyph('back')}<span>${tr('backPause')}</span></button>${footerResetButtonMarkup()}</div><output data-preferences-status role="status"></output>`;
     panel.querySelector('#pause-settings-back')?.addEventListener('click', onBack);
     panel.querySelector('[data-pause-calm]')?.addEventListener('change', event => { this.releaseSettings.calmEffects = (event.target as HTMLInputElement).checked; document.body.classList.toggle('calm-effects', this.releaseSettings.calmEffects); this.persistPreferences(); });
     panel.querySelector('[data-pause-fullscreen]')?.addEventListener('click', () => { void (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch(() => { const status = panel.querySelector('[data-preferences-status]'); if (status) status.textContent = localeText('displayFailed'); }); });
@@ -1873,7 +1927,7 @@ export class BricksWarApp {
       if (this.game) {
         const labels = { 'continue-match': 'journeyContinue', 'restart-match': 'journeyRestart', 'pause-settings': 'settings', 'return-to-menu': 'menu', 'viewport-warning': 'viewportWarning' } as const;
         for (const [id, key] of Object.entries(labels)) { const element = this.root.querySelector(`#${id}`); if (element) element.textContent = localeText(key); }
-        this.root.querySelector('#countdown')?.setAttribute('aria-label', localeText('countdownAria'));
+        const ready=this.root.querySelector<HTMLElement>('#countdown');if(ready)localizeReadyTitle(ready);
         this.root.querySelector('[data-mobile-touch-zones]')?.setAttribute('aria-label', localeText('mobileTouchAria'));
       }
       const status = this.root.querySelector<HTMLOutputElement>('[data-language-status]');
@@ -1987,15 +2041,7 @@ export class BricksWarApp {
   }
 
   private bindMenuAudioUnlock(): void {
-    const unlock = (): void => {
-      this.root.removeEventListener('pointerdown', unlock);
-      this.root.removeEventListener('keydown', unlock);
-      this.audio.unlock();
-      this.audio.enterMenu();
-      this.refreshAudioButtons();
-    };
-    this.root.addEventListener('pointerdown', unlock);
-    this.root.addEventListener('keydown', unlock);
+    bindMenuAudio(this.root, this.audio, () => this.refreshAudioButtons(), Boolean(desktop) && !this.startupMuted);
   }
 
   private bindAudioToggle(): void {

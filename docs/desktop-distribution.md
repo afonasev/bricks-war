@@ -178,6 +178,8 @@ Verification must exercise shell-dependent features such as the live native rati
 
 
 ## Changelog screenshots
+
+Always capture changelog/release-note screenshots with the game language set to English. Reuse the same English image set for every notes locale; do not create per-language screenshot sets for now.
 Release-note images use Markdown `![caption](https://raw.githubusercontent.com/afonasev/bricks-war/<40-character-commit>/docs/release-notes/<version>/<image>.png)`. Export and publish the screenshot sources first, then reference their immutable public commit. Raster PNG/JPEG/WebP/GIF images are supported; native transport caps each image at4MiB. Other origins, mutable refs, redirects and HTML are not enabled. Failed images retain a localized fallback and caption.
 
 The inline-image renderer and the native image transport must be delivered together for desktop image support. Existing v1.11.0 shells lack that route and can only show the unavailable-image fallback. A future release of this feature needs a separately authorized native rebuild/publication and a matching minimum-shell release before content publication; the current source change does not publish or choose a new shell version.

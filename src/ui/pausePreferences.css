@@ -4,8 +4,8 @@
 #app .pause-settings-panel.pause-preferences-grid {
   --preferences-gap:16px;
   display:flex; flex-direction:column; align-items:stretch; gap:12px;
-  width:min(900px,calc(100% - 24px)); height:min(760px,calc(100dvh - 24px));
-  max-height:760px; min-height:0; padding:20px; box-sizing:border-box;
+  width:min(900px,calc(100% - 24px)); height:auto;
+  max-height:min(760px,calc(100dvh - 24px)); min-height:0; padding:16px; box-sizing:border-box;
 }
 #app .pause-settings-panel.pause-preferences-grid > h2 { flex:0 0 auto; margin:0; font-size:26px; line-height:1.2; }
 #app .pause-settings-panel.pause-preferences-grid .pause-preferences-scroll {
@@ -89,3 +89,7 @@
   color:var(--text); font-weight:850; text-align:left;
 }
 #app .pause-settings-panel.pause-preferences-grid .settings-action input[type=checkbox] { min-height:26px; padding:0; }
+
+/* Back guidance belongs to its action; an empty status must reserve no footer. */
+#app .pause-settings-panel.pause-preferences-grid #pause-settings-back { display:inline-flex; align-items:center; justify-content:center; gap:8px; }
+#app .pause-settings-panel.pause-preferences-grid > [data-preferences-status]:empty { display:none; }

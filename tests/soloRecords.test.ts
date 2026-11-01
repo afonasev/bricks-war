@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { loadSoloRecords, saveSoloRecord, saveSurvivalRecords, SOLO_RECORDS_STORAGE_KEY } from '../src/ui/soloRecords';
+import { resetSoloRecords, loadSoloRecords, saveSoloRecord, saveSurvivalRecords, SOLO_RECORDS_STORAGE_KEY } from '../src/ui/soloRecords';
 
 function memory(initial?: string) {
   const values = new Map<string, string>();
@@ -77,4 +77,20 @@ describe('solo records', () => {
     expect(result.rankedIds).toEqual([]);
     expect(result.unranked.map((record) => record.id)).toEqual(['current-low']);
   });
+});
+
+it('resets only the local record table and persists an empty table for the next session', () => {
+  const store = memory(JSON.stringify([{name:'Legacy',lineScore:900,elapsedMs:1000}]));
+  store.setItem('bricks-war:language:v1', 'ru');
+  store.setItem('bricks-war:global-rating-outbox:survival-pressure-v2', '["pending"]');
+  expect(resetSoloRecords(store)).toBe(true);
+  expect(loadSoloRecords(store)).toEqual([]);
+  expect(store.getItem(SOLO_RECORDS_STORAGE_KEY)).toBe('[]');
+  expect(store.getItem('bricks-war:language:v1')).toBe('ru');
+  expect(store.getItem('bricks-war:global-rating-outbox:survival-pressure-v2')).toBe('["pending"]');
+});
+it('reports local record reset failure for blocked, absent or non-writable storage', () => {
+  expect(resetSoloRecords(null)).toBe(false);
+  expect(resetSoloRecords({getItem:()=> 'old',setItem:()=>{throw Error('blocked');}})).toBe(false);
+  expect(resetSoloRecords({getItem:()=> 'old',setItem:()=>{}})).toBe(false);
 });

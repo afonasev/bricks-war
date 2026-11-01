@@ -44,3 +44,11 @@
   display:block; width:14px; height:10px; pointer-events:none;
   fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round;
 }
+
+/* Ordinary and compact style editing use the same phone card footprint. */
+#app[data-layout="mobile"] .unified-lobby .lobby-card[class][data-lobby-slot]:not(.is-empty):is(:not(.is-editing),.is-style-editing) {
+  height:236px; min-height:236px; max-height:236px;
+}
+@media(max-width:360px) {
+  #app[data-layout="mobile"] .unified-lobby .lobby-card.is-style-editing h2 { font-size:22px; }
+}

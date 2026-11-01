@@ -19,7 +19,7 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
   frames = new Map(); listeners = new Map(); removed = false; let id = 0;
   element = { hidden: false, remove: () => { removed = true; }, setAttribute: () => {}, innerHTML: '', className: '', classList: { add: () => {} } };
-  vi.stubGlobal('document', { documentElement: { lang: '' }, createElement: () => element, body: { append: () => {} } });
+  vi.stubGlobal('document', { documentElement: { lang: '' }, querySelector: () => null, createElement: () => element, body: { append: () => {} } });
   vi.stubGlobal('window', { matchMedia: () => ({ matches: false }), addEventListener: (name: string, fn: (event: unknown) => void) => listeners.set(name, fn), removeEventListener: (name: string) => listeners.delete(name) });
   vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => { frames.set(++id, callback); return id; });
   vi.stubGlobal('cancelAnimationFrame', (key: number) => frames.delete(key));
@@ -96,3 +96,20 @@ describe('selected match-loading language', () => {
     } finally { setLocale(previous, null); }
   });
 });
+
+ it('reports prepared after the minimum and holds loading until the common network start', async () => {
+  const loading = new MatchLoading(); await painted(loading);
+  const prepared = vi.fn(); let sharedReady = false;
+  const completion = loading.ready({prepared, canReveal: () => sharedReady});
+  await vi.advanceTimersByTimeAsync(1_999); expect(prepared).not.toHaveBeenCalled();
+  await vi.advanceTimersByTimeAsync(1); expect(prepared).toHaveBeenCalledOnce();
+  await frame(); expect(removed).toBe(false);
+  sharedReady = true; await frame(); await frame();
+  expect(await completion).toBe(true); expect(removed).toBe(true);
+ });
+ it('cancels a pending shared start without leaving frame callbacks or stale completion', async () => {
+  const loading = new MatchLoading(); await painted(loading);
+  const completion = loading.ready({prepared: () => {}, canReveal: () => false});
+  await vi.advanceTimersByTimeAsync(2_000); await frame(); loading.cancel();
+  expect(await completion).toBe(false); expect(frames.size).toBe(0); expect(listeners.size).toBe(0);
+ });

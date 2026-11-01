@@ -8,10 +8,15 @@ export async function expectDesktopFit(page: Page): Promise<void> {
     const scope = overlay ?? document.querySelector('main')!;
     const nodes = [...scope.querySelectorAll<HTMLElement>('button,input,textarea,h1,h2,h3,label,li,.release-footer-action,.release-guidance-footer small,.hud-header,.hud-identity')].filter(visible);
     const rects = nodes.map(el => ({ el, r: el.getBoundingClientRect(), name: el.getAttribute('aria-label') || el.textContent?.trim().slice(0,80) }));
-    const offscreen = rects.filter(({r}) => r.left < -1 || r.top < -1 || r.right > innerWidth + 1 || r.bottom > innerHeight + 1).map(({name}) => name);
-    const controls = rects.filter(({el}) => el.matches('button,input,textarea') && !el.matches('[type="range"]'));
+    // Laboratory fields intentionally share a vertical scroll region; their full reachability is checked below.
+    const offscreen = rects.filter(({el,r}) => r.left < -1 || r.right > innerWidth + 1 || (!el.closest('.laboratory-single-page .debug-lab-content') && (r.top < -1 || r.bottom > innerHeight + 1))).map(({name}) => name);
+    const controls = rects.filter(({el,r}) => {
+      if (!el.matches('button,input,textarea') || el.matches('[type="range"]')) return false;
+      const scroll = el.closest('.laboratory-single-page .debug-lab-content')?.getBoundingClientRect();
+      return !scroll || (r.top >= scroll.top && r.bottom <= scroll.bottom);
+    });
     const overlap = controls.flatMap((a,i) => controls.slice(i+1).filter(b => !a.el.contains(b.el) && !b.el.contains(a.el) && Math.min(a.r.right,b.r.right)>Math.max(a.r.left,b.r.left)+1 && Math.min(a.r.bottom,b.r.bottom)>Math.max(a.r.top,b.r.top)+1).map(b => [a.name,b.name]));
-    const overflow = [...scope.querySelectorAll<HTMLElement>('.setup-scroll,.mode-setup-content,.release-panel,.debug-lab-content,.debug-group,.debug-field,.controls-reference,.keyboard-reference,.settings-list,.mode-settings,.participant-card'),scope as HTMLElement].filter(visible).filter(el => el.scrollHeight>el.clientHeight+1 || el.scrollWidth>el.clientWidth+1).map(el => [el.className,el.clientHeight,el.scrollHeight,el.clientWidth,el.scrollWidth]);
+    const overflow = [...scope.querySelectorAll<HTMLElement>('.setup-scroll,.mode-setup-content,.release-panel,.debug-lab-content,.debug-group,.debug-field,.controls-reference,.keyboard-reference,.settings-list,.mode-settings,.participant-card'),scope as HTMLElement].filter(visible).filter(el => (el.scrollHeight>el.clientHeight+1 && !el.matches('.laboratory-single-page .debug-lab-content')) || el.scrollWidth>el.clientWidth+1).map(el => [el.className,el.clientHeight,el.scrollHeight,el.clientWidth,el.scrollWidth]);
     const nameContainment = [...scope.querySelectorAll<HTMLElement>('[data-player-name]')].filter(visible).flatMap(el => {
       const field = el.getBoundingClientRect();
       return [el.closest('header'), el.closest('.participant-card')].flatMap(parent => {
@@ -66,14 +71,16 @@ for (const [width,height] of ([[1920,1080],[2560,1440],[1440,960],[1366,768],[12
       await expectDesktopFit(page);
       await page.getByRole('button',{name:'Настроить участника 1',exact:true}).click();
       await expect(page.getByRole('textbox',{name:'Новое имя участника 1'})).toHaveCount(0);
-      await expect(page.getByRole('heading',{name:'Стиль фигур',exact:true})).toBeVisible();
-      await expect(page.locator('[data-style]')).toHaveCount(7);
+      await expect(page.locator('.is-style-editing .lobby-editor-title')).toHaveCount(0);
+      await expect(page.locator('[data-style]')).toHaveCount(1);
       await expect(page.locator('[data-style="random"]')).toHaveAttribute('data-default-choice','true');
       await expect(page.locator('[data-style="random"]')).toBeFocused();
-      await expect(page.locator('.lobby-theme-list [aria-pressed]')).toHaveCount(0);
-      // Style choices live in a bounded scroll list. Verify every choice is fully
-      // reachable rather than treating masked offscreen rows as visible controls.
-      for (const option of await page.locator('[data-style]').all()) {
+      await expect(page.locator('.lobby-theme-wheel [aria-pressed]')).toHaveCount(0);
+      // Every style is reachable through the visible arrows, with no hidden list.
+      const seenStyles = new Set<string>();
+      for (let styleIndex=0;styleIndex<7;styleIndex++) {
+        const option = page.locator('[data-style]');
+        seenStyles.add((await option.getAttribute('data-style'))!);
         await option.scrollIntoViewIfNeeded();
         const fits = await option.evaluate(el => {
           const row = el.getBoundingClientRect(), list = el.parentElement!.getBoundingClientRect();
@@ -85,21 +92,33 @@ for (const [width,height] of ([[1920,1080],[2560,1440],[1440,960],[1366,768],[12
             && el.scrollWidth <= el.clientWidth + 1;
         });
         expect(fits).toBe(true);
+        await page.locator('[data-wheel-down]').click();
       }
+      expect(seenStyles.size).toBe(7);
       await page.locator('[data-cancel="0"]').click();
       await expectDesktopFit(page);
       await page.locator('[data-lobby-back]').click();
     }
     await page.getByRole('button',{name:/^Настройки/}).click(); await expectDesktopFit(page);
     await page.getByRole('button',{name:/^Подробнее об управлении/}).click(); await expectDesktopFit(page);
-    await page.getByRole('button',{name:'← Настройки',exact:true}).click();
+    await page.locator('#controls-back').click();
     await page.getByRole('button',{name:/^Лаборатория дизайна/}).click();
     const field = page.getByLabel('Предельное падение',{exact:true}); await field.fill('210');
     await expectDesktopFit(page);
-    while (await page.getByRole('button',{name:'Следующий раздел →',exact:true}).isEnabled()) {
-      await page.getByRole('button',{name:'Следующий раздел →',exact:true}).click(); await expectDesktopFit(page);
+    await expect(page.locator('.desktop-lab-pages')).toHaveCount(0);
+    const fields = page.locator('.debug-lab-content input,.debug-lab-content textarea');
+    expect(await fields.count()).toBeGreaterThan(40);
+    for (const control of await fields.all()) {
+      await control.evaluate(el => el.closest('.debug-field')!.scrollIntoView({block:'center',inline:'nearest'}));
+      const fits = await control.evaluate(el => {
+        const field = el.closest('.debug-field')!.getBoundingClientRect();
+        const viewport = el.closest('.debug-lab-content')!.getBoundingClientRect();
+        return field.left >= viewport.left && field.right <= viewport.right
+          && field.top >= viewport.top - 1 && field.bottom <= viewport.bottom + 1;
+      });
+      expect(fits).toBe(true);
     }
-    while (await page.getByRole('button',{name:'← Предыдущий раздел',exact:true}).isEnabled()) await page.getByRole('button',{name:'← Предыдущий раздел',exact:true}).click();
+    await expectDesktopFit(page);
     await expect(field).toHaveValue('210');
     await page.getByRole('button',{name:'Сохранить',exact:true}).click();
     await expect(page.locator('.debug-lab-actions output')).toContainText('Сохран');

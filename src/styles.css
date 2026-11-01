@@ -397,6 +397,8 @@ h1 span { display: block; color: #ffd21f; -webkit-text-stroke: 2px #ef6416; }
 .setup-audio-controls { align-self: flex-start; display: grid; gap: 7px; margin-top: clamp(10px, 1.6vh, 18px); }
 .volume-control { display: grid; grid-template-columns: auto minmax(96px, 150px) 42px; align-items: center; gap: 9px; color: var(--muted); font: 800 0.61rem ui-monospace, monospace; letter-spacing: 0.06em; text-transform: uppercase; }
 .volume-control input { width: 100%; accent-color: var(--green); cursor: pointer; }
+/* Native slider tracks do not need the inset underline used by text fields. */
+#app .volume-control input[type="range"] { box-shadow:none; }
 .volume-control output { color: var(--cyan); text-align: right; font-variant-numeric: tabular-nums; }
 
 .player-name-control { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 5px; color: var(--muted); font: 700 0.58rem ui-monospace, monospace; text-transform: uppercase; }
@@ -719,7 +721,18 @@ body.calm-effects .shield-slot.is-burning { animation: none; transform: none; op
 body.calm-effects .shield-slot.is-gain { filter: drop-shadow(0 0 8px #1bcff0); }
 body.calm-effects .shield-slot.is-burning { filter: drop-shadow(0 0 8px #ff7626); }
 .countdown, .pause-overlay { position: absolute; inset: 0; z-index: 8; display: grid; place-items: center; background: rgba(39, 127, 164, 0.16); backdrop-filter: blur(5px); }
-.countdown { color: #9b6800; font: 900 clamp(7rem, 22vw, 18rem)/1 ui-monospace, monospace; text-shadow: 0 0 80px rgba(255, 210, 80, 0.42); }
+.countdown { background: rgba(255, 248, 224, .12); backdrop-filter: blur(3px); pointer-events: none; container-type: inline-size; }
+.ready-title { display: flex; align-items: center; justify-content: center; gap: .16em; max-width: 96%; padding: .2em .08em .35em; font: 1000 clamp(2.4rem, 10cqw, 8rem)/1.15 "Avenir Next", "Trebuchet MS", ui-rounded, sans-serif; letter-spacing: -.055em; animation: ready-arrive 240ms cubic-bezier(.2,.8,.3,1) both; }
+.ready-label { color: #fff5d8; -webkit-text-stroke: .055em #64330f; paint-order: stroke fill; text-shadow: 0 .045em 0 #b57730, 0 .085em 0 #64330f, 0 .12em .12em #48240366; transform: rotate(-3deg); white-space: nowrap; }
+.ready-blocks { display: grid; gap: .04em; flex: 0 0 auto; transform: rotate(-13deg); }
+.ready-blocks-right { transform: rotate(13deg); }
+.ready-blocks i { display: block; width: .28em; height: .28em; border: .018em solid #08719b; border-radius: .045em; background: linear-gradient(135deg, #6fe8ff, #00aee9 60%, #008bc1); box-shadow: inset .018em .018em .012em #ffffffbd, inset -.025em -.025em .015em #003f794d, 0 .025em 0 #65411a; }
+.ready-blocks i + i { margin-left: .12em; border-color: #ba8008; background: linear-gradient(135deg, #fff08a, #ffd229 60%, #e8a900); }
+.ready-blocks-right i { border-color: #7120b5; background: linear-gradient(135deg, #e4a5ff, #a943ed 60%, #8126c5); }
+.ready-blocks-right i + i { margin-left: -.1em; border-color: #48831a; background: linear-gradient(135deg, #c4fb66, #82cf20 60%, #5ca80b); }
+@keyframes ready-arrive { from { opacity: 0; transform: scale(.86) translateY(.08em); } to { opacity: 1; transform: scale(1) translateY(0); } }
+body.calm-effects .ready-title { animation: none; }
+@media (prefers-reduced-motion: reduce) { .ready-title { animation: none; } }
 .pause-overlay { z-index: 9; align-content: center; gap: 12px; text-align: center; }
 .pause-panel > span { font-size: 2.5rem; font-weight: 850; }
 .pause-overlay small { color: var(--muted); }
@@ -1866,7 +1879,8 @@ html { touch-action: pan-x pan-y; overscroll-behavior: none; }
 .release-history-list { overflow-y: auto; min-height: 0; }
 .release-history pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; font-size: .85rem; }
 .release-history button, .desktop-release-history, .desktop-cancel-download { min-height: 38px; padding: 8px 12px; border: 2px solid #9bb9d2; border-radius: 10px; color: #31577f; background: #fff; }
-.release-history [data-history-back] { flex-shrink: 0; }
+#app:has([data-release-history]) .release-guidance-footer { visibility: hidden; }
+.release-history [data-history-back] { flex-shrink: 0; display: flex; align-items: center; justify-content: center; gap: 10px; }
 .release-notes { min-width: 0; }
 .release-notes figure { margin: 12px 0 18px; }
 .release-notes img { display: block; width: auto; max-width: 100%; height: auto; border: 1px solid #bfa376; border-radius: 8px; background: #fff9e9; }
@@ -2257,3 +2271,17 @@ html:has(.settings-screen), body:has(.settings-screen) { height:100dvh; overflow
   height: auto; margin: 1px 0 0; justify-content: start;
 }
 #app .mobile-solo-arena .mobile-ai-card .hud-stats b { font-size: 7px; line-height: 1.1; }
+
+/* Back guidance belongs to the actionable header button on these pages. */
+#app :is(#settings-back, #controls-back) { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+
+/* Local record deletion keeps its confirmation inside the Settings scroll area. */
+#app .record-reset-confirm { padding: 16px; width: 100%; }
+#app .record-reset-confirm[hidden] { display: none; }
+#app .record-reset-confirm h2 { font-size: 18px; margin: 0 0 8px; overflow-wrap: anywhere; }
+#app .record-reset-confirm p { margin: 0 0 12px; }
+#app .record-reset-confirm > div { display: flex; gap: 12px; flex-wrap: wrap; }
+#app .record-reset-confirm button { min-height: 44px; padding: 8px 16px; white-space: normal; border: 1px solid #c6a06c; border-radius: 10px; background: #fff9eb; color: var(--workshop-ink); font: 700 14px/1.2 'Trebuchet MS', sans-serif; box-shadow: 0 2px #af794144; }
+#app [data-record-reset-status]:empty { display: none; }
+
+#app [data-record-reset-status] { width: 100%; }

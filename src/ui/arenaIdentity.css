@@ -1,0 +1,16 @@
+/* Agreed header identity: only the backing changes; gameplay cells stay neutral. */
+#app .arena-screen .hud-palette-slot-1 { --identity-header:#e0edbf; }
+#app .arena-screen .hud-palette-slot-2 { --identity-header:#c8e9ec; }
+#app .arena-screen .hud-palette-slot-3 { --identity-header:#e6d2f3; }
+#app .arena-screen .hud-palette-slot-4 { --identity-header:#f4d3c6; }
+#app .arena-screen .hud-palette-team-1 { --identity-header:#f1dfac; }
+#app .arena-screen .hud-palette-team-2 { --identity-header:#c6def2; }
+#app .arena-screen #hud-grid .hud-card,
+#app .arena-screen .network-field-card {
+  --identity-header-height:var(--out-header-height,var(--network-header,var(--arena-header-height,52px)));
+  background:linear-gradient(to bottom,var(--identity-header) 0 var(--identity-header-height),transparent var(--identity-header-height));
+}
+#app .arena-screen.has-team-surface:not(.mobile-solo-arena):not(.network-arena) {
+  background-image:linear-gradient(var(--team-surface-direction,90deg),#dfb76c 0 var(--team-surface-split),#87afce var(--team-surface-split) 100%),var(--maple-texture);
+  background-position:center; background-size:cover; background-blend-mode:color,normal;
+}

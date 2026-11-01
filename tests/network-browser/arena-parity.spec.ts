@@ -2,7 +2,7 @@ import { mkdir } from 'node:fs/promises';
 import { test, expect } from '@playwright/test';
 
 test('ordinary arena surfaces retain complete network names and disjoint HUD across viewports', async ({ browser, baseURL }) => {
-  const contexts = await Promise.all(Array.from({ length: 4 }, () => browser.newContext({ baseURL, viewport: { width: 1600, height: 900 } })));
+  const contexts = await Promise.all(Array.from({ length: 4 }, () => browser.newContext({ baseURL, locale:'ru-RU', viewport: { width: 1600, height: 900 } })));
   const pages = await Promise.all(contexts.map(context => context.newPage()));
   const host = pages[0]!;
   const room = `Arena parity ${Date.now()}`;

@@ -125,3 +125,7 @@
 
 /* Version and credits need dark ink on the exposed wood, independent of panel metadata. */
 #app[data-layout] .workshop-menu.main-menu-screen .release-metadata { color:#33200f; -webkit-text-stroke:1.5px #fffaf0; paint-order:stroke fill; }
+
+@media (min-width: 901px) {
+  #app[data-layout] .workshop-menu.settings-screen[data-screen="settings"] .settings-utility .settings-links:has(#reset-local-records) { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+}

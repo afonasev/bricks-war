@@ -132,14 +132,14 @@ export class UnifiedLobby {
             const editorSlot = ownEntry?.[0];
             const editor = editorSlot === undefined ? null : this.editors.get(editorSlot);
             const direction = ({ArrowUp:'previous',ArrowDown:'next',ArrowLeft:'decrease',ArrowRight:'increase'} as const)[event.key as 'ArrowUp'];
-            if (direction && editor && !editor.typing && editor.step === 'name') {
+            if (direction && editor && !editor.typing && (editor.step === 'name' || editor.step === 'style')) {
                 event.preventDefault(); event.stopImmediatePropagation();
                 this.turnWheel(editorSlot!, ['previous','decrease'].includes(direction) ? -1 : 1); return;
             }
             if (['Enter',' '].includes(event.key)) {
                 event.preventDefault(); event.stopImmediatePropagation();
                 if (event.repeat) return;
-                if (editor?.step === 'name' && !editor.typing) this.root.querySelector<HTMLElement>(`[data-lobby-slot="${editorSlot}"] [data-wheel-center]`)?.click();
+                if ((editor?.step === 'name' || editor?.step === 'style') && !editor.typing) this.root.querySelector<HTMLElement>(`[data-lobby-slot="${editorSlot}"] [data-wheel-center]`)?.click();
                 else target.closest<HTMLElement>('button,[data-edit]')?.click();
                 return;
             }
@@ -180,14 +180,14 @@ export class UnifiedLobby {
         this.lastWidth = innerWidth;
         this.lastHeight = innerHeight;
         this.root.innerHTML = `<main class="unified-lobby" data-screen="${mode}" data-mode="${mode}" data-menu-owner="${this.menuOwner.kind === 'pointer' ? 'pointer' : `gamepad-${this.menuOwner.index}`}">
-      <header class="lobby-heading"><img src="${logo}" alt="Bricks War"><h1>${copy('Лобби')}</h1><span>${copy('Мастерская')}</span></header>
+      <header class="lobby-heading"><img src="${logo}" alt="Bricks War"><h1>${copy('Лобби')}</h1></header>
       <section class="lobby-settings" aria-label="${copy('Настройки матча')}">
         <button class="lobby-mode" data-cycle-mode aria-label="${copy('Режим')}: ${escape(modeName(mode))}. ${copy('Следующий режим')}" style="--mode-art:url('${MAIN_MENU_PREVIEWS[mode].image}')"><span>${escape(modeName(mode))}<b>›</b></span></button>
         ${mode === 'survival' ? `<button class="lobby-rating-action" data-open-rating>★ ${copy('Рейтинг')} <b>›</b></button>` : h.settings()}
         <button class="lobby-help" data-open-rules aria-label="${copy('Правила игры')}">?</button>
       </section>
       <div class="lobby-body ${beside ? 'with-rating' : ''}"><section class="lobby-roster" aria-label="${copy('Участники')}"><div class="lobby-cards">${mode === 'team-battle' ? [0,1].map(team => `<div class="lobby-team team-${team}" aria-hidden="true"></div>`).join('') : ''}${indices.map(i => this.card(i)).join('')}</div></section>${beside ? `<aside class="lobby-rating survival-records">${this.rating()}</aside>` : ''}</div>
-      <footer class="lobby-footer"><button data-lobby-back>${key('B')} <span data-lobby-back-label>${copy('В меню')}</span></button><span class="lobby-confirm-hint">${key('A')} ${copy('Выбрать')}</span><div class="lobby-start-group"><p id="setup-error" role="status" aria-live="polite"></p><button id="start-match" class="lobby-start">${copy('Начать игру')} ${key('≡', 'menu')}</button></div></footer>
+      <footer class="lobby-footer"><button data-lobby-back>${key('B')} <span data-lobby-back-label>${copy('В меню')}</span></button><div class="lobby-start-group"><p id="setup-error" role="status" aria-live="polite"></p><button id="start-match" class="lobby-start">${copy('Начать игру')} ${key('≡', 'menu')}</button></div></footer>
       <div class="lobby-overlay" ${this.overlay ? '' : 'hidden'}></div>
     </main>`;
         h.bindSettings();
@@ -236,12 +236,12 @@ export class UnifiedLobby {
         const bot = value.startsWith('ai-');
         const disconnected = !h.connected(slot);
         const color = slot;
-        return `<article class="lobby-card color-${color} ${draft?.typing ? 'is-typing' : ''} ${empty ? 'is-empty' : ''} ${draft ? 'is-editing' : ''} ${disconnected ? 'is-disconnected' : ''}" style="--slot:${slot};--player-name-color:${playerAccentForSlot(slot)}" data-lobby-slot="${slot}" ${empty && h.mode() !== 'survival' ? 'data-empty-bot' : ''} ${!empty && !draft ? `data-edit="${slot}" role="button" tabindex="0"` : ''} aria-label="${copy(!empty && !draft ? 'Настроить участника' : 'Участник')} ${slot + 1}">
+        return `<article class="lobby-card color-${color} ${draft?.typing ? 'is-typing' : ''} ${empty ? 'is-empty' : ''} ${draft ? 'is-editing' : ''} ${draft?.step === 'style' ? 'is-style-editing' : ''} ${disconnected ? 'is-disconnected' : ''}" style="--slot:${slot};--player-name-color:${playerAccentForSlot(slot)}" data-lobby-slot="${slot}" ${empty && h.mode() !== 'survival' ? 'data-empty-bot' : ''} ${!empty && !draft ? `data-edit="${slot}" role="button" tabindex="0"` : ''} aria-label="${copy(!empty && !draft ? 'Настроить участника' : 'Участник')} ${slot + 1}">
       ${draft ? this.editorMarkup(slot, draft) : empty ? `${h.mode() === 'survival' ? '<span class="lobby-plus" aria-hidden="true">+</span>' : `<button data-bot="${slot}" class="lobby-add-bot"><span class="lobby-plus" aria-hidden="true">+</span><span class="lobby-bot-label">${key('X')} ${copy('Добавить бота')}</span></button>`}<button data-join="${slot}">${key('Y')} ${copy('Присоединиться')}</button>` : `
         <div class="lobby-card-mark"><span>${bot ? copy('СОПЕРНИК') : `${copy('ИГРОК')} ${slot + 1}`}</span>${controllerIcon(bot ? 'ai' : isMobilePlayViewport() && value === 'human-1' ? 'mobile-touch' : value, getLocale())}</div>
         <h2>${bot ? `${copy('Бот')} <small>· ${escape(levelName(value.slice(3) as AiDifficulty).toLocaleLowerCase(getLocale()))}</small>` : escape(h.names[slot]!)}</h2>
         <p class="lobby-ready">${disconnected ? '⚠ ' + copy('Геймпад отключён') : '✓ ' + copy('Готов')}</p>
-        <div class="lobby-well">${this.piece(h.styles[slot]!)}</div><p class="lobby-style-label">${escape(styleName(h.styles[slot]!))}</p>
+        ${this.stylePreview(h.styles[slot]!)}
         <button class="lobby-remove" title="${copy('Удерживайте X, чтобы удалить участника')}" data-remove="${slot}" aria-label="${copy('Удалить участника')} ${slot + 1}">×</button>`}
     </article>`;
     }
@@ -261,12 +261,15 @@ export class UnifiedLobby {
             return `<button class="lobby-wheel-option ${offset === 0 ? 'is-current' : ''} ${item.kind === 'create' ? 'is-create' : ''}" ${offset === 0 ? 'data-wheel-center' : ''} data-wheel-index="${index}" ${item.kind === 'guest' ? 'data-generic-name' : item.kind === 'create' ? 'data-create-name' : `data-name="${escape(item.value)}"`}>${item.kind === 'create' ? '＋ ' : ''}${escape(item.label)}</button>`;
         }).join('')}${this.wheelArrow('down')}</div>`;
     }
-    private styleMarkup(d: CardDraft): string {
+    private stylePreview(style: TileStyleSelection, slot?: number): string {
+        const editing = slot !== undefined;
+        const content = `<span class="lobby-well">${this.piece(style)}</span><span class="lobby-style-label">${escape(styleName(style))}</span>`;
+        return `<div class="lobby-style-preview ${editing ? 'lobby-wheel lobby-theme-wheel' : ''}" ${editing ? `data-editor-options="${slot}"` : ''}>${editing ? this.wheelArrow('up') : '<span class="lobby-arrow-space" aria-hidden="true"></span>'}${editing ? `<button data-wheel-center data-style="${style}" data-default-choice="true" class="lobby-style-content lobby-theme-current" aria-label="${escape(styleName(style))}">${content}</button>` : `<div class="lobby-style-content">${content}</div>`}${editing ? this.wheelArrow('down') : '<span class="lobby-arrow-space" aria-hidden="true"></span>'}</div>`;
+    }
+    private styleMarkup(d: CardDraft, slot: number): string {
         const styles = ['random', ...TILE_STYLES.map(s => s.id)] as TileStyleSelection[];
-        if (d.owner < 0) return `<div class="lobby-theme-list">${styles.map(style=>`<button class="lobby-style-option" data-style="${style}" data-default-choice="${d.style===style}">${this.piece(style,true)}<span>${escape(styleName(style))}</span></button>`).join('')}</div>`;
         d.cursor=(d.cursor+styles.length)%styles.length;
-        const style=styles[d.cursor]!;
-        return `<div class="lobby-wheel lobby-theme-wheel">${this.wheelArrow('up')}<button data-wheel-center data-style="${style}" class="lobby-theme-current" aria-label="${escape(styleName(style))}"><span class="lobby-well">${this.piece(style,true)}</span><strong>${escape(styleName(style))}</strong></button><small>${d.cursor+1} / ${styles.length}</small>${this.wheelArrow('down')}</div>`;
+        return this.stylePreview(styles[d.cursor]!, slot);
     }
     private turnWheel(slot: number, delta: number): void {
         const d=this.editors.get(slot); if (!d) return;
@@ -276,7 +279,11 @@ export class UnifiedLobby {
         this.root.querySelector(`[data-lobby-slot="${slot}"] .lobby-wheel`)?.animate([{opacity:.4,transform:`translateY(${delta*6}px)`},{opacity:1,transform:'translateY(0)'}],{duration:140});
     }
     private editorMarkup(slot: number, d: CardDraft): string {
-        return `<div class="lobby-card-mark"><span>${controllerIcon(d.controller.startsWith('ai-') ? 'ai' : isMobilePlayViewport() && d.controller === 'human-1' ? 'mobile-touch' : d.controller, getLocale())} ${d.controller.startsWith('ai-') ? copy('Бот') : `${copy('Участник')} ${slot + 1}`}</span>${d.step === 'name' && !d.typing && this.nameOptions(slot,d)[d.cursor]?.kind === 'name' ? `<button data-delete-name="${escape(this.nameOptions(slot,d)[d.cursor]!.value)}" aria-label="${copy('Удалить имя')} ${escape(this.nameOptions(slot,d)[d.cursor]!.value)}">⌫</button>` : ''}<button data-cancel="${slot}" aria-label="${copy('Отменить настройку')}">×</button></div><h2 class="lobby-editor-title">${d.step === 'name' ? copy(d.typing ? 'Новое имя' : 'Выберите имя') : d.step === 'difficulty' ? copy('Сложность бота') : copy('Стиль фигур')}</h2><div class="lobby-editor-options" data-editor-options="${slot}">${d.step === 'name' ? d.typing ? this.typingMarkup(d) : this.wheelMarkup(slot,d) : d.step === 'difficulty' ? levels.map(level => `<button data-level="${level}" data-default-choice="${d.difficulty === level}">${escape(levelName(level))}</button>`).join('') : this.styleMarkup(d)}</div>${d.typing ? `<div class="lobby-editor-hint"><button data-typed-done ${this.nameTaken(slot,d.name)?'disabled':''}>${key('Y')} ${copy('Применить')}</button><button data-typing-back>${key('B')} ${copy('Отменить ввод')}</button></div>` : ''}`;
+        if (d.step === 'style') {
+            const bot = d.controller.startsWith('ai-');
+            return `<div class="lobby-card-mark"><span>${bot ? copy('СОПЕРНИК') : `${copy('ИГРОК')} ${slot+1}`}</span>${controllerIcon(bot ? 'ai' : isMobilePlayViewport() && d.controller === 'human-1' ? 'mobile-touch' : d.controller, getLocale())}</div><h2>${bot ? `${copy('Бот')} <small>· ${escape(levelName(d.difficulty).toLocaleLowerCase(getLocale()))}</small>` : escape(d.name)}</h2><p class="lobby-ready">✓ ${copy('Готов')}</p>${this.styleMarkup(d,slot)}<button class="lobby-remove" data-cancel="${slot}" aria-label="${copy('Отменить настройку')}">×</button>`;
+        }
+        return `<div class="lobby-card-mark"><span>${controllerIcon(d.controller.startsWith('ai-') ? 'ai' : isMobilePlayViewport() && d.controller === 'human-1' ? 'mobile-touch' : d.controller, getLocale())} ${d.controller.startsWith('ai-') ? copy('Бот') : `${copy('Участник')} ${slot + 1}`}</span>${d.step === 'name' && !d.typing && this.nameOptions(slot,d)[d.cursor]?.kind === 'name' ? `<button data-delete-name="${escape(this.nameOptions(slot,d)[d.cursor]!.value)}" aria-label="${copy('Удалить имя')} ${escape(this.nameOptions(slot,d)[d.cursor]!.value)}">⌫</button>` : ''}<button data-cancel="${slot}" aria-label="${copy('Отменить настройку')}">×</button></div><h2 class="lobby-editor-title">${d.step === 'name' ? copy(d.typing ? 'Новое имя' : 'Выберите имя') : d.step === 'difficulty' ? copy('Сложность бота') : copy('Стиль фигур')}</h2><div class="lobby-editor-options" data-editor-options="${slot}">${d.step === 'name' ? d.typing ? this.typingMarkup(d) : this.wheelMarkup(slot,d) : d.step === 'difficulty' ? levels.map(level => `<button data-level="${level}" data-default-choice="${d.difficulty === level}">${escape(levelName(level))}</button>`).join('') : this.styleMarkup(d,slot)}</div>${d.typing ? `<div class="lobby-editor-hint"><button data-typed-done ${this.nameTaken(slot,d.name)?'disabled':''}>${key('Y')} ${copy('Применить')}</button><button data-typing-back>${key('B')} ${copy('Отменить ввод')}</button></div>` : ''}`;
     }
     private typingMarkup(d: CardDraft): string {
         if (d.owner < 0) return `<label class="lobby-physical-name">${copy('Новое имя')}<input class="lobby-typed-name" data-typing-name maxlength="18" value="${escape(d.name)}" aria-label="${copy('Новое имя')}"></label>`;
@@ -458,7 +465,15 @@ export class UnifiedLobby {
                 const hold=old??{slot,value,token:live.token,since:performance.now(),fired:false};this.removeHold.set(pad.index,hold);
                 if(hold.slot!==slot||hold.value!==value||hold.token!==live.token)hold.fired=true;
                 if(!hold.fired){card!.style.setProperty('--remove-progress',String(Math.min(1,(performance.now()-hold.since)/700)));if(performance.now()-hold.since>=700){hold.fired=true;this.host.remove(slot);}}
-            }else if(!pad.buttons[2]?.pressed){const heldSlot=this.removeHold.get(pad.index)?.slot;this.removeHold.delete(pad.index);if(heldSlot!==undefined)this.root.querySelector<HTMLElement>(`[data-lobby-slot="${heldSlot}"]`)?.style.removeProperty('--remove-progress');}
+            }else if(!pad.buttons[2]?.pressed){
+                const hold=this.removeHold.get(pad.index);this.removeHold.delete(pad.index);
+                if(hold)this.root.querySelector<HTMLElement>(`[data-lobby-slot="${hold.slot}"]`)?.style.removeProperty('--remove-progress');
+                // Decide a card's short X on release so it cannot also delete on a hold.
+                if(hold&&!hold.fired&&hold.token===live.token&&hold.slot===slot&&this.host.slots[slot]===hold.value&&performance.now()-hold.since<700&&this.host.mode()!=='survival'){
+                    const free=freeLobbySlot(this.host.slots,this.editors);
+                    if(free>=0){this.openEditor(free,pad.index,'ai-medium');continue;}
+                }
+            }
             if(!action||action===previous||action==='join')continue;
             this.root.dataset.inputMode='gamepad';
             if(action==='start'){this.host.start();continue;}

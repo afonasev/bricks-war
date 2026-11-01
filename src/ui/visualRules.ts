@@ -1,7 +1,5 @@
-import { html as tr } from '../i18n/locale';
 import { getLocale, type Locale } from '../i18n/locale';
 import { rulesCopy, type RulesCopyKey } from '../i18n/rulesCatalogs';
-import { gamepadFooterHintsMarkup } from './gamepadFooterHints';
 import { RULE_EXAMPLES as E, SCORE_EXAMPLES, RISING_EXAMPLE } from './visualRulesExamples';
 interface RuleCard {
   topic: string; mode: string; title: string; lead: string;
@@ -87,26 +85,20 @@ function localizedCards() { return ruleCardsForLocale(getLocale()); }
 
 export function rulesScreenMarkup(): string {
   const book = rulesCopy(getLocale()), cards = localizedCards();
-  return `<main class="rules-screen" data-screen="rules"><header class="rules-heading"><button class="screen-back" id="rules-back" type="button">${escaped(book.backSettings)}</button><div><p class="eyebrow">${escaped(book.guide)}</p><h1>${escaped(book.title)}</h1></div><output id="rules-progress" aria-label="${escaped(book.progress)}"></output></header><article id="rules-card" class="rules-card" aria-live="polite" aria-atomic="true"></article><nav class="rules-topics" aria-label="${escaped(book.topics)}">${cards.map((card,index)=>`<button type="button" data-rule-topic="${index}" aria-label="${index+1}. ${escaped(card.topic)}">${index+1}</button>`).join('')}</nav><footer class="rules-footer"><nav class="rules-navigation"><button id="rules-prev" type="button" aria-label="${tr('previous')}">← ${tr('back')}</button><button id="rules-next" type="button" aria-label="${tr('next')}">${tr('next')}</button></nav>${gamepadFooterHintsMarkup()}</footer></main>`;
+  return `<main class="rules-screen" data-screen="rules"><header class="rules-heading"><button class="screen-back" id="rules-back" type="button">${escaped(book.backSettings)}</button><div><p class="eyebrow">${escaped(book.guide)}</p><h1>${escaped(book.title)}</h1></div><output id="rules-progress" aria-label="${escaped(book.progress)}"></output></header><article id="rules-card" class="rules-card" aria-live="polite" aria-atomic="true"></article><nav class="rules-topics" aria-label="${escaped(book.topics)}">${cards.map((card,index)=>`<button type="button" data-rule-topic="${index}" aria-label="${index+1}. ${escaped(card.topic)}">${index+1}</button>`).join('')}</nav></main>`;
 }
 
 export function bindRulesScreen(screen: HTMLElement, back: () => void): () => void {
   const cards = localizedCards();
   let index = 0;
-  const prev = screen.querySelector<HTMLButtonElement>('#rules-prev')!;
-  const next = screen.querySelector<HTMLButtonElement>('#rules-next')!;
   const topics = Array.from(screen.querySelectorAll<HTMLButtonElement>('[data-rule-topic]'));
   const show = (target: number) => {
     index = Math.max(0, Math.min(cards.length-1, target));
     const card = cards[index]!;
     screen.querySelector('#rules-card')!.innerHTML = `<figure class="rules-art" role="img" aria-label="${escaped(card.alt)}">${card.art}</figure><div class="rules-copy"><p class="rules-mode">${escaped(card.mode)}</p><h2>${escaped(card.title)}</h2><p class="rules-lead">${escaped(card.lead)}</p><ul>${card.notes.map(note=>`<li>${escaped(note)}</li>`).join('')}</ul></div>`;
     screen.querySelector('#rules-progress')!.textContent = `${index+1} / ${cards.length}`;
-    prev.disabled = index === 0; next.disabled = index === cards.length-1;
     topics.forEach((button,i)=>button.setAttribute('aria-current',i===index ? 'step' : 'false'));
-    if (document.activeElement === prev && prev.disabled) next.focus();
-    if (document.activeElement === next && next.disabled) prev.focus();
   };
-  prev.addEventListener('click',()=>show(index-1)); next.addEventListener('click',()=>show(index+1));
   topics.forEach((button,i)=>button.addEventListener('click',()=>show(i)));
   screen.querySelector('#rules-back')!.addEventListener('click',back);
   const onKey = (event: KeyboardEvent) => {

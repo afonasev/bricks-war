@@ -3,7 +3,7 @@ import { mkdir, copyFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 const destination = process.argv[2];
 if (!destination) throw Error('Pass a clean public repository checkout path');
-const files = execFileSync('git', ['ls-files', '-z'], { encoding: 'utf8' }).split('\0').filter(Boolean);
+const files = execFileSync('git', ['ls-files', '-z'], { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 }).split('\0').filter(Boolean);
 const selected = files.filter(file => /^(src|server|electron|public|scripts|tests|config)\//.test(file)
   || /^tools\//.test(file) && !/^tools\/(flow|test_flow)\.py$/.test(file)
   || !file.includes('/') && /^(package.*\.json|tsconfig.*\.json|vite.*\.ts|vitest.*\.ts|playwright.*\.ts|index\.html|\.gitignore|Makefile)$/.test(file)

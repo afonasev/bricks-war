@@ -15,7 +15,7 @@ export function staticPlayfieldRenderKey(state: MatchState, layoutKey: string, w
       participant.resolvedTileStyle,
       participant.board.alive ? 1 : 0,
       participant.board.staticRenderRevision,
-      state.shieldPresentations.some((event) => event.participantId === participant.config.id && event.remainingMs > 0) || (state.attackQueues[participant.config.id]?.[0]?.phase === 'rise' && (state.attackQueues[participant.config.id]?.[0]?.riseRows ?? 0)>0) ? 1 : 0,
+      state.shieldPresentations.some((event) => event.participantId === participant.config.id && event.remainingMs > 0) || state.attackQueues[participant.config.id]?.some(e=>e.phase==='rise'&&e.riseRows>0) ? 1 : 0,
       state.clearPresentations.some((event) => event.participantId === participant.config.id) ? 1 : 0,
     ].join(':')).join('|'),
   ].join('#');
@@ -35,7 +35,7 @@ export function playfieldRenderKey(
   const rareAttack = Math.max(0, impactRows, ...(state.pendingConflict?.senders.map((sender) => sender.rows) ?? []));
   const boardMotionActive = state.phase === 'playing' && !reducedMotion && (
     state.attackLaunchEvents.length > 0 || state.anomalyCueEvents.length > 0 || state.shieldChargeEvents.length > 0
-    || state.shieldPresentations.length > 0 || Object.values(state.attackQueues).some(q=>q[0]?.phase==='warning'||q[0]?.phase==='rise')
+    || state.shieldPresentations.length > 0 || Object.values(state.attackQueues).some(q=>q.some(e=>e.phase==='warning'||e.phase==='rise'))
     || ((state.conflictImpactEvent?.pulseMs??0)>0&&(state.conflictImpactEvent?.defendedRecipientIds?.length??0)>0));
   const motionActive = !reducedMotion && (
     rareAttack >= 4
@@ -45,7 +45,7 @@ export function playfieldRenderKey(
   return [
     staticPlayfieldRenderKey(state, layoutKey, width, height),
     state.phase,
-    Object.entries(state.attackQueues).map(([id,q])=>`${id}:${q[0]?.serial}:${q[0]?.phase}:${effectFrame(q[0]?.remainingMs)}`).join(','),
+    Object.entries(state.attackQueues).map(([id,q])=>`${id}:${q.map(e=>`${e.serial}:${e.phase}:${effectFrame(e.remainingMs)}`).join(';')}`).join(','),
     state.attackLaunchEvents.map(e=>`${e.serial}:${effectFrame(e.remainingMs)}`).join(','),
     state.anomalyCueEvents.map(e=>`${e.serial}:${effectFrame(e.remainingMs)}`).join(','),
     state.shieldPresentations.map((e) => `${e.serial}:${e.participantId}:${effectFrame(e.remainingMs)}`).join(','),

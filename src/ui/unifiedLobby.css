@@ -1728,14 +1728,13 @@
 #app .unified-lobby .lobby-card.is-empty[data-empty-bot] { cursor:pointer; }
 
 /* Approved owned-lobby controls: shared hints follow entry ownership, not last input. */
-#app[data-layout] .unified-lobby[data-owner-hints="pointer"] :is(.lobby-key,.lobby-confirm-hint) { display:none!important; }
+#app[data-layout] .unified-lobby[data-owner-hints="pointer"] .lobby-key { display:none!important; }
 #app[data-layout] .unified-lobby[data-owner-hints="pointer"] [data-join] .lobby-key,
 #app[data-layout] .unified-lobby[data-owner-hints="pointer"] .is-editing:has(.controller-gamepad) .lobby-key { display:inline-flex!important; }
 #app[data-layout] .unified-lobby[data-owner-hints="gamepad"] .lobby-key { display:inline-flex; }
 #app[data-layout] .unified-lobby .lobby-card-hint { display:none!important; }
 #app[data-layout] .unified-lobby .lobby-mode span { bottom:0; background:#fff3dc; padding:10px 16px; }
 #app[data-layout] .unified-lobby .lobby-mode { border-bottom-width:1px; }
-#app[data-layout] .unified-lobby .lobby-confirm-hint { display:flex; align-items:center; justify-content:center; gap:8px; font-size:12px; color:#806c4e; }
 #app[data-layout] .unified-lobby :is(.lobby-cycle,.lobby-mode,.lobby-help,[data-lobby-back],.lobby-start):is(:focus-visible,.pad-0,.pad-1,.pad-2,.pad-3),
 #app[data-layout] .unified-lobby :is(.pad-selected,.lobby-wheel-option.is-current) {
   outline:none!important; box-shadow:inset 0 0 0 1px #ae9468,0 2px 3px #80592418!important;
@@ -1794,8 +1793,6 @@
 @media(max-width:760px) {
   #app[data-layout] .unified-lobby .lobby-card.is-editing { height:352px; padding:16px 21px; }
   #app[data-layout] .unified-lobby .lobby-editor-options { width:100%; }
-  #app[data-layout] .unified-lobby .lobby-confirm-hint { font-size:0; flex:none; }
-  #app[data-layout] .unified-lobby .lobby-confirm-hint .lobby-key { font-size:12px; }
   #app[data-layout] .unified-lobby[data-owner-hints="gamepad"] .lobby-key { display:inline-flex!important; }
   #app[data-layout] .unified-lobby .lobby-footer { gap:10px; }
   #app[data-layout] .unified-lobby .lobby-footer > button { white-space:nowrap; }
@@ -1933,3 +1930,56 @@
   #app[data-layout="mobile"] .unified-lobby .lobby-card:not(.is-editing) .lobby-style-label { width:88px; }
   #app[data-layout="mobile"] .unified-lobby .lobby-card:not(.is-editing) .lobby-piece { width:72px; height:48px; }
 }
+/* Survival has a standalone plus rather than the centered Add bot button. */
+#app[data-layout] .unified-lobby[data-mode="survival"] .is-empty > .lobby-plus { align-self:center; }
+
+/* Approved simple style card: the same preview at rest and while editing. */
+#app[data-layout] .unified-lobby .lobby-card:not(.is-empty):is(:not(.is-editing),.is-style-editing) { height:330px; }
+#app[data-layout] .unified-lobby .lobby-card.is-style-editing { padding:21px 21px 18px; }
+#app[data-layout] .unified-lobby .lobby-style-preview {
+  flex:1; min-height:0; width:100%; display:grid; grid-template-columns:minmax(0,1fr); grid-template-rows:24px auto 24px;
+  justify-items:center; align-items:center; align-content:center; gap:4px; margin:0; padding:0; border:0; background:none;
+}
+#app[data-layout] .unified-lobby .lobby-style-content {
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px;
+  width:100%; min-height:0; margin:0; padding:0; border:0; border-radius:0; background:transparent;
+}
+#app[data-layout] .unified-lobby .lobby-style-preview .lobby-well {
+  display:flex; align-items:center; justify-content:center; width:100%; height:96px;
+  flex:none; min-height:0; margin:0; padding:0; border:0; border-radius:0; background:none; box-shadow:none;
+}
+#app[data-layout] .unified-lobby .lobby-style-preview .lobby-piece { width:144px; height:96px; }
+#app[data-layout] .unified-lobby .lobby-style-preview .lobby-style-label { min-height:2.5em; display:flex; align-items:center; justify-content:center; position:static; width:100%; max-width:none; margin:0; font-size:14px; line-height:1.25; font-weight:600; color:#697480; text-align:center; overflow-wrap:anywhere; }
+#app[data-layout] .unified-lobby .lobby-style-preview :is([data-wheel-up],[data-wheel-down],.lobby-arrow-space) {
+  display:flex; align-items:center; justify-content:center; width:44px; height:24px; min-height:24px;
+  margin:0; padding:0; border:0; background:none; box-shadow:none;
+}
+#app[data-layout] .unified-lobby .lobby-style-preview .lobby-wheel-chevron { width:15px; height:10px; }
+
+#app[data-layout] .unified-lobby .is-style-editing .lobby-theme-current:is(:focus,:focus-visible,.pad-selected) { background:transparent !important; box-shadow:none !important; outline:none !important; }
+@media(min-width:761px) and (max-height:600px) {
+  #app[data-layout] .unified-lobby .lobby-card:not(.is-empty):is(:not(.is-editing),.is-style-editing) { height:244px; padding:10px 14px; }
+  #app[data-layout] .unified-lobby .lobby-style-preview { grid-template-rows:20px auto 20px; gap:0; }
+  #app[data-layout] .unified-lobby .lobby-style-preview .lobby-well { height:60px; }
+  #app[data-layout] .unified-lobby .lobby-style-preview .lobby-piece { width:90px; height:60px; }
+  #app[data-layout] .unified-lobby .lobby-style-preview .lobby-style-label { font-size:12px; }
+  #app[data-layout] .unified-lobby .lobby-style-preview :is([data-wheel-up],[data-wheel-down],.lobby-arrow-space) { height:20px; min-height:20px; }
+}
+#app[data-layout="mobile"] .unified-lobby .lobby-card:not(.is-empty):is(:not(.is-editing),.is-style-editing) { height:236px; display:grid; grid-template-columns:minmax(0,1fr) 104px; grid-template-rows:min-content 1fr auto; gap:6px 16px; padding:28px 16px 14px; }
+#app[data-layout="mobile"] .unified-lobby .lobby-card.is-style-editing .lobby-card-mark { display:none; }
+#app[data-layout="mobile"] .unified-lobby .lobby-card.is-style-editing h2 { grid-column:1; grid-row:1; max-width:none; width:auto; margin:0; font-size:24px; }
+#app[data-layout="mobile"] .unified-lobby .lobby-card.is-style-editing .lobby-ready { grid-column:1; grid-row:2; align-self:start; width:auto; max-width:none; margin:0; }
+#app[data-layout="mobile"] .unified-lobby .lobby-card .lobby-style-preview { grid-column:2; grid-row:1 / span 3; width:104px; grid-template-rows:44px auto 44px; gap:0; }
+#app[data-layout="mobile"] .unified-lobby .lobby-style-preview .lobby-well { width:104px; height:56px; }
+#app[data-layout="mobile"] .unified-lobby .lobby-style-preview .lobby-piece { width:84px; height:56px; }
+#app[data-layout="mobile"] .unified-lobby .lobby-style-preview .lobby-style-label { width:104px; font-size:11px; }
+#app[data-layout="mobile"] .unified-lobby .lobby-style-preview :is([data-wheel-up],[data-wheel-down],.lobby-arrow-space) { height:44px; min-height:44px; }
+#app[data-layout="mobile"] .unified-lobby .lobby-card.is-style-editing .lobby-remove { top:4px; right:8px; width:24px; height:24px; }
+/* Beat legacy phone absolute-position rules equally in ready/edit states. */
+#app[data-layout] .unified-lobby .lobby-card[class][data-lobby-slot] .lobby-style-preview .lobby-well { position:static; flex:none; width:100%; height:96px; }
+@media(min-width:761px) and (max-height:600px) {
+  #app[data-layout] .unified-lobby .lobby-card[class][data-lobby-slot] .lobby-style-preview .lobby-well { height:60px; }
+}
+#app[data-layout="mobile"] .unified-lobby .lobby-card[class][data-lobby-slot] .lobby-style-preview .lobby-well { position:static; width:104px; height:56px; }
+#app[data-layout="mobile"] .unified-lobby .lobby-card[class][data-lobby-slot] .lobby-style-preview .lobby-style-label { min-height:2.5em; width:104px; font-size:11px; line-height:1.25; }
+#app[data-layout] .unified-lobby .lobby-card.is-style-editing .lobby-card-mark { width:calc(100% - 36px); }

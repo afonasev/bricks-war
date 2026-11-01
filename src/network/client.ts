@@ -53,6 +53,7 @@ export class NetworkMatchSession implements MatchSession {
   private assembly = new SnapshotAssembly();
   private seenEvents = new Set<string>();
   private recoverySequence: number | null = null;
+  private preparedMatchId: string | null = null;
   constructor(readonly credential: Credential) {}
   connect(): void {
     if (this.closed || this.socket?.readyState === WebSocket.OPEN || this.socket?.readyState === WebSocket.CONNECTING) return;
@@ -135,6 +136,9 @@ export class NetworkMatchSession implements MatchSession {
     if (this.seenEvents.size>128) this.seenEvents=new Set(snapshot.events.map(e=>e.id));
     const own = snapshot.seats.find(s=>s.id===snapshot.ownId);
     if (!own?.connected && !document.hidden && own?.retained) this.send({type:'ack', revision:snapshot.revision,visible:true});
+    if (own?.connected && this.preparedMatchId === snapshot.matchId && snapshot.preparing?.includes(snapshot.ownId)) {
+      this.send({type:'arena-prepared', matchId:this.preparedMatchId!});
+    }
     this.status = own?.connected ? (this.recoverySequence===null?'Подключено':'Задержка связи · восстановление…') : 'Восстановление состояния…';
     setNetworkParticipation(!!snapshot.state && snapshot.state.phase !== 'results' && !!own?.retained);
     this.onChange();
@@ -204,6 +208,11 @@ export class NetworkMatchSession implements MatchSession {
     this.pending.push({input,at:performance.now()});this.send(input);this.onResetInput();this.onChange();
   }
   private reset(): void {this.pending=[];this.sequence=0;this.recoverySequence=null;this.repeat.reset();this.prediction.reset();this.held={...EMPTY_HELD};this.onResetInput();}
+  arenaPrepared(matchId: string): void {
+    if (this.snapshot?.matchId !== matchId) return;
+    this.preparedMatchId = matchId;
+    if (this.snapshot.seats.find(s => s.id === this.snapshot!.ownId)?.connected) this.send({type:'arena-prepared', matchId});
+  }
   send(command: ClientCommand): void {if(this.socket?.readyState===WebSocket.OPEN) this.socket.send(JSON.stringify(command));}
   toggleManualPause(): boolean {
     if (!this.snapshot?.state || !this.active) return false;

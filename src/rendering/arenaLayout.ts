@@ -267,3 +267,15 @@ export function chooseNetworkLayout(width: number, height: number, count: number
   return { ...base, mode: 'mobile-solo', columns: 1, rows: 1, slotWidth: width, slotHeight: height,
     cardWidth: own.cardWidth, cardHeight: own.cardHeight, cellSize: own.cellSize, participantCards: [own, ...minis] };
 }
+
+/** Fixed local teams occupy slots 0–1 and 2–3; split the actual gap, not the viewport. */
+export function localTeamSurfaceDivider(cards: readonly ArenaCardLayout[]): {axis: 'x' | 'y'; position: number} | null {
+  if (cards.length !== 4) return null;
+  const a = cards.slice(0, 2), b = cards.slice(2);
+  const right = Math.max(...a.map(card => card.x + card.cardWidth));
+  const left = Math.min(...b.map(card => card.x));
+  if (right <= left) return {axis: 'x', position: (right + left) / 2};
+  const bottom = Math.max(...a.map(card => card.y + card.cardHeight));
+  const top = Math.min(...b.map(card => card.y));
+  return bottom <= top ? {axis: 'y', position: (bottom + top) / 2} : null;
+}

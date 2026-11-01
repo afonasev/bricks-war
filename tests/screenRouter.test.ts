@@ -30,6 +30,12 @@ describe('production screen routing', () => {
     expect(router.back()).toBe('main-menu');
   });
 
+  it('returns release history to its Settings or native main-menu origin', () => {
+    const router = new ScreenRouter();
+    router.open('history'); expect(router.back()).toBe('settings');
+    router.open('history', 'main-menu'); expect(router.back()).toBe('main-menu');
+  });
+
   it('supports Pause-owned Settings and restores a remembered selection safely', () => {
     const router = new ScreenRouter();
     router.open('arena');

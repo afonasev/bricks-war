@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { LOCAL_ARENA_CARD_GAP, chooseLocalArenaLayout, chooseArenaLayout, chooseMobileSoloLayout, chooseNetworkLayout } from '../src/rendering/arenaLayout';
+import { localTeamSurfaceDivider, LOCAL_ARENA_CARD_GAP, chooseLocalArenaLayout, chooseArenaLayout, chooseMobileSoloLayout, chooseNetworkLayout } from '../src/rendering/arenaLayout';
 
 describe('adaptive arena layout', () => {
   it.each([
@@ -193,4 +193,19 @@ describe('centered workshop group', () => {
       expect((layout.cellSize+1)*10+4>horizontalRoom || header+(layout.cellSize+1)*20+20>verticalRoom).toBe(true);
     }
   });
+});
+
+describe('team background follows field groups', () => {
+  it.each([[1440,960],[1280,480],[720,1000]])('splits the actual team gap at %ix%i', (width,height) => {
+    const cards=chooseLocalArenaLayout(width,height,4).participantCards!;
+    const split=localTeamSurfaceDivider(cards)!;
+    expect(split).not.toBeNull();
+    const end=split.axis==='x' ? Math.max(...cards.slice(0,2).map(c=>c.x+c.cardWidth)) : Math.max(...cards.slice(0,2).map(c=>c.y+c.cardHeight));
+    const start=split.axis==='x' ? Math.min(...cards.slice(2).map(c=>c.x)) : Math.min(...cards.slice(2).map(c=>c.y));
+    expect(split.position-end).toBeCloseTo(start-split.position);
+    expect(split.position).toBeGreaterThan(end);
+    const shifted=cards.map(c=>({...c,x:c.x+17,y:c.y+31}));
+    expect(localTeamSurfaceDivider(shifted)!.position).toBeCloseTo(split.position+(split.axis==='x'?17:31));
+  });
+  it('has no team split for an incomplete roster',()=>expect(localTeamSurfaceDivider(chooseLocalArenaLayout(1280,800,3).participantCards!)).toBeNull());
 });

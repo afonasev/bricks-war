@@ -1,6 +1,6 @@
-import { isRatingAttempt, ratingKey, type GlobalRating, type RatingAttempt } from '../domain/globalRating';
+import { GLOBAL_RATING_RULESET, isRatingAttempt, ratingKey, type GlobalRating, type RatingAttempt } from '../domain/globalRating';
 
-export const RATING_OUTBOX_KEY = 'bricks-war:global-rating-outbox:v1';
+export const RATING_OUTBOX_KEY = `bricks-war:global-rating-outbox:${GLOBAL_RATING_RULESET}`;
 type StorageLike = Pick<Storage, 'getItem' | 'setItem'>;
 const browserStorage = (): StorageLike | null => { try { return localStorage; } catch { return null; } };
 
@@ -56,14 +56,14 @@ async function request<T>(path: string, body?: unknown): Promise<T> {
   } finally { clearTimeout(timer); }
 }
 async function submitRating(attempts: readonly RatingAttempt[]): Promise<void> {
-  const result = await request<{ ok: boolean }>('rating-submit', { attempts });
+  const result = await request<{ ok: boolean }>('rating-submit', { attempts, ruleset: GLOBAL_RATING_RULESET });
   if (result.ok !== true) throw new Error('Результат не подтверждён');
 }
 export async function fetchGlobalRating(names: readonly string[]): Promise<GlobalRating> {
   const query = new URLSearchParams();
   [...new Set(names)].slice(0, 4).forEach(name => query.append('name', name));
-  const data = await request<GlobalRating>(`rating?${query}`);
-  if (!data || !Array.isArray(data.top) || !Array.isArray(data.own) || data.top.length > 10 || data.own.length > 4
+  const data = await request<GlobalRating & {ruleset: string}>(`rating?${query}`);
+  if (!data || data.ruleset !== GLOBAL_RATING_RULESET || !Array.isArray(data.top) || !Array.isArray(data.own) || data.top.length > 10 || data.own.length > 4
     || ![...data.top, ...data.own].every(a => isRatingAttempt(a) && Number.isSafeInteger(a.rank) && a.rank > 0)) {
     throw new Error('Некорректный ответ рейтинга');
   }

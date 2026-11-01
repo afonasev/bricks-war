@@ -34,15 +34,15 @@ for (const [width,height,native,locale] of [[1440,960,false,'ru'],[1280,480,fals
  });
 }
 
-for (const [id,back,reset,confirm] of [['Xbox Controller','B','Y','A'],['Sony DualSense','○','△','✕'],['Nintendo Switch Pro','A','X','B'],['Unknown Pad','Право','Верх','Низ']] as const) {
+for (const [id,back,reset] of [['Xbox Controller','B','Y'],['Sony DualSense','○','△'],['Nintendo Switch Pro','A','X'],['Unknown Pad','B','Y']] as const) {
  test(`settings family hints, reset and focus ${id}`,async({page})=>{
   await page.addInitScript(id=>{localStorage.setItem('bricks-war:language:v1','ru');const pad={index:0,id,connected:true,mapping:'standard',axes:[0,0],buttons:Array.from({length:16},()=>({pressed:false,value:0})),timestamp:0};Object.defineProperty(navigator,'getGamepads',{value:()=>pad.connected?[pad]:[]});Object.assign(window,{familyPad:pad});},id);
   await page.goto('/?muted=1');await page.locator('[data-destination="settings"]').click();
-  const backHint=page.locator('.settings-screen footer .input-back'),resetHint=page.locator('.settings-utility .input-reset');
-  await expect(backHint).toHaveText(back);await expect(backHint).toBeVisible();await expect(resetHint).toHaveText(reset);await expect(resetHint).toBeVisible();await expect(page.locator('footer .input-confirm')).toHaveText(confirm);
+  const backHint=page.locator('#settings-back .input-back'),resetHint=page.locator('.settings-utility .input-reset');
+  await expect(backHint).toHaveText(back);await expect(backHint).toBeVisible();await expect(resetHint).toHaveText(reset);await expect(resetHint).toBeVisible();await expect(page.locator('.settings-screen footer [data-hint-action]')).toHaveCount(0);
   await expect(page.locator('[data-reset-preferences]')).toHaveCount(1);await page.locator('#master-volume').fill('25');await page.locator('.settings-utility [data-reset-preferences]').click();await expect(page.locator('#master-volume')).toHaveValue('100');
   await page.keyboard.press('Tab');await page.locator('#calm-effects').focus();await expect(page.locator('#calm-effects').locator('..')).toHaveCSS('background-color','rgb(139, 212, 246)');await page.keyboard.press('Space');await expect(page.locator('#calm-effects')).toBeChecked();
-  await page.locator('#open-controls').click();await expect(page.locator('.controls-screen footer .input-back')).toHaveText(back);await page.locator('#controls-back').click();
+  await page.locator('#open-controls').click();await expect(page.locator('#controls-back .input-back')).toHaveText(back);await page.locator('#controls-back').click();
   await page.evaluate(()=>{(window as any).familyPad.connected=false});await expect(backHint).toBeVisible();await expect(backHint).toHaveText('B');await expect(resetHint).toBeVisible();await expect(resetHint).toHaveText('Y');await expect(page.locator('[data-reset-preferences]')).toBeVisible();await page.locator('#master-volume').fill('25');await page.locator('.settings-utility [data-reset-preferences]').click();await expect(page.locator('#master-volume')).toHaveValue('100');
  });
 }

@@ -1,9 +1,7 @@
-import { text } from '../i18n/locale';
 export function gamepadFaceLabels(id: string): readonly [string, string, string, string] {
   if (/dualsense|dualshock|playstation|sony|054c/i.test(id)) return ['✕', '○', '□', '△'];
   if (/nintendo|switch|057e/i.test(id)) return ['B', 'A', 'Y', 'X'];
-  if (/xbox|xinput|045e/i.test(id)) return ['A', 'B', 'X', 'Y'];
-  return [text('bottom'), text('right'), text('left'), text('top')];
+  return ['A', 'B', 'X', 'Y']; // Xbox is also the fallback for unrecognized devices.
 }
 
 

@@ -285,10 +285,10 @@ test('opens localized phone Controls help, returns to Settings, and preserves pr
     if (screenshotDir) await page.screenshot({ path: `${screenshotDir}/${name}.png`, fullPage });
   };
   const expectReadablePhoneHelp = async () => {
+    await expect(page.locator('[data-phone-controls-help] > footer')).toHaveCount(0);
     const result = await page.locator('[data-phone-controls-help]').evaluate((screen) => {
       const selectors = [
-        '.phone-controls-heading', '.phone-controls-intro', '.phone-controls-figure', '.phone-controls-pause',
-        '.phone-controls-screen > .release-guidance-footer',
+        '.section-heading', '.phone-controls-intro', '.phone-controls-figure', '.phone-controls-pause', '.section-navigation',
       ];
       const queriedBlocks = selectors.map((selector) => screen.querySelector<HTMLElement>(selector));
       const blocks = queriedBlocks.filter((node): node is HTMLElement => Boolean(node));
@@ -317,16 +317,16 @@ test('opens localized phone Controls help, returns to Settings, and preserves pr
         )));
       }).map((node) => node.textContent?.trim() ?? node.tagName);
       const horizontalTextOverflow = textNodes.filter((node) => node.scrollWidth > node.clientWidth + 1).map((node) => node.textContent?.trim() ?? node.tagName);
-      const heading = screen.querySelector<HTMLElement>('.phone-controls-heading')!;
-      const footer = screen.querySelector<HTMLElement>('.release-guidance-footer')!;
+      const heading = screen.querySelector<HTMLElement>('.section-heading')!;
+      const footer = screen.querySelector<HTMLElement>('.section-navigation')!;
       const footerBottom = footer.getBoundingClientRect().bottom;
       const screenBottom = screen.getBoundingClientRect().bottom;
       const pageFitsViewport = screen.getBoundingClientRect().height <= innerHeight;
       return {
-        footerLeftGap: Math.abs(footer.getBoundingClientRect().left - screen.getBoundingClientRect().left),
-        footerRightGap: Math.abs(footer.getBoundingClientRect().right - screen.getBoundingClientRect().right),
-        footerScreenBottomGap: Math.abs(screenBottom - footerBottom),
-        footerViewportBottomGap: pageFitsViewport ? Math.abs(innerHeight - footerBottom) : 0,
+        footerLeftGap: Math.abs(footer.getBoundingClientRect().left - screen.getBoundingClientRect().left - parseFloat(getComputedStyle(screen).paddingLeft)),
+        footerRightGap: Math.abs(footer.getBoundingClientRect().right - screen.getBoundingClientRect().right + parseFloat(getComputedStyle(screen).paddingRight)),
+        footerScreenBottomGap: Math.abs(screenBottom - footerBottom - parseFloat(getComputedStyle(screen).paddingBottom)),
+        footerViewportBottomGap: pageFitsViewport ? Math.abs(innerHeight - footerBottom - parseFloat(getComputedStyle(screen).paddingBottom)) : 0,
         missingBlocks: selectors.filter((_, index) => !queriedBlocks[index]),
         overlaps: [...overlaps(blocks), ...overlaps(Array.from(screen.querySelector('.phone-controls-figure')!.children)), ...overlaps(Array.from(diagram.children)), ...overlaps(Array.from(screen.querySelector('.phone-controls-directions')!.children)), ...overlaps(Array.from(heading.children))],
         clipped,

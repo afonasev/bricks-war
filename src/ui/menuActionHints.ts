@@ -6,10 +6,12 @@ export function refreshMenuActionHints(root: HTMLElement, selected: HTMLElement 
     const label = hint.querySelector<HTMLElement>('[data-hint-label]');
     const badge = hint.querySelector<HTMLElement>('[data-face-action]');
     const range = selected?.matches('input[type="range"]') ?? false;
-    if (badge) badge.hidden = range;
-    if (label) label.textContent = range ? `← → ${lobbyText('Изменить')}` : selected?.matches('input[type="checkbox"], select, [data-menu-select]') ? lobbyText('Изменить') : text('select');
+    const preference = root.dataset.inputMode === 'gamepad' && Boolean(selected?.closest('.settings-screen, #pause-settings-panel, [data-network-preferences]'));
+    const editing = selected?.hasAttribute('data-gamepad-editing');
+    if (badge) badge.hidden = range && !preference;
+    if (label) label.textContent = editing ? text('keyboardDone') : preference && selected?.matches('input[type="range"], input[type="checkbox"], select, [data-menu-select-trigger]') ? lobbyText('Изменить') : range ? `← → ${lobbyText('Изменить')}` : selected?.matches('input[type="checkbox"], select, [data-menu-select]') ? lobbyText('Изменить') : text('select');
   });
   root.querySelectorAll<HTMLElement>('[data-hint-action="back"] [data-hint-label]').forEach(label => {
-    label.textContent = root.querySelector('[data-release-history]') ? lobbyText('Закрыть') : root.querySelector('[data-virtual-keyboard], [data-display-confirm], .menu-select.is-open') ? lobbyText('Отменить') : text('back');
+    label.textContent = root.querySelector('[data-release-history]') ? lobbyText('Закрыть') : root.querySelector('[data-virtual-keyboard], [data-display-confirm], .menu-select.is-open, [data-gamepad-editing]') ? lobbyText('Отменить') : text('back');
   });
 }

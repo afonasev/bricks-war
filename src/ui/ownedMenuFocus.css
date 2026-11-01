@@ -138,3 +138,13 @@
   mask:radial-gradient(farthest-side,transparent calc(100% - 3px),#000 calc(100% - 2px));
   opacity:clamp(0,calc(var(--remove-progress,0)*100),1);
 }
+
+/* Activity is a subtle palette-relative tint, not an extra nested frame. */
+#app[data-layout] .unified-lobby .lobby-card[class][data-lobby-slot]:is(.is-editing,.pad-0,.pad-1,.pad-2,.pad-3) {
+  --card-surface:linear-gradient(145deg,color-mix(in srgb,#fffff5 60%,var(--accent)),color-mix(in srgb,var(--pale) 60%,var(--accent)));
+  --card-navigation-shadow:inset 0 2px #ffffff88,0 5px 8px #67451e26;
+}
+/* The whole card is the focus surface; the preview and chevrons stay unboxed. */
+#app[data-layout] .unified-lobby[data-screen] .lobby-card[class][data-lobby-slot].is-style-editing .lobby-style-preview > button {
+  background:transparent !important; border:0 !important; box-shadow:none !important; outline:none !important;
+}

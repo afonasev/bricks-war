@@ -9,6 +9,12 @@ for(const [width,height] of [[1440,960],[1280,480],[800,620],[390,844],[390,667]
   await page.goto('/?muted=1'); await page.locator('main').waitFor();
   const audit:unknown[]=[];
   async function check(name:string){
+   if(await page.locator('main.section-shell').count()){
+    await expect(page.locator('main.section-shell footer')).toHaveCount(0);
+    await expect(page.locator('main.section-shell')).toHaveCSS('border-radius','0px');
+    await expect(page.locator('.section-navigation .section-back')).toBeInViewport();
+    return;
+   }
    const geometry=await page.evaluate(()=>{
     const main=document.querySelector('main')!;const footer=main.querySelector('footer')!;
     const r=footer.getBoundingClientRect();

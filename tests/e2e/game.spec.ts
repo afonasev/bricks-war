@@ -263,7 +263,7 @@ test('offers only Repeat and Main Menu in results and Repeat preserves identitie
   await expect(results.locator('#play-again')).toBeVisible();
   await expect(results.getByRole('button')).toHaveCount(2);
   await expect(results.getByRole('button')).toContainText(['Повторить', 'Главное меню']);
-  // At 20x the visible countdown lasts 150ms: observe its real reveal instead of
+  // At 20x the visible ready phase lasts 50ms: observe its real reveal instead of
   // missing that window while sequential assertions cross the browser boundary.
   await page.evaluate(() => {
     (window as any).__repeatPresentation = null;
@@ -284,7 +284,7 @@ test('offers only Repeat and Main Menu in results and Repeat preserves identitie
   await expect(page.locator('.match-loading')).toBeVisible();
   await page.locator('.match-loading').waitFor({ state: 'detached' });
   await expect.poll(() => page.evaluate(() => (window as any).__repeatPresentation))
-    .toEqual({ visible: true, countdown: '3', canvasReady: true, identityPreserved: true });
+    .toEqual({ visible: true, countdown: 'Готовы?', canvasReady: true, identityPreserved: true });
   await expect(page.locator('.hud-card').first()).toContainText('Мира');
 });
 

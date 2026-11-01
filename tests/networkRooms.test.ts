@@ -1,3 +1,4 @@
+import { startPreparedMatch } from './helpers/networkArena';
 import { describe, expect, it } from 'vitest';
 import { RoomService, RoomError } from '../server/rooms';
 import { PROTOCOL_VERSION, RULES_VERSION, RETURN_WINDOW_MS, type Credential, type InputEnvelope } from '../src/network/protocol';
@@ -13,7 +14,7 @@ function fixture() {
     for(const l of links)service.command(l.room,l.seat,l.epoch,{type:'ready',ready:true});
     return {credentials,links,room:links[0]!.room};
   };
-  const start=(l:ReturnType<typeof connect>)=>service.command(l.room,l.seat,l.epoch,{type:'start'});
+  const start=(l:ReturnType<typeof connect>)=>startPreparedMatch(service,l.room,l.seat,l.epoch);
   return {service,connect,advance,jump,room,start};
 }
 describe('authoritative room lifecycle',()=>{

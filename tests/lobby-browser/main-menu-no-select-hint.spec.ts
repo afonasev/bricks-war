@@ -1,0 +1,4 @@
+import {test,expect} from '@playwright/test';
+for(const [width,height]of [[1440,960],[390,844]])test(`main menu omits Select hint ${width}`,async({page})=>{
+ await page.setViewportSize({width:width!,height:height!});await page.addInitScript(()=>{localStorage.setItem('bricks-war:language:v1','en');Object.defineProperty(navigator,'getGamepads',{value:()=>[{index:0,id:'Xbox QA',connected:true,mapping:'standard',axes:[0,0],buttons:Array.from({length:16},()=>({pressed:false,value:0})),timestamp:0}]});});await page.goto('/?muted=1');await expect(page.locator('[data-play-entry]')).toBeVisible();await expect(page.locator('.main-menu-screen .release-footer-action')).toHaveCount(0);await expect(page.locator('.main-menu-screen footer')).toContainText('2026');await page.screenshot({path:`${process.env.BRICKS_LOBBY_EVIDENCE}/main-${width}.png`});
+});

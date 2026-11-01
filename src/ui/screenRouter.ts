@@ -7,6 +7,7 @@ export type AppScreen =
   | 'settings'
   | 'controls'
   | 'rules'
+  | 'history'
   | 'laboratory'
   | 'arena'
   | 'pause'
@@ -21,6 +22,7 @@ const DEFAULT_PARENTS: Partial<Record<AppScreen, AppScreen>> = {
   controls: 'settings',
   rules: 'settings',
   laboratory: 'settings',
+  history: 'settings',
   pause: 'arena',
   results: 'main-menu',
 };

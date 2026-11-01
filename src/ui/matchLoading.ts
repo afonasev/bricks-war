@@ -3,7 +3,7 @@ import { html as tr } from '../i18n/locale';
 
 export const MATCH_LOADING_MINIMUM_MS = 2_000;
 
-/** Loading owns only presentation time; it never changes server time. */
+/** Loading waits for presentation readiness; the network server owns start time. */
 export class MatchLoading {
   private readonly element = document.createElement('section');
   private readonly frames = new Set<number>();
@@ -50,11 +50,16 @@ export class MatchLoading {
   }
 
   /** Call only after the renderer has presented its first complete arena frame. */
-  async ready(): Promise<boolean> {
+  async ready(sharedStart?: { prepared: () => void; canReveal: () => boolean }): Promise<boolean> {
     if (!this.active) return false;
     const remaining = Math.max(0, MATCH_LOADING_MINIMUM_MS - (performance.now() - this.shownAt));
     if (remaining > 0 && !await this.delay(remaining)) return false;
-    if (!this.suppressed && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    if (sharedStart) {
+      sharedStart.prepared();
+      while (!sharedStart.canReveal()) if (!await this.frame()) return false;
+    }
+    // A shared start is revealed immediately: the server is already counting its second.
+    if (!sharedStart && !this.suppressed && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
       this.element.classList.add('is-ready');
       if (!await this.delay(180)) return false;
     }

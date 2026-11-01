@@ -1,3 +1,4 @@
+import {chooseLobbyStyle} from '../helpers/lobbyStyle';
 import { openLocalLobby } from '../helpers/localLobby';
 import { test, expect, type Page } from '@playwright/test';
 import { mkdir, writeFile } from 'node:fs/promises';
@@ -37,13 +38,13 @@ for (const scenario of [
     await pulse(page, 3);
     await page.locator('[data-draft-name]').fill('Контроллер');
     await page.locator('[data-use-name]').click();
-    await page.locator('[data-style="classic"]').click(); humans++;
+    await chooseLobbyStyle(page,'classic'); humans++;
     await expect(page.locator('[data-controller=gamepad]')).toHaveCount(1);
   }
   for (let i = humans; i < scenario.count; i++) {
     await page.locator('[data-bot]').first().click();
     await page.locator('[data-level="medium"]').click();
-    await page.locator('[data-style="classic"]').click();
+    await chooseLobbyStyle(page,'classic');
   }
   await page.locator('#start-match').click();
   await expect(page.locator('.match-loading')).toHaveCount(0);

@@ -321,7 +321,8 @@ describe('match engine', () => {
     engine.state.participants[1]!.board.lockElapsedMs = LOCK_DELAY_MS;
     engine.step(FIXED_STEP_MS);
     finishPlayableClear(engine, 1);
-    expect(engine.state.pendingConflict?.defendedRecipientIds).toContain('p2');
+    expect(engine.state.pendingConflict?.incomingRows.p2).toBeUndefined();
+    expect(engine.state.conflictImpactEvent?.defendedRecipientIds).toContain('p2');
     engine.step(3_000);
     expect(grayRows(engine.state.participants[1]!)).toBe(0);
     expect(engine.state.conflictImpactEvent?.defendedRecipientIds).toContain('p2');
@@ -411,7 +412,8 @@ describe('match engine', () => {
     engine.step(800);
     finishPlayableClear(engine, 1);
     expect(engine.state.lockEvents).toContainEqual({ participantId: 'p2', lines: 1, source: 'classic' });
-    expect(engine.state.pendingConflict?.defendedRecipientIds).toEqual(['p2']);
+    expect(engine.state.pendingConflict?.incomingRows.p2).toBeUndefined();
+    expect(engine.state.conflictImpactEvent?.defendedRecipientIds).toEqual(['p2']);
     engine.step(1_200);
     expect(grayRows(engine.state.participants[1]!)).toBe(0);
     expect(engine.state.conflictImpactEvent?.defendedRecipientIds).toEqual(['p2']);
@@ -739,17 +741,18 @@ describe('match engine', () => {
     expect(participant.shieldReady).toBe(false);
   });
 
-  it('shows each of 3, 2, and 1 for exactly one second', () => {
+  it('holds the ready phase for exactly one second without advancing gameplay', () => {
     const engine = createFixture();
-    expect(Math.ceil(engine.state.countdownMs / 1000)).toBe(3);
-    engine.step(1_000);
-    expect(Math.ceil(engine.state.countdownMs / 1000)).toBe(2);
-    engine.step(1_000);
-    expect(Math.ceil(engine.state.countdownMs / 1000)).toBe(1);
+    const before = structuredClone(engine.state.participants);
+    expect(engine.state.countdownMs).toBe(1_000);
     engine.step(999);
     expect(engine.state.phase).toBe('countdown');
+    expect(engine.state.countdownMs).toBe(1);
+    expect(engine.state.elapsedMs).toBe(0);
+    expect(engine.state.participants).toEqual(before);
     engine.step(1);
     expect(engine.state.phase).toBe('playing');
+    expect(engine.state.elapsedMs).toBe(0);
   });
 
   it('changes gravity from the placed-piece high-water mark', () => {

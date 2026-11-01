@@ -1,3 +1,4 @@
+import { startPreparedMatch } from './helpers/networkArena';
 import {describe,it,expect} from 'vitest';
 import {RoomService} from '../server/rooms';
 import {PROTOCOL_VERSION,RULES_VERSION,type Credential} from '../src/network/protocol';
@@ -65,15 +66,15 @@ describe('network Battle and explicit Teams',()=>{
     expect(()=>f.service.command(b.room,b.seat,b.epoch,{type:'rules',rules:defaultRoomRules('battle')})).toThrow();
     for(const l of [a,b])f.service.command(l.room,l.seat,l.epoch,{type:'ready',ready:true});
     f.service.command(b.room,b.seat,b.epoch,{type:'team',teamId:'team-2'});expect(a.seat.ready).toBe(false);
-    for(const l of [a,b])f.service.command(l.room,l.seat,l.epoch,{type:'ready',ready:true});expect(()=>f.service.command(a.room,a.seat,a.epoch,{type:'start'})).toThrow('равные');
+    for(const l of [a,b])f.service.command(l.room,l.seat,l.epoch,{type:'ready',ready:true});expect(()=>startPreparedMatch(f.service,a.room,a.seat,a.epoch)).toThrow('равные');
     f.service.command(b.room,b.seat,b.epoch,{type:'team',teamId:'team-1'});for(const l of [a,b])f.service.command(l.room,l.seat,l.epoch,{type:'ready',ready:true});
-    f.service.command(a.room,a.seat,a.epoch,{type:'start'});expect(a.room.engine!.options.matchVariant).toBe('teams');
+    startPreparedMatch(f.service,a.room,a.seat,a.epoch);expect(a.room.engine!.options.matchVariant).toBe('teams');
     const checkpoint=a.room.engine!.checkpoint();f.service.disconnect(b.room,b.seat,b.epoch);const returned=f.connect(guest);
     const snapshot=f.service.snapshot(returned.room,returned.seat);expect(snapshot.rules.mode).toBe('team-battle');expect(snapshot.seats.find(s=>s.id===guest.participantId)).toMatchObject({teamId:'team-1',ready:false});
     expect(a.room.engine!.state.participants.map(p=>p.config.teamId)).toEqual(checkpoint.state.participants.map(p=>p.config.teamId));
   });
   it('requires two live ready humans even with six Battle bots',async()=>{
-    const f=fixture();const c=await f.service.create('Battle','Host','',{rules:defaultRoomRules('battle'),bots:Array.from({length:6},()=>({difficulty:'expert',teamId:'team-1',tileStyle:'random'}))});const a=f.connect(c);f.service.command(a.room,a.seat,a.epoch,{type:'ready',ready:true});expect(()=>f.service.command(a.room,a.seat,a.epoch,{type:'start'})).toThrow('два');
+    const f=fixture();const c=await f.service.create('Battle','Host','',{rules:defaultRoomRules('battle'),bots:Array.from({length:6},()=>({difficulty:'expert',teamId:'team-1',tileStyle:'random'}))});const a=f.connect(c);f.service.command(a.room,a.seat,a.epoch,{type:'ready',ready:true});expect(()=>startPreparedMatch(f.service,a.room,a.seat,a.epoch)).toThrow('два');
     await expect(f.service.create('Bad','Host','',{bots:[{difficulty:'bogus'}] as never})).rejects.toThrow();
   });
 });

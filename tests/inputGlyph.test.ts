@@ -9,6 +9,9 @@ describe('shared semantic input glyphs', () => {
     expect(faceGlyph('back')).toContain('data-face-action="back"');
     expect(faceGlyph('confirm','',true)).toContain('is-compact');
   });
+  it.each(['', 'unknown', 'Generic Controller', '8BitDo Ultimate Wireless', 'Vendor: 1234 Product: 5678'])('uses Xbox labels for unrecognized device %s', id => {
+    expect(gamepadFaceLabels(id)).toEqual(['A','B','X','Y']);
+  });
   it('uses the same bounded component in static guidance and clickable reset', () => {
     expect(gamepadFooterAction('select','confirm')).toContain('data-hint-label');
     expect(gamepadFooterAction('select','confirm')).toContain(faceGlyph('confirm'));

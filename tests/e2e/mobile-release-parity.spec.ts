@@ -38,8 +38,7 @@ test('keeps the supported phone release flow touch-accessible', async ({ page })
   await expect(page.locator('.main-menu-screen .is-ui-selected')).toHaveCount(0);
   await menu.getByRole('button', { name: /^Играть/ }).hover();
   await expect(page.locator('.main-menu-screen .is-ui-selected')).toHaveCount(0);
-  await expect(page.locator('.input-confirm')).toHaveText('A');
-  await expect(page.locator('.input-confirm')).toBeHidden();
+  await expect(page.locator('.input-confirm')).toHaveCount(0);
   await expect(page.locator('.input-back')).toHaveCount(0);
 
   await openLocalLobby(page,'survival');

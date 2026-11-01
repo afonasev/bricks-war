@@ -1,3 +1,4 @@
+import { nearestAttackWarning } from '../simulation/attackQueue';
 import { translate, type Locale } from '../i18n/locale';
 import { DEFAULT_GAME_TUNING } from '../domain/gameTuning';
 import type { MatchMessageTemplates } from '../domain/gameTuning';
@@ -100,7 +101,7 @@ export function participantMatchEvent(
 ): MatchEventDescriptor | null {
   const incomingRows = state.pendingConflict?.incomingRows[participantId] ?? 0;
   if (incomingRows > 0) {
-    const current = state.attackQueues[participantId]?.[0];
+    const current = nearestAttackWarning(state.attackQueues[participantId]);
     const sender = state.participants.find(participant => participant.config.id === current?.senderId);
     const queuedName = sender?.config.controller === 'ai' && current?.senderLabel === 'ИИ'
       ? translate(locale, 'aiLabel') : current?.senderLabel;

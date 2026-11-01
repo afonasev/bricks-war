@@ -1,12 +1,12 @@
 import { openLocalLobby } from '../helpers/localLobby';
 import {test,expect} from '@playwright/test';
-for(const [id,back,reset] of [['Xbox Controller','B','Y'],['Sony DualSense','○','△'],['Nintendo Switch Pro','A','X'],['Unknown Pad','Право','Верх']]) {
+for(const [id,back,reset] of [['Xbox Controller','B','Y'],['Sony DualSense','○','△'],['Nintendo Switch Pro','A','X'],['Unknown Pad','B','Y']]) {
  test(`settings footer hints persist with pointer input: ${id}`,async({page})=>{
   await page.addInitScript(id=>{const pad={index:0,id,connected:true,mapping:'standard',axes:[0,0],buttons:Array.from({length:16},()=>({pressed:false,value:0})),timestamp:0};Object.defineProperty(navigator,'getGamepads',{value:()=>pad.connected?[pad]:[],configurable:true});(window as any).hintPad=pad;},id);
   await page.goto('/?muted=1');await page.locator('[data-destination="settings"]').click();
   const backHint=page.locator('.settings-screen footer .input-back'),resetHint=page.locator('footer .input-reset');
   await expect(backHint).toHaveText(back!);await expect(backHint).toBeVisible();await expect(resetHint).toHaveText(reset!);await expect(resetHint).toBeVisible();
-  await expect(page.locator('button .input-badge')).toHaveCount(1);await expect(page.locator('footer [data-reset-preferences] .input-reset')).toHaveCount(1);await expect(page.locator('[data-reset-preferences]')).toHaveCount(1);await expect(page.locator('.settings-utility [data-reset-preferences]')).toHaveCount(0);await expect(page.locator('footer .input-confirm')).toHaveText(id==='Sony DualSense'?'✕':id==='Nintendo Switch Pro'?'B':id==='Unknown Pad'?'Низ':'A');await expect(page.locator('.context-pad-hint')).toHaveCount(0);
+  await expect(page.locator('button .input-badge')).toHaveCount(1);await expect(page.locator('footer [data-reset-preferences] .input-reset')).toHaveCount(1);await expect(page.locator('[data-reset-preferences]')).toHaveCount(1);await expect(page.locator('.settings-utility [data-reset-preferences]')).toHaveCount(0);await expect(page.locator('footer .input-confirm')).toHaveText(id==='Sony DualSense'?'✕':id==='Nintendo Switch Pro'?'B':'A');await expect(page.locator('.context-pad-hint')).toHaveCount(0);
   await page.locator('#master-volume').fill('25');await page.locator('footer [data-reset-preferences]').click();await expect(page.locator('#master-volume')).toHaveValue('100');
   await page.locator('#master-volume').click();await expect(backHint).toBeVisible();await expect(resetHint).toBeVisible();
   for(const viewport of [{width:1440,height:960},{width:1280,height:480},{width:390,height:844}]) {

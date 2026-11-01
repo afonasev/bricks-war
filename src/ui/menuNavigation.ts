@@ -1,6 +1,8 @@
 import { refreshFaceGlyphs } from './inputGlyph';
+import { historyScrollDelta } from './historyScroll';
 import { refreshMenuActionHints } from './menuActionHints';
 import { spatialElementIndex } from './spatialNavigation';
+import { preferenceHorizontalIndex } from './preferenceNavigation';
 import { nameKeyboardRows } from './nameKeyboard';
 import { getLocale } from '../i18n/locale';
 import { text } from '../i18n/locale';
@@ -117,6 +119,8 @@ export class MenuFocusController {
   private index = -1;
   private selectedItem: HTMLElement | null = null;
   private frame = 0;
+  private lastPollTime = 0;
+  private editingControl: { element: HTMLInputElement | HTMLSelectElement; original: string } | null = null;
   private readonly latch = new GamepadMenuLatch();
   private readonly readGamepads: () => readonly (Gamepad | null)[];
 
@@ -132,6 +136,7 @@ export class MenuFocusController {
   }
 
   activate(screen: AppScreen, preferredIndex = 0): void {
+    this.finishControlEditing();
     if (screen !== 'results') this.clearResultsProtection();
     this.screen = screen;
     for (const key of this.heldKeys) this.transitionKeys.add(key);
@@ -162,6 +167,7 @@ export class MenuFocusController {
   }
 
   suspend(): void {
+    this.finishControlEditing();
     this.clearResultsProtection();
     this.screen = null;
     this.selectedItem = null;
@@ -202,6 +208,7 @@ export class MenuFocusController {
   }
 
   destroy(): void {
+    this.finishControlEditing();
     this.clearResultsProtection();
     this.root.ownerDocument.removeEventListener('keydown', this.onDocumentKeyDown, true);
     this.root.ownerDocument.removeEventListener('keyup', this.onDocumentKeyUp, true);
@@ -228,16 +235,29 @@ export class MenuFocusController {
           ?? this.root) ?? this.root;
     const exposed = (element: HTMLElement) => element.getClientRects().length > 0
       && !element.closest('[hidden], [inert], [aria-hidden="true"]');
-    const activeScope = Array.from(this.root.querySelectorAll<HTMLElement>('[data-virtual-keyboard], [data-display-confirm], [data-release-history], [data-network-preferences]')).find(exposed)
+    const activeScope = Array.from(this.root.querySelectorAll<HTMLElement>('[data-virtual-keyboard], [data-display-confirm], [data-release-history], [data-network-preferences], [data-record-reset-confirm]')).find(exposed)
       ?? Array.from(this.root.querySelectorAll<HTMLElement>('#network-pause')).find(exposed) ?? scope;
     return Array.from(activeScope.querySelectorAll<HTMLElement>('[data-ui-focus]:not([disabled])'))
       .filter(exposed);
   }
 
   private setInputMode(mode: 'pointer' | 'keyboard' | 'gamepad'): void {
+    if (mode !== 'gamepad') this.finishControlEditing();
     this.root.dataset.inputMode = mode;
     if (mode === 'pointer' && isMobilePlayViewport()) this.clearSelection();
     this.options.onInputMode?.(mode);
+  }
+
+  private finishControlEditing(cancel = false): void {
+    const editing = this.editingControl;
+    this.editingControl = null;
+    if (!editing) return;
+    editing.element.removeAttribute('data-gamepad-editing');
+    if (cancel && editing.element.isConnected && editing.element.value !== editing.original) {
+      editing.element.value = editing.original;
+      editing.element.dispatchEvent(new Event('input', { bubbles: true }));
+      editing.element.dispatchEvent(new Event('change', { bubbles: true }));
+    }
   }
 
   private clearSelection(): void {
@@ -255,6 +275,7 @@ export class MenuFocusController {
     }
     this.index = (index + items.length) % items.length;
     const selected = items[this.index];
+    if (selected !== this.editingControl?.element) this.finishControlEditing();
     this.selectedItem = selected ?? null;
     const mobileMenu = isMobilePlayViewport() && !['keyboard','gamepad'].includes(this.root.dataset.inputMode ?? '');
     if (!mobileMenu) selected?.classList.add('is-ui-selected');
@@ -269,6 +290,12 @@ export class MenuFocusController {
   private perform(action: MenuAction, mode: 'keyboard' | 'gamepad'): void {
     if (!action || !this.screen || (this.screen === 'results' && !this.resultsGuard.ready())) return;
     this.setInputMode(mode);
+    if (mode === 'gamepad' && this.screen === 'rules' && (action === 'decrease' || action === 'increase')) {
+      const topics = Array.from(this.root.querySelectorAll<HTMLButtonElement>('[data-rule-topic]'));
+      const current = topics.findIndex(button => button.getAttribute('aria-current') === 'step');
+      topics[current + (action === 'decrease' ? -1 : 1)]?.click();
+      return;
+    }
     const selected = this.items()[this.index] ?? null;
     if (mode === 'gamepad' && action === 'add-ai') {
       if (this.root.querySelector('[data-virtual-keyboard]')) return;
@@ -291,6 +318,28 @@ export class MenuFocusController {
       if (action === 'back') sendMenuSelectCommand(selected!, 'cancel');
       return;
     }
+    const preference = selected?.closest('.settings-screen, #pause-settings-panel, [data-network-preferences]');
+    if (mode === 'gamepad' && preference) {
+      if (this.editingControl && this.editingControl.element !== selected) this.finishControlEditing();
+      if (this.editingControl) {
+        if (action === 'confirm' || action === 'back') this.finishControlEditing(action === 'back');
+        else if (action === 'decrease' || action === 'increase') this.adjustOrMove(action === 'increase' ? 1 : -1);
+        else if (selected instanceof HTMLSelectElement && (action === 'previous' || action === 'next')) this.adjustOrMove(action === 'next' ? 1 : -1);
+        refreshMenuActionHints(this.root, selected);
+        return;
+      }
+      if (action === 'confirm' && ((selected instanceof HTMLInputElement && selected.type === 'range') || selected instanceof HTMLSelectElement)) {
+        this.select(this.index, false);
+        this.editingControl = { element: selected, original: selected.value };
+        selected.setAttribute('data-gamepad-editing', 'true');
+        refreshMenuActionHints(this.root, selected);
+        return;
+      }
+      if (action === 'decrease' || action === 'increase') {
+        this.select(preferenceHorizontalIndex(this.items(), this.index, action));
+        return;
+      }
+    }
     if (selected?.matches('[data-history-scroll]') && ['decrease', 'increase'].includes(action)) {
       selected.scrollBy({ top: (action === 'increase' ? 1 : -1) * selected.clientHeight * .8 }); return;
     }
@@ -299,6 +348,7 @@ export class MenuFocusController {
     if (action === 'confirm') {
       if (mode !== 'gamepad' || !this.options.onGamepadConfirm?.(this.latch.lastGamepadIndex(), selected)) selected?.click();
     }
+    if (action === 'back' && this.root.querySelector('[data-record-reset-confirm]:not([hidden])')) { this.root.querySelector<HTMLButtonElement>('[data-record-reset-cancel]')?.click(); return; }
     if (action === 'back') { const keyboard = this.root.querySelector('[data-virtual-keyboard]'); if (keyboard) { keyboard.querySelector<HTMLButtonElement>('[data-keyboard-action="cancel"]')?.click(); } else this.options.onBack(); }
     if (mode === 'gamepad' && (['previous', 'next', 'decrease', 'increase'].includes(action) || (action === 'confirm' && selected?.matches('[data-player-name]')))) {
       this.options.onGamepadSelection?.(this.latch.lastGamepadIndex(), this.items()[this.index] ?? null);
@@ -446,8 +496,11 @@ export class MenuFocusController {
     backdrop.append(keyboard); this.root.append(backdrop); this.select(0);
   }
 
-  private readonly pollGamepads = (): void => {
+  private readonly pollGamepads = (now: number): void => {
+    const elapsed = this.lastPollTime ? now - this.lastPollTime : 0;
+    this.lastPollTime = now;
     const pads = this.readGamepads();
+    if (this.editingControl && (!this.editingControl.element.isConnected || !pads.some(pad => pad?.connected))) this.finishControlEditing();
     this.options.onGamepadsSnapshot?.(pads);
     const freshPads = this.resultsGuard.freshGamepads(pads);
     const action = this.latch.read(
@@ -463,12 +516,21 @@ export class MenuFocusController {
         if (reset?.getClientRects().length) {
           const active = this.root.ownerDocument.activeElement;
           const editing = active instanceof HTMLTextAreaElement || active instanceof HTMLInputElement && ['text','search','email','password','number'].includes(active.type);
-          const modal = this.root.querySelector('[data-virtual-keyboard], [data-display-confirm], [data-release-history], [data-profile-choice], .menu-select.is-open');
+          const modal = this.root.querySelector('[data-virtual-keyboard], [data-display-confirm], [data-release-history], [data-profile-choice], [data-record-reset-confirm]:not([hidden]), .menu-select.is-open');
           if (!editing && !modal && !reset.disabled && this.options.acceptsGamepad?.(index) !== false) reset.click();
         } else this.options.onGamepadRoster?.(index);
       },
     );
-    const activePad = pads.find(pad => pad?.connected && pad.index === this.latch.lastGamepadIndex()) ?? pads.find(pad => pad?.connected);
+    const history = this.screen !== null && !this.root.ownerDocument.hidden
+      ? this.root.querySelector<HTMLElement>('[data-release-history]:not([inert]) [data-history-scroll]') : null;
+    const scrollingPad = history?.getClientRects().length ? pads.find(pad => pad?.connected
+      && this.options.acceptsGamepad?.(pad.index) !== false
+      && historyScrollDelta(pad.axes[3] ?? 0, elapsed) !== 0) : null;
+    if (history && scrollingPad) {
+      history.scrollTop += historyScrollDelta(scrollingPad.axes[3] ?? 0, elapsed);
+      this.setInputMode('gamepad');
+    }
+    const activePad = scrollingPad ?? pads.find(pad => pad?.connected && pad.index === this.latch.lastGamepadIndex()) ?? pads.find(pad => pad?.connected);
     this.root.dataset.gamepadHints = activePad ? 'connected' : 'none';
     if (this.screen !== null && !this.root.querySelector('.unified-lobby')) {
       refreshMenuActionHints(this.root, this.root.contains(this.root.ownerDocument.activeElement) ? this.root.ownerDocument.activeElement as HTMLElement : this.selectedItem);

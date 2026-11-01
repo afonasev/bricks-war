@@ -1,0 +1,10 @@
+import {test,expect} from '@playwright/test';
+import {openLocalLobby} from '../helpers/localLobby';
+for(const [width,height]of [[1440,960],[1280,480],[390,844]])test(`pause settings compact footer ${width}`,async({page})=>{
+ await page.setViewportSize({width:width!,height:height!});await page.addInitScript(()=>{localStorage.setItem('bricks-war:language:v1','en');const pad={index:0,id:'Xbox QA',mapping:'standard',connected:true,axes:[0,0,0,0],buttons:Array.from({length:16},()=>({pressed:false,value:0})),timestamp:0};Object.defineProperty(navigator,'getGamepads',{value:()=>[pad]});(window as any).footerPad=pad;});
+ await page.goto('/?muted=1');await openLocalLobby(page,'survival');await page.locator('#start-match').click();await expect(page.locator('canvas')).toBeVisible();await expect(page.locator('.match-loading')).toHaveCount(0);await expect(page.locator('#countdown')).toBeHidden();
+ if(await page.locator('#manual-pause').isVisible())await page.locator('#manual-pause').click();else await page.keyboard.press('Escape');await page.locator('#pause-settings').click();
+ const panel=page.locator('#pause-settings-panel');await expect(panel).toBeVisible();await expect(panel.locator('footer,.preferences-guidance-footer,.input-confirm')).toHaveCount(0);await expect(panel.locator('#pause-settings-back .input-back')).toHaveText('B');
+ const geometry=await panel.evaluate(e=>{const p=e.getBoundingClientRect(),actions=e.querySelector('.pause-preferences-actions')!.getBoundingClientRect(),scroll=e.querySelector('.pause-preferences-scroll')!.getBoundingClientRect();return {inside:p.top>=0&&p.bottom<=innerHeight+1,disjoint:scroll.bottom<=actions.top+1,reserve:p.bottom-actions.bottom};});expect(geometry.inside).toBe(true);expect(geometry.disjoint).toBe(true);expect(geometry.reserve).toBeLessThanOrEqual(24);
+ await page.screenshot({path:`${process.env.BRICKS_LOBBY_EVIDENCE}/pause-settings-${width}.png`});await page.evaluate(()=>{(window as any).footerPad.buttons[1].pressed=true;});await expect(panel).toBeHidden();await expect(page.locator('#manual-pause-actions')).toBeVisible();
+});

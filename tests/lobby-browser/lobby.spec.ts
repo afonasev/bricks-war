@@ -1,3 +1,4 @@
+import {chooseLobbyStyle} from '../helpers/lobbyStyle';
 import { openLocalLobby } from '../helpers/localLobby';
 import { test, expect, type Page } from '@playwright/test';
 const evidence = process.env.BRICKS_LOBBY_EVIDENCE ?? 'evidence/redesign-unified-lobby/runtime';
@@ -26,7 +27,7 @@ async function bot(page: Page, level = 'medium', style = 'classic') {
     if (style !== 'random') {
         await card.click();
         await page.locator(`[data-level="${level}"]`).click();
-        await page.locator(`[data-style="${style}"]`).click();
+        await chooseLobbyStyle(page,style);
     }
 }
 async function pulse(page: Page, index: number, button: number) {
@@ -67,7 +68,7 @@ test('cold defaults, atomic bot and human edits, run memory, start admission and
     await page.locator('[data-edit="0"]').click();
     await expect(page.locator('[data-draft-name]')).toHaveCount(0);
     await expect(page.locator('[data-level]')).toHaveCount(0);
-    await expect(page.locator('[data-style]')).toHaveCount(7);
+    await expect(page.locator('[data-style]')).toHaveCount(1);
     await expect(page.locator('[data-style="random"]')).toHaveAttribute('data-default-choice','true');
     await page.screenshot({path:`${evidence}/player-style-desktop.png`,fullPage:true});
     await page.setViewportSize({width:390,height:844});
@@ -77,7 +78,7 @@ test('cold defaults, atomic bot and human edits, run memory, start admission and
     await expect(page.locator('.lobby-card h2').first()).toHaveText('Саша');
     await expect(page.locator('.lobby-style-label').first()).toHaveText('Случайный');
     await page.locator('[data-edit="0"]').click();
-    await page.locator('[data-style="marmalade"]').click();
+    await chooseLobbyStyle(page,'marmalade');
     await expect(page.locator('[data-controller="wasd"]')).toHaveCount(1);
     for(let i=0;i<4;i++) await page.locator('#match-duration').click();
     await page.locator('[data-lobby-back]').click();
@@ -108,7 +109,7 @@ test('survival has a join card and restores all hidden bots including style and 
     await pulse(page, 0, 3);
     await expect(page.locator('.is-editing')).toHaveCount(1);
     await page.locator('[data-use-name]').click();
-    await page.locator('[data-style="classic"]').click();
+    await chooseLobbyStyle(page,'classic');
     await expect(page.locator('.lobby-card:not(.is-empty)')).toHaveCount(2);
     await nextMode(page);
     await expect(page.locator('.lobby-card:not(.is-empty)')).toHaveCount(4);
@@ -133,7 +134,7 @@ test('simultaneous identical pads own independent in-card editors, cancel, hold-
         const card = page.locator(`[data-lobby-slot="${slot}"]`);
         await card.locator('[data-draft-name]').fill(slot === 1 ? 'Первый' : 'Второй');
         await card.locator('[data-use-name]').click();
-        await card.locator('[data-style="classic"]').click();
+        await chooseLobbyStyle(card,'classic');
     }
     await expect(page.locator('.lobby-card:not(.is-empty)')).toHaveCount(3);
     await expect(page.locator('#start-match')).toBeEnabled();
@@ -146,7 +147,7 @@ test('simultaneous identical pads own independent in-card editors, cancel, hold-
     await page.evaluate(() => { (window as any).lobbyPads[0].buttons[2].pressed = false; });
     await page.locator('[data-draft-name]').fill('Первый');
     await page.locator('[data-use-name]').click();
-    await page.locator('[data-style="classic"]').click();
+    await chooseLobbyStyle(page,'classic');
     await pulse(page, 0, 3);
     await expect(page.locator('[data-style="classic"]')).toHaveAttribute('data-default-choice','true');
     await expect(page.locator('[data-draft-name]')).toHaveCount(0);
@@ -162,7 +163,7 @@ test('simultaneous identical pads own independent in-card editors, cancel, hold-
     await expect(page.locator('.is-disconnected')).toHaveCount(1);
     await pulse(page, 1, 3);
     await expect(page.locator('[data-draft-name]')).toHaveCount(0);
-    await page.locator('[data-style="classic"]').click();
+    await chooseLobbyStyle(page,'classic');
     await expect(page.locator('.is-disconnected')).toHaveCount(0);
     await expect(page.locator('#start-match')).toBeEnabled();
     await page.screenshot({ path: `${evidence}/survival-three.png` });
@@ -259,7 +260,7 @@ test('pad-only A/Y/B editing stays local while another pad configures, including
     await page.evaluate(() => { (window as any).lobbyPads.forEach((p: any) => p.buttons[3].pressed = false); });
     await page.waitForTimeout(80);
     await pulse(page, 0, 0);
-    await expect(page.locator('[data-lobby-slot="1"] [data-style]')).toHaveCount(7);
+    await expect(page.locator('[data-lobby-slot="1"] [data-style]')).toHaveCount(1);
     await expect(page.locator('[data-lobby-slot="2"] [data-draft-name]')).toBeVisible();
     await page.screenshot({ path: `${evidence}/parallel-editors.png` });
     await pulse(page, 1, 1);
@@ -294,7 +295,7 @@ test('pad-only A/Y/B editing stays local while another pad configures, including
 test('four distinct local humans reach survival match consumers without expanding input limits', async ({page}) => {
   await open(page,'Кто больше');
   for (const pad of [0,1]) { await pulse(page,pad,3); await pulse(page,pad,0); await pulse(page,pad,0); }
-  await page.locator('[data-join]').click(); await page.locator('[data-draft-name]').fill('Стрелки'); await page.locator('[data-use-name]').click(); await page.locator('[data-style="forest-mosaic"]').click();
+  await page.locator('[data-join]').click(); await page.locator('[data-draft-name]').fill('Стрелки'); await page.locator('[data-use-name]').click(); await chooseLobbyStyle(page,'forest-mosaic');
   await expect(page.locator('.lobby-card:not(.is-empty)')).toHaveCount(4); await expect(page.locator('[data-join]')).toHaveCount(0); await expect(page.locator('aside.lobby-rating')).toHaveCount(0);
   await expect(page.locator('[data-controller=wasd]')).toHaveCount(1);await expect(page.locator('[data-controller=arrows]')).toHaveCount(1);await expect(page.locator('[data-controller=gamepad]')).toHaveCount(2);
   await page.screenshot({path:`${evidence}/desktop-devices.png`});
@@ -303,7 +304,7 @@ test('four distinct local humans reach survival match consumers without expandin
 
 test('long names remain readable and disjoint on a narrow phone and compact desktop', async ({page}) => {
   await page.addInitScript(()=>localStorage.setItem('bricks-war:player-names:v1',JSON.stringify(['WWWWWWWWWWWWWWWWWWWW','Лена','Гоша','Миша'])));
-  await open(page);await page.locator('[data-edit="0"]').click();await page.locator('[data-style="classic"]').click();
+  await open(page);await page.locator('[data-edit="0"]').click();await chooseLobbyStyle(page,'classic');
   for(const [width,height] of [[360,800],[390,844],[1280,480]]) {
     await page.setViewportSize({width:width!,height:height!});
     const issues=await page.locator('[data-lobby-slot="0"]').evaluate(card=>{
@@ -421,7 +422,7 @@ test('FB2 an external roster change or overlay cannot retarget a held X',async({
 });
 
 test('FB3 physical human cards retain exact geometry across modes and viewport sizes',async({page})=>{
-  await open(page);await bot(page,'medium');await pulse(page,0,3);await page.locator('[data-use-name]').click();await page.locator('[data-style="classic"]').click();
+  await open(page);await bot(page,'medium');await pulse(page,0,3);await page.locator('[data-use-name]').click();await chooseLobbyStyle(page,'classic');
   for(const [width,height] of [[1440,960],[1280,480],[390,844],[360,800]]) {
     await page.setViewportSize({width:width!,height:height!});
     const geometry=()=>page.locator('[data-lobby-slot="0"], [data-lobby-slot="2"]').evaluateAll(es=>es.map(e=>{const r=e.getBoundingClientRect();return {slot:(e as HTMLElement).dataset.lobbySlot,x:r.x,y:r.y,width:r.width,height:r.height}}));
@@ -478,7 +479,7 @@ for (const width of [1440, 390]) test(`new bot commits random style immediately;
     await expect(card.locator('h2')).toContainText('средняя');
     await card.click();
     await page.locator('[data-level="hard"]').click();
-    await page.locator('[data-style="marmalade"]').click();
+    await chooseLobbyStyle(page,'marmalade');
     await expect(card.locator('h2')).toContainText('сложная');
     await expect(card.locator('.lobby-style-label')).toHaveText('Мармелад');
 });
@@ -493,7 +494,7 @@ for (const width of [1440,390]) test(`occupied and reserved human names stay hid
     await expect(first.locator('[data-use-name]')).toBeDisabled();
     await expect(first.locator('[data-draft-name]')).toHaveAttribute('aria-invalid','true');
     await first.locator('[data-name="Гоша"]').click();
-    await expect(first.locator('[data-style]')).toHaveCount(7);
+    await expect(first.locator('[data-style]')).toHaveCount(1);
     await expect(second.locator('[data-name="Гоша"]')).toHaveCount(0);
     await second.locator('[data-draft-name]').fill('гоша');
     await expect(second.locator('[data-use-name]')).toBeDisabled();
@@ -506,13 +507,13 @@ for (const width of [1440,390]) test(`occupied and reserved human names stay hid
     await second.locator('[data-cancel]').click();
     await expect(first.locator('[data-name="Гоша"]')).toHaveCount(1);
     await first.locator('[data-name="Гоша"]').click();
-    await first.locator('[data-style="classic"]').click();
+    await chooseLobbyStyle(first,'classic');
     await pulse(page,1,3);
     await expect(second.locator('[data-name="Гоша"]')).toHaveCount(0);
     await first.hover();await first.locator('[data-remove]').click();
     await expect(second.locator('[data-name="Гоша"]')).toHaveCount(1);
     await second.locator('[data-name="Гоша"]').click();
-    await second.locator('[data-style="classic"]').click();
+    await chooseLobbyStyle(second,'classic');
     await expect(page.locator('.lobby-card h2',{hasText:'Гоша'})).toHaveCount(1);
     await expect(page.locator('.lobby-card h2').first()).toHaveText('Саша');
     if(width===1440) {
@@ -563,9 +564,9 @@ for(const [width,height] of [[1440,960],[1280,720],[1280,480],[390,844]]) test(`
     await expect(card.locator('.lobby-name-keys')).toHaveCount(0);
     await card.locator('[data-draft-name]').click();
     await card.locator('[data-typing-name]').fill('Аня');
-    await pulse(page,0,3);await expect(card.locator('[data-style]')).toHaveCount(7);
+    await pulse(page,0,3);await expect(card.locator('[data-style]')).toHaveCount(1);
     await expect(card.locator('.lobby-name-keys')).toHaveCount(0);
-    await card.locator('[data-style="classic"]').click();
+    await chooseLobbyStyle(card,'classic');
     await expect(card.locator('h2')).toHaveText('Аня');
 });
 
@@ -580,10 +581,10 @@ test('two typing owners keep independent buffers and Y B actions',async({page})=
     await pulse(page,0,0);await expect(first.locator('[data-typing-name]')).toHaveValue(originals[0]+'Й');
     await expect(second.locator('[data-typing-name]')).toHaveValue(originals[1]!);
     await pulse(page,1,0);await expect(second.locator('[data-typing-name]')).toHaveValue(originals[1]+'Й');
-    await pulse(page,0,3);await expect(first.locator('[data-style]')).toHaveCount(7);
+    await pulse(page,0,3);await expect(first.locator('[data-style]')).toHaveCount(1);
     await expect(second.locator('[data-typing-name]')).toHaveValue(originals[1]+'Й');
     await pulse(page,1,1);await expect(second.locator('[data-draft-name]')).toHaveValue(originals[1]!);
-    await expect(first.locator('[data-style]')).toHaveCount(7);
+    await expect(first.locator('[data-style]')).toHaveCount(1);
 });
 
 for(const width of [1440,390])test(`selected occupied card shows full blue fill with static hints and still opens with A ${width}`,async({page})=>{

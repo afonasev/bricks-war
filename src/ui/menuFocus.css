@@ -20,3 +20,23 @@
 .name-keyboard-row button { min-width:0; flex:1; padding:10px 1px; font-size:16px; }
 .name-keyboard-row .name-keyboard-space { flex:5; }
 @media(max-width:760px) { .name-keyboard-row { gap:3px; } .name-keyboard-row button { font-size:12px; padding:10px 0; } }
+
+/* Approved Settings focus: calmer than menu navigation, with stable row padding. */
+#app :is(.settings-screen, .pause-settings-panel, [data-network-preferences]) {
+  --menu-focus-fill:#e8f2f5;
+  --menu-focus-ink:#214d73;
+}
+#app[data-layout] :is(.section-shell.settings-screen .settings-list, .pause-settings-panel.pause-preferences-grid) .volume-control {
+  padding:12px 14px;
+  border-radius:12px;
+}
+#app[data-layout]:is([data-input-mode="keyboard"],[data-input-mode="gamepad"])
+  :is(.section-shell.settings-screen .settings-list, .pause-settings-panel.pause-preferences-grid) .volume-control:has(> input:is(.is-ui-selected,:focus-visible)) {
+  background:#e8f2f5 !important;
+  box-shadow:inset 0 0 0 1px #c3d8df !important;
+  border-radius:12px;
+}
+#app[data-layout] :is(.section-shell.settings-screen .settings-list, .pause-settings-panel.pause-preferences-grid) .volume-control > input[type="range"] {
+  background:transparent !important;
+  box-shadow:none !important;
+}

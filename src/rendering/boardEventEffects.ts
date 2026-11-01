@@ -1,3 +1,4 @@
+import { nearestAttackWarning } from '../simulation/attackQueue';
 import type Phaser from 'phaser';
 import type {MatchState} from '../domain/types';
 
@@ -35,7 +36,7 @@ function reflection(g:Graphics,x:number,y:number,w:number,h:number,color:number,
 
 /** Selected motion studies, driven exclusively by match active time. */
 export function drawBoardEventEffects(g:Graphics,state:MatchState,id:string,x:number,y:number,w:number,h:number,calm=false):void{
-  const current=state.attackQueues[id]?.[0];
+  const current=nearestAttackWarning(state.attackQueues[id]);
   for(const launch of state.attackLaunchEvents.filter(e=>e.participantId===id)){
     const p=clamp(1-launch.remainingMs/1500),a=(1-p)**1.5;
     rim(g,x,y,w,h,RED,Math.sin(p*Math.PI),0,true);
@@ -57,8 +58,8 @@ export function drawBoardEventEffects(g:Graphics,state:MatchState,id:string,x:nu
   }
   const shield=state.shieldPresentations.find(e=>e.participantId===id&&e.remainingMs>0);
   if(shield)reflection(g,x,y,w,h,CYAN,1-shield.remainingMs/shield.durationMs,calm);
-  if(current?.phase==='rise'&&current.defended)
-    reflection(g,x,y,w,h,YELLOW,1-current.remainingMs/1100,calm);
+  const block=state.attackQueues[id]?.find(e=>e.phase==='rise'&&e.defended);
+  if(block) reflection(g,x,y,w,h,YELLOW,1-block.remainingMs/1100,calm);
   const cue=state.anomalyCueEvents.find(e=>e.participantId===id);
   if(cue){const p=1-cue.remainingMs/800;energy(g,x,y,w,h,PURPLE,Math.sin(p*Math.PI),p);}
 }

@@ -1,3 +1,4 @@
+import {chooseLobbyStyle} from '../helpers/lobbyStyle';
 import {test,expect,type Page} from '@playwright/test';
 const evidence=process.env.BRICKS_LOBBY_EVIDENCE??'evidence/refine-owned-lobby-controls/runtime';
 async function boot(page:Page){
@@ -28,9 +29,9 @@ test('keyboard retains setting focus, editor focus, immediate typing and direct 
  await page.keyboard.press('Enter');await page.keyboard.press('Enter');await expect(page.locator('#match-duration')).toHaveAttribute('data-value','3');await expect(page.locator('.unified-lobby')).toHaveAttribute('data-mode','battle');await expect(page.locator('#match-duration')).toBeFocused();
  await page.keyboard.press('w');const draft=page.locator('[data-lobby-slot="1"]');await expect(draft.locator('[data-wheel-center]')).toHaveText('Гость');await expect(draft.locator('[data-wheel-center]')).toBeFocused();
  await page.keyboard.press('ArrowUp');await expect(draft.locator('[data-wheel-center]')).toContainText('Создать новое');await page.keyboard.press('Enter');
- const input=draft.locator('[data-typing-name]');await expect(input).toBeFocused();await input.fill('Анна');await page.keyboard.press('Enter');await expect(draft.locator('.lobby-theme-list')).toBeVisible();await expect(draft.locator('[data-style="random"]')).toBeFocused();
- await draft.locator('[data-style="forest-mosaic"]').click();await expect(page.locator('[data-edit="1"] h2')).toHaveText('Анна');await expect(page.locator('[data-edit="1"]')).toBeFocused();
- await expect(page.locator('.lobby-card-hint')).toHaveCount(0);await expect(page.locator('.lobby-confirm-hint')).toBeHidden();await expect(page.locator('[data-bot] .lobby-key')).toBeHidden();await expect(page.locator('[data-join] .lobby-key')).toBeVisible();
+ const input=draft.locator('[data-typing-name]');await expect(input).toBeFocused();await input.fill('Анна');await page.keyboard.press('Enter');await expect(draft.locator('.lobby-theme-wheel')).toBeVisible();await expect(draft.locator('[data-style="random"]')).toBeFocused();
+ await chooseLobbyStyle(draft,'forest-mosaic');await expect(page.locator('[data-edit="1"] h2')).toHaveText('Анна');await expect(page.locator('[data-edit="1"]')).toBeFocused();
+ await expect(page.locator('.lobby-card-hint')).toHaveCount(0);await expect(page.locator('.lobby-confirm-hint')).toHaveCount(0);await expect(page.locator('[data-bot] .lobby-key')).toBeHidden();await expect(page.locator('[data-join] .lobby-key')).toBeVisible();
  await page.locator('[data-bot]').click();await page.locator('[data-level="expert"]').click();await expect(page.locator('#start-match')).toBeEnabled();await layout(page);await page.screenshot({path:evidence+'/mouse-ready.png'});
  await page.locator('#start-match').click();await expect(page.locator('.hud-card')).toHaveCount(3);await expect(page.locator('.hud-identity strong')).toContainText(['Игрок 1','Анна','ИИ · ЭКСПЕРТ']);
 });
@@ -48,7 +49,7 @@ test('entry pad alone controls globals; Y skips people, swaps bots, hold edits a
  await page.evaluate(()=>{(window as any).ownedPads[0].connected=false});await page.waitForTimeout(120);await page.evaluate(()=>{const p=(window as any).ownedPads[0];p.connected=true;p.id='Replacement pad'});await page.waitForTimeout(120);await pulse(page,0,0);await expect(page.locator('.unified-lobby')).toHaveAttribute('data-mode',mode!);await expect(page.locator('.is-editing')).toHaveCount(0);
 });
 for(const [width,height]of [[1440,960],[1280,720],[1280,480],[390,844]])test(`names, themes and bot zone remain readable ${width}x${height}`,async({page})=>{
- await page.setViewportSize({width:width!,height:height!});await boot(page);await page.locator('[data-play-entry]').click();await page.locator('[data-edit="0"]').click();await expect(page.locator('[data-style]')).toHaveCount(7);await layout(page,width!<761);await page.screenshot({path:`${evidence}/themes-${width}x${height}.png`,fullPage:true});await page.keyboard.press('Escape');
+ await page.setViewportSize({width:width!,height:height!});await boot(page);await page.locator('[data-play-entry]').click();await page.locator('[data-edit="0"]').click();await expect(page.locator('[data-style]')).toHaveCount(1);await layout(page,width!<761);await page.screenshot({path:`${evidence}/themes-${width}x${height}.png`,fullPage:true});await page.keyboard.press('Escape');
  if(width!>760){await page.keyboard.press('w');await layout(page);await page.screenshot({path:`${evidence}/names-${width}x${height}.png`});await page.keyboard.press('Escape');}
  await page.locator('[data-bot] .lobby-plus').click();await expect(page.locator('[data-level]')).toHaveCount(4);await layout(page,width!<761);await page.locator('[data-level="medium"]').click();await expect(page.locator('[data-edit="1"]')).toBeVisible();
 });
@@ -64,11 +65,11 @@ test('parallel pad typing preserves cancellation, uniqueness, family hints and m
  await pulse(page,0,3);await expect(first.locator('.lobby-theme-wheel')).toBeVisible();await pulse(page,1,3);await expect(second).toHaveClass(/is-typing/);await expect(second.locator('[data-typed-done]')).toBeDisabled();
  await pulse(page,1,15);await pulse(page,1,0);await expect(second.locator('[data-typing-name]')).toHaveValue('ЙЦ');await pulse(page,1,3);await expect(second.locator('.lobby-theme-wheel')).toBeVisible();
  await pulse(page,0,0);await pulse(page,1,0);await expect(first.locator('h2')).toHaveText('Й');await expect(second.locator('h2')).toHaveText('ЙЦ');
- await expect(page.locator('.lobby-confirm-hint')).toBeHidden();await page.locator('#start-match').click();await expect(page.locator('.hud-card')).toHaveCount(3);await expect(page.locator('.hud-identity strong')).toHaveText(['Игрок 1','Й','ЙЦ']);
+ await expect(page.locator('.lobby-confirm-hint')).toHaveCount(0);await page.locator('#start-match').click();await expect(page.locator('.hud-card')).toHaveCount(3);await expect(page.locator('.hud-identity strong')).toHaveText(['Игрок 1','Й','ЙЦ']);
 });
 test('entry pad Start admits the roster and keyboard cannot change globals while a guest edits',async({page})=>{
  await boot(page);await pulse(page,0,0);await page.keyboard.press('w');await expect(page.locator('[data-lobby-slot="1"] [data-wheel-center]')).toHaveText('Гость');
- await page.keyboard.press('Enter');await page.locator('[data-lobby-slot="1"] [data-style="classic"]').click();
+ await page.keyboard.press('Enter');await chooseLobbyStyle(page.locator('[data-lobby-slot="1"]'),'classic');
  await page.locator('#match-duration').press('Enter');await expect(page.locator('#match-duration')).toHaveAttribute('data-value','until-victory');await expect(page.locator('.unified-lobby')).toHaveAttribute('data-mode','battle');await expect(page.locator('.is-editing')).toHaveCount(0);
  await holdY(page,0);await expect(page.locator('.lobby-theme-wheel')).toBeVisible();await pulse(page,0,13);await pulse(page,0,0);
  await pulse(page,0,9);await expect(page.locator('.hud-card')).toHaveCount(2);await expect(page.locator('.hud-identity strong')).toHaveText(['Игрок 1','Игрок 2']);

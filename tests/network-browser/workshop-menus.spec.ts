@@ -64,7 +64,7 @@ test('own-card readiness, profile editing, host and guest permissions use real s
   await expect(host.locator('#app')).toHaveAttribute('data-input-mode','gamepad');
   await host.evaluate(()=>{const w=window as unknown as {networkMenuButtons:{pressed:boolean;value:number}[]};w.networkMenuButtons[0]!.pressed=false;w.networkMenuButtons[0]!.value=0;});
   await expect(host.locator('.network-screen')).toHaveAttribute('data-network-view','lobby');await host.screenshot({path:`${output}/controller-focus.png`});
-  await host.locator('.screen-back').click();await host.locator('[data-net-action="preferences"]').click();await shots(host,'network-settings');await host.locator('[data-network-prefs-back]').click();
+  await host.locator('.screen-back').click();await expect(host.locator('[data-net-action="preferences"]')).toHaveCount(0);
   expect(errors).toEqual([]);await writeFile(`${output}/console-errors.json`,JSON.stringify(errors));
  }finally{for(const c of contexts)await c.close();}
 });

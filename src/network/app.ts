@@ -1,4 +1,5 @@
 import { WORKSHOP_THEME_TEXTURES } from '../rendering/workshopSprites';
+import { readyTitleMarkup, localizeReadyTitle } from '../ui/readyPresentation';
 import { gamepadFooterHintsMarkup } from '../ui/gamepadFooterHints';
 import {MenuFocusController} from '../ui/menuNavigation';
 import {loadReleaseSettings} from '../ui/releaseSettings';
@@ -17,7 +18,7 @@ import { TiltControls } from '../controllers/tilt';
 import type { ArenaLayout } from '../rendering/arenaLayout';
 import { TILE_STYLES } from '../domain/tileStyles';
 import { nextPiecePreviewMarkup } from '../ui/nextPiecePreview';
-import { playerAccentForSlot } from '../ui/hudIdentity';
+import { hudIdentityForParticipant, playerAccentForSlot } from '../ui/hudIdentity';
 import { formatClock } from '../ui/format';
 import {setNetworkParticipation} from '../pwa/participation';
 import {isMobilePlayViewport} from '../ui/mobileSettings';
@@ -135,7 +136,7 @@ export class NetworkApp {
       for(const source of this.sources.keys())this.blocked.add(source);this.sources.clear();
     }
     this.session?.dispose();this.session=null;this.view='list';this.renderKey='';
-    this.shell(networkText('online'),`<section id="network-current"></section><section class="network-list-toolbar release-panel"><div><h2>${h('roomsHeading')}</h2><p>${h('modeList')} · ${networkText('upToEight')}</p></div><div class="network-actions">${this.button(networkText('createRoom'),'create')}${this.button(networkText('refresh'),'retry')}${this.button(networkText('networkSettings'),'preferences')}</div></section><section id="network-lobbies" aria-label="${escape(networkText('lobbyList'))}"></section>`);
+    this.shell(networkText('online'),`<section id="network-current"></section><section class="network-list-toolbar release-panel"><div><h2>${h('roomsHeading')}</h2><p>${h('modeList')} · ${networkText('upToEight')}</p></div><div class="network-actions">${this.button(networkText('createRoom'),'create')}${this.button(networkText('refresh'),'retry')}</div></section><section id="network-lobbies" aria-label="${escape(networkText('lobbyList'))}"></section>`);
     await this.refreshList();
   }
   private async refreshList():Promise<void> {
@@ -373,7 +374,7 @@ export class NetworkApp {
       </header>
       <div class="network-stage game-stage" id="network-stage"><div id="network-canvas" class="game-canvas"></div>
         <div class="mobile-touch-zones network-mobile-zones" data-network-mobile-zones aria-label="${tr('mobileTouchAria')}"><span class="mobile-touch-zone mobile-touch-zone-left" aria-hidden="true">←</span><span class="mobile-touch-zone mobile-touch-zone-down" aria-hidden="true">↓</span><span class="mobile-touch-zone mobile-touch-zone-right" aria-hidden="true">→</span></div>
-        <div id="network-hud"></div><output id="network-countdown" class="countdown"></output>
+        <div id="network-hud"></div><output id="network-countdown" class="countdown" role="status" hidden>${readyTitleMarkup()}</output>
         </div><div class="mobile-match-actions network-mobile-actions"><button type="button" data-net-action="pause" class="mobile-match-action" aria-label="${h('pause')}"><span aria-hidden="true">Ⅱ</span></button><output id="network-mobile-clock" class="mobile-match-timer" aria-label="${h('matchTime')}"></output></div>
       <output id="network-mobile-status" class="network-mobile-status" role="status" hidden></output>
       <div class="network-touch" hidden><button data-control="left" aria-label="${h('left')}">←</button><button data-control="down" aria-label="${h('down')}">↓</button><button data-control="right" aria-label="${h('right')}">→</button><button data-control="rotate" aria-label="${h('rotate')}">↻</button>${this.controls==='tilt'?this.button(u('tilt'),'tilt'):''}</div>
@@ -392,9 +393,12 @@ export class NetworkApp {
       el.onlostpointercapture=e=>this.release(`pointer-${e.pointerId}`);
     });
     this.arenaElement=this.root.querySelector<HTMLElement>('.network-arena');this.arenaIdentity=identity;
+    const preparedSession=this.session, preparedMatchId=this.session.snapshot.matchId, loading=this.matchLoading;
     this.arenaRuntime={engine:this.session,input:new HumanInputRouter(),aiControllers:new Map(),get mobileSolo(){return isMobilePlayViewport();},onReady:()=>{
-        const loading=this.matchLoading;
-        if(loading)void loading.ready().then(ready=>{
+        if(loading&&this.matchLoading===loading)void loading.ready({
+          prepared:()=>{if(this.session===preparedSession&&preparedMatchId)preparedSession.arenaPrepared(preparedMatchId);},
+          canReveal:()=>!preparedSession.snapshot?.preparing?.length||preparedSession.snapshot.state?.phase!=='countdown',
+        }).then(ready=>{
           if(!ready||this.matchLoading!==loading)return;
           this.matchLoading=null;this.updateArena();
         });
@@ -417,6 +421,7 @@ export class NetworkApp {
       for(const [action,key] of [['left','left'],['down','down'],['right','right'],['rotate','rotate']] as const)this.root.querySelector(`[data-control="${action}"]`)?.setAttribute('aria-label',u(key));
       const tilt=this.root.querySelector('[data-net-action="tilt"]');if(tilt)tilt.textContent=u('tilt');
       const hud=this.root.querySelector<HTMLElement>('#network-hud');if(hud)delete hud.dataset.key;
+      const ready=this.root.querySelector<HTMLElement>('#network-countdown');if(ready)localizeReadyTitle(ready);
       const pause=this.root.querySelector<HTMLElement>('#network-pause');if(pause)delete pause.dataset.renderKey;
     }
     arena.classList.toggle('mobile-solo-arena',isMobilePlayViewport());
@@ -428,7 +433,8 @@ export class NetworkApp {
       inputEpoch:String(snapshot.inputEpoch),inputAck:String(snapshot.inputAck),matchId:snapshot.matchId??'',tick:String(snapshot.tick),alive:String(own.board.alive),preparation:String(own.board.preparationRemainingMs)});
     for(const clock of this.root.querySelectorAll('#network-clock,#network-mobile-clock'))clock.textContent=formatClock(snapshot.state.isSurvival||snapshot.state.options.battleTimeMode==='until-victory'?snapshot.state.elapsedMs:snapshot.state.remainingMs??0);
     const countdown=this.root.querySelector<HTMLElement>('#network-countdown')!;
-    countdown.textContent=snapshot.state.phase==='countdown'?String(Math.ceil(snapshot.state.countdownMs/1000)):'';
+    countdown.hidden=snapshot.state.phase!=='countdown'||!!this.matchLoading||!!snapshot.preparing?.length;
+    countdown.style.animationPlayState=snapshot.state.phase==='paused'?'paused':'running';
     const hud=this.root.querySelector<HTMLElement>('#network-hud')!;
     if(this.layout) {
       const key=JSON.stringify([this.layout,shieldInventoryKey(session.state),session.state.participants.map(p=>[p.config.id,p.config.label,p.score,p.board.alive,p.board.nextPiece.id,p.placedPieces,p.shieldCount,p.shieldCharge])]);
@@ -437,11 +443,11 @@ export class NetworkApp {
         hud.innerHTML=session.state.participants.map((p,i)=>{
           const card=this.layout!.participantCards![i]!;
           const slot=Number(p.config.controllerLabel??i);
-          const palette=p.config.teamId?(p.config.teamId==='team-1'?1:2):Math.min(3,Math.max(0,slot))+1;
+          const identity=hudIdentityForParticipant(slot,session.state.options.matchVariant,getLocale(),p.config.teamId);
           const preview=i===0?nextPiecePreviewMarkup(p.board.nextPiece,getLocale()):'';
           const shields=i===0?shieldInventoryMarkup(p, session.state,getLocale()):'';
-          return `<article class="hud-card network-field-card hud-palette-slot-${palette} ${i===0?'network-own-card':'network-mini-card'} ${card.cardWidth<=250?'is-compact':''} ${p.board.alive?'':'is-out'}" style="--preview-atlas:url('${WORKSHOP_THEME_TEXTURES[p.resolvedTileStyle].url}');left:${card.x}px;top:${card.y}px;width:${card.cardWidth}px;height:${card.cardHeight}px;--network-header:${card.headerHeight}px;--player-name-color:${playerAccentForSlot(slot)}">
-            <div class="wood-panel-shell" aria-hidden="true"></div><div class="wood-panel-foot" aria-hidden="true"></div><header class="network-field-heading" data-field="${p.config.id}"><div class="hud-identity"><strong>${escape(networkAiName(p.config.controller==='ai'?'ai':'human',p.config.label,p.config.difficulty))}${p.config.teamId?` · ${h('teamShort',{number:p.config.teamId==='team-2'?2:1})}`:''}</strong></div><div class="hud-stats"><b>${h('points',{count:p.score.toLocaleString(getLocale())})}</b>${i===0?`<span>${h('pieces',{count:p.placedPieces})}</span>`:''}</div>${i===0?'':`<small>${p.board.alive?u('inGame'):u('out')}</small>`}</header>${shields}${preview}${p.board.alive?'':`<b class="out-label">${h('outCaps')}</b>`}</article>`;
+          return `<article class="hud-card network-field-card hud-palette-${identity.palette} ${i===0?'network-own-card':'network-mini-card'} ${card.cardWidth<=250?'is-compact':''} ${p.board.alive?'':'is-out'}" style="--preview-atlas:url('${WORKSHOP_THEME_TEXTURES[p.resolvedTileStyle].url}');left:${card.x}px;top:${card.y}px;width:${card.cardWidth}px;height:${card.cardHeight}px;--network-header:${card.headerHeight}px;--player-name-color:${playerAccentForSlot(slot)}">
+            <div class="wood-panel-shell" aria-hidden="true"></div><div class="wood-panel-foot" aria-hidden="true"></div><header class="network-field-heading" data-field="${p.config.id}"><div class="hud-identity"><strong>${escape(networkAiName(p.config.controller==='ai'?'ai':'human',p.config.label,p.config.difficulty))}</strong></div><div class="hud-stats"><b>${h('points',{count:p.score.toLocaleString(getLocale())})}</b>${i===0?`<span>${h('pieces',{count:p.placedPieces})}</span>`:''}</div>${i===0?'':`<small>${p.board.alive?u('inGame'):u('out')}</small>`}</header>${shields}${preview}${p.board.alive?'':`<b class="out-label">${h('outCaps')}</b>`}</article>`;
         }).join('');
       }
     }

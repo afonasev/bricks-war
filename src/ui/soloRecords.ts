@@ -83,3 +83,12 @@ export function saveSoloRecord(record: SurvivalAttempt, writeStorage: RecordStor
   const saved = saveSurvivalRecords([record], writeStorage);
   return { records: saved.records, ranked: saved.rankedIds.length === 1 };
 }
+
+/** Clear only local Survival records; preferences, names and global outbox are independent. */
+export function resetSoloRecords(writeStorage: RecordStorage | null = storage()): boolean {
+  if (!writeStorage) return false;
+  try {
+    writeStorage.setItem(SOLO_RECORDS_STORAGE_KEY, '[]');
+    return writeStorage.getItem(SOLO_RECORDS_STORAGE_KEY) === '[]';
+  } catch { return false; }
+}

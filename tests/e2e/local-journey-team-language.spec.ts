@@ -20,7 +20,9 @@ for(const locale of LOCALES) test(`localized Team Battle short desktop ${locale}
   await page.locator('#start-match').click();await expect(page.locator('.match-loading')).toBeVisible();
   await expect(page.locator('.match-loading')).toHaveCount(0);await expect(page.locator('#countdown')).toBeHidden();
   await expect(page.locator('.hud-card')).toHaveCount(4);
-  await expect(page.locator('.hud-team')).toHaveText([catalogs[locale].teamSunShort,catalogs[locale].teamSunShort,catalogs[locale].teamSkyShort,catalogs[locale].teamSkyShort]);
+  await expect(page.locator('.hud-team')).toHaveCount(0);
+  await expect(page.locator('.hud-palette-team-1')).toHaveCount(2);
+  await expect(page.locator('.hud-palette-team-2')).toHaveCount(2);
   await expect(page.locator('.hud-identity strong').nth(3)).toHaveText(catalogs[locale].aiLabel);
   await page.screenshot({path:`${process.env.BRICKS_CANDIDATE_EVIDENCE ?? 'evidence/localize-local-game-journey'}/setup-hud-screenshots/${locale}-team-hud-1280x480.png`});
  } finally {await context.close();}

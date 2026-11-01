@@ -1,0 +1,131 @@
+/* Same light wood overlay as the current lobby, painted once over the viewport. */
+#app[data-layout]:has(main.section-shell) { background:var(--workshop-background); filter:none; }
+#app[data-layout] main.release-screen.section-shell,
+#app[data-layout] main.rules-screen.section-shell {
+  --release-footer-reserve:0px;
+  display:flex; flex-direction:column; gap:14px; width:100%; min-height:0;
+  padding:16px 22px 12px; border:0; border-radius:0; box-shadow:none;
+  background:transparent; color:var(--workshop-ink); overflow:hidden;
+  font-family:'Trebuchet MS',sans-serif;
+}
+#app[data-layout] .section-shell::before,
+#app[data-layout] .section-shell::after { content:none; }
+#app[data-layout] .section-heading { display:flex; align-items:center; gap:22px; flex:0 0 58px; min-height:58px; margin:0; width:100%; }
+#app[data-layout] .section-heading .section-brand { width:112px; height:56px; object-fit:contain; flex:none; }
+#app[data-layout] .section-heading h1 { margin:0; font:700 32px/1.1 'Trebuchet MS',sans-serif; color:var(--workshop-ink); text-transform:none; text-shadow:none; -webkit-text-stroke:0; letter-spacing:-1px; }
+#app[data-layout] .section-heading output { margin-left:auto; white-space:nowrap; font-size:17px; }
+#app[data-layout] .section-content { display:flex; flex:1 1 auto; min-height:0; flex-direction:column; gap:12px; width:100%; overflow:hidden; }
+#app[data-layout] .section-navigation { display:flex; flex:0 0 42px; align-items:center; justify-content:space-between; gap:12px; min-height:42px; }
+#app[data-layout] .section-navigation .section-back { display:inline-flex; align-items:center; justify-content:center; gap:8px; flex:none; min-height:38px; padding:6px 11px; margin:0; border:1px solid #c6a06c; border-radius:10px; background:#fff9eb; color:var(--workshop-ink); box-shadow:0 2px #af794144; font:700 14px/1.2 'Trebuchet MS',sans-serif; }
+#app[data-layout] .section-secondary { display:flex; align-items:center; gap:12px; }
+#app[data-layout] .section-shell .settings-list { flex:1 1 auto; min-height:0; overflow:auto; padding:2px 3px 6px; }
+#app[data-layout] .section-shell .settings-utility { flex:0 0 auto; margin:0; }
+#app[data-layout] .section-shell .controls-reference { flex:1 1 auto; min-height:0; width:100%; margin:0; }
+#app[data-layout] .section-shell .rules-card { flex:1 1 auto; min-height:0; }
+#app[data-layout] .section-shell .rules-topics { flex:none; margin:0; }
+#app[data-layout] .section-shell .debug-lab-content { flex:1 1 auto; min-height:0; overflow:auto; }
+#app[data-layout] .section-toolbar { flex:none; display:flex; flex-direction:column; gap:8px; }
+#app[data-layout] .section-toolbar > p { margin:0; font-size:13px; }
+#app[data-layout] .section-toolbar .debug-lab-actions { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+#app[data-layout] .history-screen .release-history-list { flex:1 1 auto; min-height:0; overflow:auto; padding:18px 22px; border:1px solid #c8a16b; border-radius:18px; background:#fff9e9ee; }
+#app[data-layout] .history-screen .release-history-list article { margin:0 0 28px; }
+#app[data-layout] .history-screen .release-history-list h3 { margin:0 0 14px; font-size:21px; }
+#app[data-layout] .history-screen pre { white-space:pre-wrap; overflow-wrap:anywhere; font:inherit; font-size:15px; }
+#app[data-layout] .history-screen [role="status"] { margin:0; font-size:14px; }
+#app[data-layout] .history-screen [role="status"]:empty { display:none; }
+@media(max-width:760px) {
+  #app[data-layout] main.release-screen.section-shell,
+  #app[data-layout] main.rules-screen.section-shell { height:100dvh; min-height:100dvh; padding:12px 14px max(12px,env(safe-area-inset-bottom)); gap:12px; }
+  #app[data-layout] .section-heading { gap:12px; flex-basis:52px; min-height:52px; flex-wrap:nowrap; }
+  #app[data-layout] .section-heading .section-brand { width:82px; height:46px; }
+  #app[data-layout] .section-heading h1 { font-size:25px; letter-spacing:-.7px; min-width:0; }
+  #app[data-layout] .section-heading output { font-size:13px; }
+  #app[data-layout] .section-content { gap:10px; }
+  #app[data-layout] .section-shell .phone-controls-content { flex:1 1 auto; min-height:0; overflow:auto; width:100%; margin:0; }
+  #app[data-layout] .section-shell .phone-controls-intro { flex:none; font-size:14px; margin:0; }
+  #app[data-layout] .section-shell .phone-controls-heading { margin:0; width:100%; }
+  #app[data-layout] .section-shell .rules-card { overflow:auto; justify-content:flex-start; }
+  #app[data-layout] .section-shell .rules-art { width:100%; }
+  #app[data-layout] .section-shell .rules-art svg { max-height:290px; }
+  #app[data-layout] .section-shell .rules-navigation button { min-width:0; padding:8px 12px; font-size:13px; }
+  #app[data-layout] .section-shell .rules-topics { gap:4px; }
+  #app[data-layout] .history-screen .release-history-list { padding:14px; }
+  #app[data-layout] .section-navigation .section-back { font-size:13px; }
+}
+@media(max-height:540px) and (max-width:760px) {
+  #app[data-layout] .section-heading { flex-basis:40px; min-height:40px; }
+  #app[data-layout] .section-heading .section-brand { height:38px; }
+  #app[data-layout] .section-heading h1 { font-size:22px; }
+  #app[data-layout] .section-shell .section-content { overflow:auto; }
+}
+#app[data-layout] main.section-shell { align-items:stretch; }
+#app[data-layout] .section-navigation { width:100%; }
+/* Mobile layout also includes short landscape screens wider than 760px. */
+#app[data-layout="mobile"] main.section-shell {
+  height:100dvh; min-height:0; max-height:100dvh;
+  padding:12px 14px max(12px,env(safe-area-inset-bottom));
+}
+#app[data-layout="mobile"] .section-heading { flex-basis:52px; min-height:52px; gap:12px; }
+#app[data-layout="mobile"] .section-heading .section-brand { width:82px; height:46px; }
+#app[data-layout="mobile"] .section-heading h1 { font-size:25px; }
+#app[data-layout="mobile"] .section-content { min-height:0; overflow:auto; }
+
+/* Like the lobby, sections use physical viewport coordinates, not the old stage. */
+#app[data-layout="desktop"] main.release-screen.section-shell,
+#app[data-layout="desktop"] main.rules-screen.section-shell {
+  height:100dvh; min-height:0; max-height:100dvh; padding:22px 32px 18px; gap:18px;
+}
+#app[data-layout="desktop"] .section-heading { flex-basis:64px; min-height:64px; }
+#app[data-layout="desktop"] .section-heading .section-brand { width:132px; height:64px; }
+@media(min-width:901px) and (max-height:600px) {
+  #app[data-layout="desktop"] main.release-screen.section-shell,
+  #app[data-layout="desktop"] main.rules-screen.section-shell { padding:9px 24px; gap:9px; font-size:13px; }
+  #app[data-layout="desktop"] .section-heading { flex-basis:36px; min-height:36px; gap:15px; }
+  #app[data-layout="desktop"] .section-heading .section-brand { width:88px; height:36px; }
+  #app[data-layout="desktop"] .section-heading h1 { font-size:25px; }
+  #app[data-layout="desktop"] .section-navigation { min-height:38px; flex-basis:38px; }
+  #app[data-layout="desktop"] .section-content { gap:8px; }
+  #app[data-layout="desktop"] main.section-shell.settings-screen .settings-section { padding:9px 12px; }
+  #app[data-layout="desktop"] main.section-shell.settings-screen .settings-section h2 { font-size:16px; }
+  #app[data-layout="desktop"] main.section-shell.settings-screen .settings-section > header { margin-bottom:6px; }
+  #app[data-layout="desktop"] main.section-shell.settings-screen .volume-control { min-height:26px; padding:3px 6px; font-size:13px; }
+  #app[data-layout="desktop"] main.section-shell.settings-screen .settings-display-section .settings-action { min-height:32px; padding:3px 0; }
+  #app[data-layout="desktop"] main.section-shell.settings-screen .settings-action strong { font-size:13px; }
+  #app[data-layout="desktop"] main.section-shell.settings-screen .settings-action small { font-size:10px; line-height:1.15; margin-top:2px; }
+  #app[data-layout="desktop"] main.section-shell.settings-screen .menu-select-trigger { min-height:28px; padding:5px 8px; font-size:13px; }
+  #app[data-layout="desktop"] main.section-shell.settings-screen .settings-language-section { padding:8px 12px; }
+  #app[data-layout="desktop"] main.section-shell.settings-screen .settings-navigation { min-height:32px; padding:5px 9px; font-size:13px; }
+  #app[data-layout="desktop"] .section-toolbar > p { font-size:11px; }
+  #app[data-layout="desktop"] .section-toolbar button { min-height:28px; padding:5px 8px; font-size:12px; }
+}
+#app[data-layout] main.section-shell .settings-list,
+#app[data-layout] main.section-shell .settings-utility { width:100%; max-width:none; }
+
+/* Short desktop windows keep every group visible without a scroll/utility collision. */
+@media(min-width:901px) and (max-height:600px) {
+  #app[data-layout="desktop"] main.section-shell.settings-screen .settings-list { grid-template-columns:repeat(3,minmax(0,1fr)); grid-template-rows:auto 1fr; }
+  #app[data-layout="desktop"] main.section-shell.settings-screen .settings-columns { display:contents; }
+  #app[data-layout="desktop"] main.section-shell.settings-screen .settings-audio-section { grid-column:1; grid-row:1; }
+  #app[data-layout="desktop"] main.section-shell.settings-screen .settings-language-section { grid-column:1; grid-row:2; }
+  #app[data-layout="desktop"] main.section-shell.settings-screen .settings-stick-section { grid-column:2; grid-row:1 / span 2; }
+  #app[data-layout="desktop"] main.section-shell.settings-screen .settings-display-section { grid-column:3; grid-row:1 / span 2; }
+}
+#app[data-layout="desktop"] .section-toolbar .debug-lab-actions { flex-direction:row; }
+#app[data-layout="desktop"] .section-toolbar .debug-lab-actions > button { width:auto; flex:0 0 auto; }
+@media(min-width:901px) and (max-height:600px) {
+  #app[data-layout="desktop"] .section-shell .debug-message-fields .debug-field { grid-template-columns:minmax(0,1fr) minmax(0,1fr); }
+}
+/* Phone slide selectors have touch-sized targets, with two rows in portrait. */
+#app[data-layout="mobile"] .section-shell .rules-topics {
+  display:grid; grid-template-columns:repeat(8,56px); gap:8px; justify-content:center;
+}
+#app[data-layout="mobile"] .section-shell .rules-topics button {
+  width:56px; min-height:48px; padding:6px; font-size:18px; border-radius:10px;
+}
+@media(max-width:600px) {
+  #app[data-layout="mobile"] .section-shell .rules-topics { grid-template-columns:repeat(4,56px); }
+}
+@media(max-width:600px) and (max-height:700px) {
+  #app[data-layout="mobile"] .section-shell .rules-art svg { max-height:clamp(130px,calc(100dvh - 430px),245px); }
+  #app[data-layout="mobile"] .section-shell .rules-art { flex-shrink:0; }
+}

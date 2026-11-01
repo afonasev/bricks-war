@@ -168,7 +168,7 @@ export interface ConflictSenderState {
   recipientIds: string[];
 }
 
-/** Durable FIFO entry; serial is assigned at emission, activationSerial at head activation. */
+/** Durable attack entry. Conflict/Battle is FIFO; Survival pressure warnings overlap. */
 export interface BoardAttackState {
   serial: number;
   activationSerial: number;

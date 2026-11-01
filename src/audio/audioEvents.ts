@@ -110,13 +110,10 @@ export class AudioEventTracker {
     } : current;
 
     if (!previous) {
-      return current.phase === 'countdown' ? [{ type: 'countdown', second: current.countdownSecond }] : [];
+      return [];
     }
 
     const events: GameAudioEvent[] = [];
-    if (current.phase === 'countdown' && current.countdownSecond !== previous.countdownSecond) {
-      events.push({ type: 'countdown', second: current.countdownSecond });
-    }
     if (previous.phase === 'countdown' && current.phase === 'playing') events.push({ type: 'round-start' });
 
     if (!state.isSurvival && current.anomalyArrivalSerial > previous.anomalyArrivalSerial) {
@@ -126,7 +123,7 @@ export class AudioEventTracker {
       for (let i = 0; i < state.anomalySuccessEvents.filter(e => e.serial > previous.anomalySuccessSerial).length; i++) events.push({type: 'anomaly-success', pan: 0});
     }
     if (current.attackActivationSerial > previous.attackActivationSerial) {
-      const heads = Object.entries(state.attackQueues).filter(([,q]) => q[0]?.phase === 'warning' && q[0].activationSerial > previous.attackActivationSerial);
+      const heads = Object.entries(state.attackQueues).filter(([,q]) => q.some(event => event.phase === 'warning' && !event.defended && event.activationSerial > previous.attackActivationSerial));
       if (heads.length) events.push({type: 'attack-warning', pan: heads.length === 1 ? participantPan(Math.max(0,state.participants.findIndex(p => p.config.id === heads[0]![0])),state.participants.length) : 0});
     }
     if (current.finalPushSerial > previous.finalPushSerial) events.push({ type: 'final-push' });

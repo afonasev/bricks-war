@@ -1,3 +1,4 @@
+import { nearestAttackWarning } from '../simulation/attackQueue';
 import type { MatchState } from '../domain/types';
 import { CLEANUP_PULSE_MS, CONFLICT_IMPACT_PULSE_MS, CONFLICT_WARNING_MS } from '../simulation/match';
 
@@ -30,7 +31,7 @@ export function conflictPresentationForParticipant(
   participantId: string,
 ): ConflictPresentation {
   const pending = state.pendingConflict;
-  const current = state.attackQueues[participantId]?.[0];
+  const current = nearestAttackWarning(state.attackQueues[participantId]);
   const senderRows = Math.max(0,...state.attackLaunchEvents.filter(e=>e.participantId===participantId).map(e=>e.rows));
   const incomingRows = pending?.incomingRows[participantId] ?? 0;
   const senderIds = (pending?.senders ?? [])

@@ -1,3 +1,4 @@
+import { nearestAttackWarning } from './attackQueue';
 import { balancedNetworkTeams } from '../network/rules';
 import type {
   ActionsByParticipant,
@@ -42,7 +43,7 @@ import {
 } from './matchOptions';
 
 export const FIXED_STEP_MS = 1000 / 60;
-export const COUNTDOWN_MS = 3000;
+export const COUNTDOWN_MS = 1000;
 export const LOCK_DELAY_MS = 500;
 export const SOFT_DROP_INTERVAL_MS = 150;
 export const MAX_LOCK_RESETS = 15;
@@ -58,6 +59,13 @@ export const SOLO_PRESSURE_START_MS = 180_000;
 export const SOLO_PRESSURE_INTERVAL_MS = 15_000;
 export const SOLO_PRESSURE_MIN_INTERVAL_MS = 5_000;
 export const SOLO_PRESSURE_INTERVAL_DECREMENT_MS = 1_000;
+export const SURVIVAL_LATE_PRESSURE_START_MS = 285_000;
+export function survivalPressureInterval(elapsedMs: number, pulseCount: number): number {
+  if (elapsedMs < SURVIVAL_LATE_PRESSURE_START_MS) {
+    return Math.max(SOLO_PRESSURE_MIN_INTERVAL_MS, SOLO_PRESSURE_INTERVAL_MS - (pulseCount - 1) * SOLO_PRESSURE_INTERVAL_DECREMENT_MS);
+  }
+  return Math.max(1_000, 5_000 - Math.floor((elapsedMs - SURVIVAL_LATE_PRESSURE_START_MS) / 30_000) * 1_000);
+}
 export const PRESSURE_PULSE_MS = 650;
 export const ROUND_START_PULSE_MS = 1100;
 export const LEVEL_UP_PULSE_MS = 1200;
@@ -176,7 +184,7 @@ export function decodeMatchState(state: EncodedMatchState): MatchState {
 }
 
 export interface EngineCheckpoint {
-  version: 6;
+  version: 7;
   execution: 'local' | 'network';
   state: EncodedMatchState;
   sequence: ReturnType<PieceSequence['checkpoint']>;
@@ -314,7 +322,7 @@ export class MatchEngine {
   }
 
   checkpoint(): EngineCheckpoint {
-    return structuredClone({ version: 6, execution: this.execution, state: encodeMatchState(this.state),
+    return structuredClone({ version: 7, execution: this.execution, state: encodeMatchState(this.state),
       sequence: this.sequence.checkpoint(), phaseBeforePause: this.phaseBeforePause,
       nonAttackLockIds: [...this.nonAttackLockIds], resolvedAnomalyBurnParticipantIds: [...this.resolvedAnomalyBurnParticipantIds],
       resolvedClearParticipantIds: [...this.resolvedClearParticipantIds], pendingClears: [...this.pendingClears],
@@ -322,7 +330,7 @@ export class MatchEngine {
   }
 
   predictionCheckpoint(): PredictionCheckpoint {
-    return structuredClone({version: 6, execution: this.execution, phaseBeforePause: this.phaseBeforePause,
+    return structuredClone({version: 7, execution: this.execution, phaseBeforePause: this.phaseBeforePause,
       nonAttackLockIds: [...this.nonAttackLockIds], resolvedAnomalyBurnParticipantIds: [...this.resolvedAnomalyBurnParticipantIds],
       resolvedClearParticipantIds: [...this.resolvedClearParticipantIds], pendingClears: [...this.pendingClears],
       deferredPressureRows: [...this.deferredPressureRows]});
@@ -342,7 +350,7 @@ export class MatchEngine {
   }
 
   static restore(checkpoint: EngineCheckpoint): MatchEngine {
-    if (checkpoint.version !== 6) throw new Error('Unsupported checkpoint version');
+    if (checkpoint.version !== 7) throw new Error('Unsupported checkpoint version');
     const state = decodeMatchState(checkpoint.state);
     const engine = new MatchEngine(state.participants.map((p) => p.config), state.seed,
       Number.isFinite(state.durationMs) ? state.durationMs / 60_000 : DEFAULT_DURATION_MINUTES,
@@ -434,6 +442,10 @@ export class MatchEngine {
       const lockEvent = this.advanceBoard(participant, activeDeltaMs);
       if (lockEvent) lockEvents.push(lockEvent);
     }
+    // Resolve newly earned blocks in this same step, without advancing any queue timer twice.
+    if (Object.values(this.state.attackQueues).some(queue => queue.some(event => event.phase === 'warning' && event.defended))) {
+      this.advancePendingConflict(0);
+    }
     this.state.lockEvents = lockEvents.sort((a, b) => a.participantId.localeCompare(b.participantId));
     this.collectConflictAttacks(this.state.lockEvents);
 
@@ -460,7 +472,9 @@ export class MatchEngine {
       }
       this.state.pressureRows += 1;
       this.state.pressurePulseMs = PRESSURE_PULSE_MS;
-      const pressureIntervalMs = !Number.isFinite(this.state.durationMs)
+      const pressureIntervalMs = this.state.isSurvival
+        ? survivalPressureInterval(this.state.nextPressureAtMs, this.state.pressureRows)
+        : !Number.isFinite(this.state.durationMs)
         ? Math.max(SOLO_PRESSURE_MIN_INTERVAL_MS, SOLO_PRESSURE_INTERVAL_MS
           - (this.state.pressureRows - 1) * SOLO_PRESSURE_INTERVAL_DECREMENT_MS)
         : this.options.tuning?.pressureIntervalMs ?? PRESSURE_INTERVAL_MS;
@@ -671,7 +685,7 @@ export class MatchEngine {
         const defended = new Set(this.state.pendingConflict.defendedRecipientIds);
         defended.add(participant.config.id);
         this.state.pendingConflict.defendedRecipientIds = [...defended].sort();
-        const currentAttack = this.state.attackQueues[participant.config.id]?.[0];
+        const currentAttack = nearestAttackWarning(this.state.attackQueues[participant.config.id]);
         if (currentAttack?.phase === 'warning') currentAttack.defended = true;
       }
       this.beginClearPresentation(participant, lines, lockedGrid, clearedRows, removedGrayRows, 'highlight');
@@ -1035,17 +1049,25 @@ export class MatchEngine {
   }
 
   private activateBoardAttack(id: string): void {
-    const head = this.state.attackQueues[id]?.[0];
-    if (head?.phase !== 'queued') return;
-    head.phase = 'warning';
-    head.remainingMs = CONFLICT_WARNING_MS;
-    head.activationSerial = ++this.state.attackActivationSerial;
+    const queue = this.state.attackQueues[id] ?? [];
+    // Survival pressure clocks are independent; opponent attacks retain FIFO order.
+    const candidates = this.state.isSurvival
+      ? queue.filter(event => event.reason === 'pressure' || event === queue.find(e => e.reason === 'conflict'))
+      : queue.slice(0, 1);
+    for (const event of candidates) {
+      if (event.phase !== 'queued') continue;
+      event.phase = 'warning';
+      event.remainingMs = CONFLICT_WARNING_MS;
+      event.activationSerial = ++this.state.attackActivationSerial;
+    }
   }
 
   /** Compatibility view. All timing/defense ownership is in recipient queues. */
   private projectPendingConflict(): void {
-    const heads = Object.entries(this.state.attackQueues).flatMap(([id, queue]) =>
-      queue[0]?.phase === 'warning' ? [{id, head: queue[0]}] : []);
+    const heads = Object.entries(this.state.attackQueues).flatMap(([id, queue]) => {
+      const head = nearestAttackWarning(queue);
+      return head ? [{id, head}] : [];
+    });
     this.state.pendingConflict = heads.length === 0 ? null : {
       serial: Math.max(...heads.map(({head}) => head.activationSerial)),
       remainingWarningMs: Math.min(...heads.map(({head}) => head.remainingMs)),
@@ -1080,41 +1102,44 @@ export class MatchEngine {
       const queue = this.state.attackQueues[id]!;
       const participant = this.state.participants.find(p => p.config.id === id);
       if (!participant?.board.alive) { queue.length = 0; continue; }
-      const head = queue[0];
-      if (!head) continue;
-      if (head.phase === 'shield') {
-        if (this.state.shieldPresentations.some(e => e.participantId === id)) continue;
-        head.phase = 'rise'; head.remainingMs = head.riseRows > 0 ? 600 : 0;
-        if (head.remainingMs > 0) continue;
-      } else if (head.phase === 'rise') head.remainingMs = Math.max(0, head.remainingMs - deltaMs) < .001 ? 0 : head.remainingMs - deltaMs;
-      else if (head.phase === 'warning') {
-        if (resolutionOnly) continue;
-        head.remainingMs = Math.max(0, head.remainingMs - deltaMs);
-        if (head.remainingMs < .001) head.remainingMs = 0;
-        if (head.remainingMs > 0 || (this.pendingClears.has(id) && !head.defended)) continue;
-        resolved = true;
-        this.state.attackResolutionEvents.push({serial:++this.state.attackResolutionSerial,participantId:id,defended:head.defended});
-        if(this.state.attackResolutionEvents.length>64)this.state.attackResolutionEvents.shift();
-        const source = head.senderId ? [{participantId: head.senderId, rows: head.rows, recipientIds: [id]}] : [];
-        senders.push(...source);
-        if (head.defended) { defendedRecipientIds.push(id); head.phase = 'rise'; head.remainingMs = 1100; }
-        else {
-          const remaining = this.absorbShieldRows(participant, head.rows, head.reason);
-          head.riseRows = remaining;
-          if (remaining < head.rows) shieldedRecipientIds.push(id);
-          if (this.queueShieldImpact(participant, head.rows, remaining, head.reason, source)) {
-            head.phase = 'shield'; continue;
+      const candidates = this.state.isSurvival
+        ? queue.filter(event => event.reason === 'pressure' || event === queue.find(e => e.reason === 'conflict'))
+        : queue.slice(0, 1);
+      for (const head of candidates) {
+        if (head.phase === 'shield') {
+          if (this.state.shieldPresentations.some(e => e.participantId === id)) continue;
+          head.phase = 'rise'; head.remainingMs = head.riseRows > 0 ? 600 : 0;
+          if (head.remainingMs > 0) continue;
+        } else if (head.phase === 'rise') head.remainingMs = Math.max(0, head.remainingMs - deltaMs) < .001 ? 0 : head.remainingMs - deltaMs;
+        else if (head.phase === 'warning') {
+          if (resolutionOnly) continue;
+          head.remainingMs = Math.max(0, head.remainingMs - deltaMs);
+          if (head.remainingMs < .001) head.remainingMs = 0;
+          if (!head.defended && (head.remainingMs > 0 || this.pendingClears.has(id))) continue;
+          resolved = true;
+          this.state.attackResolutionEvents.push({serial:++this.state.attackResolutionSerial,participantId:id,defended:head.defended});
+          if(this.state.attackResolutionEvents.length>64)this.state.attackResolutionEvents.shift();
+          const source = head.senderId ? [{participantId: head.senderId, rows: head.rows, recipientIds: [id]}] : [];
+          senders.push(...source);
+          if (head.defended) { defendedRecipientIds.push(id); head.phase = 'rise'; head.remainingMs = 1100; }
+          else {
+            const remaining = this.absorbShieldRows(participant, head.rows, head.reason);
+            head.riseRows = remaining;
+            if (remaining < head.rows) shieldedRecipientIds.push(id);
+            if (this.queueShieldImpact(participant, head.rows, remaining, head.reason, source)) {
+              head.phase = 'shield'; continue;
+            }
+            if (head.reason === 'pressure') {
+              for (let row = 0; row < remaining && participant.board.alive; row++) addRisingFloor(participant.board);
+            } else this.insertConflictRows(participant, remaining);
+            incomingRows[id] = (incomingRows[id] ?? 0) + remaining;
+            head.phase = 'rise'; head.remainingMs = remaining > 0 ? 600 : 0;
           }
-          if (head.reason === 'pressure') {
-            for (let row = 0; row < remaining && participant.board.alive; row++) addRisingFloor(participant.board);
-          } else this.insertConflictRows(participant, remaining);
-          incomingRows[id] = remaining;
-          head.phase = 'rise'; head.remainingMs = remaining > 0 ? 600 : 0;
+          if (head.remainingMs > 0) continue;
         }
-        if (head.remainingMs > 0) continue;
-      }
-      if (head.phase === 'rise' && head.remainingMs === 0) {
-        queue.shift(); this.activateBoardAttack(id);
+        if (head.phase === 'rise' && head.remainingMs === 0) {
+          queue.splice(queue.indexOf(head), 1); this.activateBoardAttack(id);
+        }
       }
     }
     if (resolved) this.state.conflictImpactEvent = {

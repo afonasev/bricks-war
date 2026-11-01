@@ -1,3 +1,4 @@
+import { startPreparedMatch } from './helpers/networkArena';
 import {SnapshotAssembly} from '../src/network/snapshotAssembly';
 import {it,expect,vi} from 'vitest';
 import WebSocket from 'ws';
@@ -87,7 +88,7 @@ it('committed input publishes complete state before the next periodic deadline',
   let now=0;const service=new RoomService(()=>now);const host=await service.create('Input priority','Host'),guest=await service.join(host.roomId,'Guest');
   const links=[host,guest].map(c=>service.connect(c,PROTOCOL_VERSION,RULES_VERSION));
   for(const link of links){service.command(link.room,link.seat,link.epoch,{type:'ack',revision:link.room.revision,visible:true});service.command(link.room,link.seat,link.epoch,{type:'ready',ready:true});}
-  service.command(links[0]!.room,links[0]!.seat,links[0]!.epoch,{type:'start'});
+  startPreparedMatch(service,links[0]!.room,links[0]!.seat,links[0]!.epoch);
   for(let i=0;i<260;i++){now+=1000/60;for(const seat of links[0]!.room.seats)seat.lastHealth=now;service.advance();}
   let publicationClock=0;const clock=vi.spyOn(performance,'now').mockImplementation(()=>publicationClock);const runtime=createNetworkServer(service);
   await new Promise<void>(r=>runtime.server.listen(0,'127.0.0.1',r));const origin=`http://127.0.0.1:${(runtime.server.address() as {port:number}).port}`;

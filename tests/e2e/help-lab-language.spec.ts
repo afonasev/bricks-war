@@ -4,7 +4,7 @@ import {catalogs} from '../../src/i18n/catalogs';
 import type {GameTuning} from '../../src/domain/gameTuning';
 import {readFileSync} from 'node:fs';
 const DEFAULT_GAME_TUNING=JSON.parse(readFileSync('config/game-tuning.json','utf8')) as GameTuning;
-const shots='evidence/localize-help-and-laboratory/screenshots';
+const shots=process.env.BRICKS_LOBBY_EVIDENCE ?? 'evidence/localize-help-and-laboratory/screenshots';
 async function openSettings(page:Page){await page.goto('/?muted=1');await page.locator('[data-destination="settings"]').click();}
 async function textFits(page:Page,selector:string){return page.locator(selector).evaluateAll(elements=>elements.filter(e=>e.getClientRects().length>0).map(e=>{const range=document.createRange();range.selectNodeContents(e);const t=range.getBoundingClientRect(),b=e.getBoundingClientRect();return {text:e.textContent,fits:t.left>=b.left-1&&t.right<=b.right+1};}));}
 for(const locale of LOCALES){
@@ -53,7 +53,7 @@ for(const locale of LOCALES){
      await page.screenshot({path:`${shots}/${locale}-rules-${viewport.width}x${viewport.height}-${i+1}.png`});
     }
    }
-   await expect(page.locator('#rules-next')).toBeDisabled();await page.locator('#rules-back').click();await expect(page.locator('[data-screen="settings"]')).toBeVisible();
+   await expect(page.locator('#rules-next')).toHaveCount(0);await page.locator('#rules-back').click();await expect(page.locator('[data-screen="settings"]')).toBeVisible();
   }finally{await context.close();}
  });
  test(`localized Laboratory values and custom text survive ${locale}`,async({browser})=>{
@@ -63,22 +63,23 @@ for(const locale of LOCALES){
   await context.addInitScript(value=>localStorage.setItem('bricks-war:game-tuning:v1',JSON.stringify(value)),tuning);
   try{
    await openSettings(page);await page.locator('#open-settings-lab').click();
-   await expect(page.locator('.debug-lab-header h1')).toHaveText(catalogs[locale].labTitle);
+   await expect(page.locator('.debug-lab-screen h1')).toHaveText(catalogs[locale].lab);
    await expect(page.locator('[data-tuning-key="minimumGravityMs"]')).toHaveValue(String(tuning.minimumGravityMs));
    await expect(page.locator('[data-message-key="roundStart"]')).toHaveValue(catalogs[locale].noticeRoundStart);
    await expect(page.locator('[data-message-key="shieldBlock"]')).toHaveValue(tuning.messages.shieldBlock);
    await expect(page.locator('[data-message-key="levelUp"]')).toHaveValue(tuning.messages.levelUp);
    for(const viewport of [{width:1440,height:960},{width:1280,height:480}]){
     await page.setViewportSize(viewport);
-    const pageCount=Number((await page.locator('.desktop-lab-pages output').innerText()).match(/^\d+ \/ (\d+)/)![1]);expect(pageCount).toBeGreaterThan(10);
-    // Return to the first page before checking every existing field/page.
-    while(await page.locator('[data-lab-previous]').isEnabled())await page.locator('[data-lab-previous]').click();
-    for(let i=0;i<pageCount;i++){
+    await expect(page.locator('.desktop-lab-pages')).toHaveCount(0);
+    const groups=page.locator('.debug-group');
+    await expect(groups).toHaveCount(6);
+    for(let i=0;i<await groups.count();i++){
+     const fields=groups.nth(i).locator('input,textarea');
+     for(const field of await fields.all())await field.scrollIntoViewIfNeeded();
      const geometry=await textFits(page,'.debug-field b,.debug-field small');
      await test.info().attach(`lab-${viewport.width}-${i}`,{body:JSON.stringify(geometry),contentType:'application/json'});
      expect(geometry.every(t=>t.fits)).toBe(true);
-     if(i===0||i===2||i===9||i===pageCount-1)await page.screenshot({path:`${shots}/${locale}-lab-${viewport.width}x${viewport.height}-${i+1}.png`});
-     if(i<pageCount-1)await page.locator('[data-lab-next]').click();
+     await page.screenshot({path:`${shots}/${locale}-lab-${viewport.width}x${viewport.height}-${i+1}.png`});
     }
    }
    await page.locator('#save-debug-tuning').click();

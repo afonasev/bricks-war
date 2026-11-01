@@ -21,7 +21,7 @@ for(const [width,height] of [[320,740],[390,844],[844,390]])test(`phone cards fi
  await page.locator('[data-bot]').first().click();await expect(page.locator('[data-level]')).toHaveCount(4);await page.locator('[data-level="medium"]').click();await expect(page.locator('[data-edit="1"] h2')).toContainText('Бот');await readableCards(page);
  if(width===390)await page.locator('.lobby-cards').screenshot({path:`${out}/with-bot.png`});
  await page.locator('[data-remove="1"]').click();await expect(page.locator('[data-bot="1"]')).toBeVisible();
- await first.click();await expect(page.locator('.lobby-theme-list')).toBeVisible();if(width===390)await page.locator('.lobby-cards').screenshot({path:`${out}/style-editor.png`});await page.locator('[data-cancel]').click();
+ await first.click();await expect(page.locator('.lobby-theme-wheel')).toBeVisible();if(width===390)await page.locator('.lobby-cards').screenshot({path:`${out}/style-editor.png`});await page.locator('[data-cancel]').click();
  // No-human recovery stays available after the sole touch player is removed.
  await page.locator('[data-remove="0"]').click();await expect(page.locator('[data-join]').first()).toBeVisible();await page.locator('[data-join]').first().click();await expect(page.locator('[data-wheel-center]')).toBeVisible();await page.locator('[data-cancel]').click();
  // Re-enter a fresh browser state for mode-specific card placement.

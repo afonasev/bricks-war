@@ -11,7 +11,7 @@ for (const viewport of [{width:1440,height:960},{width:1280,height:480},{width:3
     await page.locator('[data-destination="settings"]').click();
     await page.locator('#open-rules').click();
     await expect(page.locator('#rules-progress')).toHaveText('1 / 8');
-    await expect(page.locator('#rules-prev')).toBeDisabled();
+    await expect(page.locator('#rules-prev')).toHaveCount(0);
     await expect(page.locator('[data-rule-topic]')).toHaveCount(8);
     const allContent = await page.locator('#rules-card').innerText();
     expect(allContent).toContain('Собери полный ряд');
@@ -52,12 +52,12 @@ for (const viewport of [{width:1440,height:960},{width:1280,height:480},{width:3
     expect(topicLabels.join(' ')).not.toContain('Финал Битвы');
     expect(topicLabels.join(' ')).not.toContain('Команды и сеть');
     expect(fullDeck).not.toContain('Огненная фигура');
-    await expect(page.locator('#rules-next')).toBeDisabled();
+    await expect(page.locator('#rules-next')).toHaveCount(0);
     await page.keyboard.press('ArrowRight');
     await expect(page.locator('#rules-progress')).toHaveText('8 / 8');
-    await page.locator('#rules-prev').click();
+    await page.keyboard.press('ArrowLeft');
     await expect(page.locator('#rules-progress')).toHaveText('7 / 8');
-    await page.locator('#rules-next').click();
+    await page.keyboard.press('ArrowRight');
     await expect(page.locator('#rules-progress')).toHaveText('8 / 8');
     await page.keyboard.press('Escape');
     await expect(page.locator('[data-screen="settings"]')).toBeVisible();

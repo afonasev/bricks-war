@@ -51,7 +51,7 @@ test('network menu uses arrows and shared preferences without a live server',asy
  await page.goto('/?muted=1');await page.locator('[data-network-entry]').click();await expect(page.locator('[data-network-view="list"]')).toBeVisible();await page.getByRole('button',{name:'Настройки',exact:true}).click();await expect(page.locator('[data-network-preferences]')).toBeVisible();await page.locator('#master-volume').press('ArrowDown');await expect(page.locator('#music-volume')).toBeFocused();await page.locator('[data-network-prefs-back]').click();await expect(page.locator('[data-network-preferences]')).toHaveCount(0);await page.getByRole('button',{name:'Создать лобби',exact:true}).click();await expect(page.locator('#network-form')).toBeVisible();await page.getByRole('textbox',{name:'Ваше имя',exact:true}).fill('Игрок');await page.getByRole('textbox',{name:'Ваше имя',exact:true}).press('Enter');await expect(page.getByRole('textbox',{name:'Ваше имя',exact:true})).not.toBeFocused();
 });
 
-for(const [id,glyph] of [['Xbox Controller','Y'],['Sony DualSense','△'],['Nintendo Switch Pro','X'],['Unknown Pad','Верх']] as const){
+for(const [id,glyph] of [['Xbox Controller','Y'],['Sony DualSense','△'],['Nintendo Switch Pro','X'],['Unknown Pad','Y']] as const){
  test(`settings top-face reset ${id} is contextual and edge triggered`,async({page})=>{
   await page.addInitScript(id=>{const pad={index:0,id,connected:true,mapping:'standard',axes:[0,0],buttons:Array.from({length:16},()=>({pressed:false,value:0})),timestamp:0};Object.defineProperty(navigator,'getGamepads',{value:()=>[pad],configurable:true});(window as any).settingsPad=pad;},id);
   await page.goto('/?muted=1');await page.locator('[data-destination="settings"]').click();

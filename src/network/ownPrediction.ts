@@ -1,3 +1,4 @@
+import { nearestAttackWarning } from '../simulation/attackQueue';
 import type {MatchState} from '../domain/types';
 import {MatchEngine, FIXED_STEP_MS} from '../simulation/match';
 import type {PieceSequence} from '../simulation/random';
@@ -52,7 +53,7 @@ export class OwnPrediction {
     const own = predicted?.participants.find(p => p.config.id === this.ownId);
     if (!predicted || !own || confirmed.phase !== 'playing' || confirmed.anomalyTransition || confirmed.globalEventHold) return confirmed;
     const attackQueues = {...confirmed.attackQueues, [this.ownId]: predicted.attackQueues[this.ownId] ?? []};
-    const heads = Object.entries(attackQueues).flatMap(([id,q])=>q[0]?.phase==='warning'?[{id,head:q[0]}]:[]);
+    const heads = Object.entries(attackQueues).flatMap(([id,q])=>{const head=nearestAttackWarning(q);return head?[{id,head}]:[];});
     const pendingConflict = heads.length ? {
       serial: confirmed.pendingConflict?.serial ?? 0,
       remainingWarningMs: Math.min(...heads.map(e=>e.head.remainingMs)),

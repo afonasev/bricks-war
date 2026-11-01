@@ -7,14 +7,14 @@ import { startupLocaleScript } from '../src/i18n/bootstrap';
 import { DEFAULT_RELEASE_SETTINGS, saveReleaseSettings } from '../src/ui/releaseSettings';
 
 describe('entry language contract', () => {
-  it('localizes shared footer actions and unknown face directions while preserving family glyphs', () => {
+  it('localizes shared actions while keeping unknown devices in Xbox style', () => {
     vi.stubGlobal('window', { innerWidth: 1440, innerHeight: 960 });
     try {
       for (const locale of LOCALES) {
         setLocale(locale, null);
         expect(gamepadFooterAction('confirm', 'confirm')).toContain(catalogs[locale].confirm);
         expect(footerResetButtonMarkup()).toContain(catalogs[locale].reset);
-        expect(gamepadFaceLabels('unknown')).toEqual([catalogs[locale].bottom,catalogs[locale].right,catalogs[locale].left,catalogs[locale].top]);
+        expect(gamepadFaceLabels('unknown')).toEqual(['A','B','X','Y']);
         expect(gamepadFaceLabels('Xbox')).toEqual(['A','B','X','Y']);
         expect(gamepadFaceLabels('DualSense')).toEqual(['✕','○','□','△']);
       }

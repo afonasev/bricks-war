@@ -10,11 +10,13 @@ describe('participant HUD identity', () => {
 
   it('groups fixed teammates by palette and label', () => {
     expect([0, 1, 2, 3].map((slot) => hudIdentityForParticipant(slot, 'teams'))).toEqual([
-      { palette: 'team-1', teamLabel: 'СОЛНЦЕ' },
-      { palette: 'team-1', teamLabel: 'СОЛНЦЕ' },
-      { palette: 'team-2', teamLabel: 'НЕБО' },
-      { palette: 'team-2', teamLabel: 'НЕБО' },
+      { palette: 'team-1', teamLabel: null },
+      { palette: 'team-1', teamLabel: null },
+      { palette: 'team-2', teamLabel: null },
+      { palette: 'team-2', teamLabel: null },
     ]);
+    expect(hudIdentityForParticipant(0, 'teams', 'en', 'team-2').palette).toBe('team-2');
+    expect(hudIdentityForParticipant(3, 'teams', 'en', 'team-1').palette).toBe('team-1');
     expect(new Set([0, 1, 2, 3].map(playerAccentForSlot)).size).toBe(4);
   });
 });

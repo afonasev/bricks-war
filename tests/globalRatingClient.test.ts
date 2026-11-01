@@ -53,3 +53,16 @@ it('does not endlessly re-send an acknowledged snapshot when storage becomes rea
   await outbox.flush();
   expect(send).toHaveBeenCalledTimes(1); expect(outbox.pending()).toEqual([]);
 });
+
+it('never uploads the previous pressure ruleset offline queue', async () => {
+  const storage = memory();
+  const legacy = JSON.stringify([a('LegacyOffline',99999)]);
+  storage.setItem('bricks-war:global-rating-outbox:v1', legacy);
+  const send = vi.fn().mockResolvedValue(undefined);
+  const outbox = new RatingOutbox(storage, send);
+  expect(outbox.pending()).toEqual([]);
+  await outbox.flush(); expect(send).not.toHaveBeenCalled();
+  outbox.enqueue([a('NewRules',100)]); await outbox.flush();
+  expect(send).toHaveBeenCalledExactlyOnceWith([a('NewRules',100)]);
+  expect(storage.getItem('bricks-war:global-rating-outbox:v1')).toBe(legacy);
+});

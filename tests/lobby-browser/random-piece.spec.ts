@@ -5,6 +5,6 @@ async function centered(page:Page){const shapes=await page.locator('.random-piec
 for(const [width,height] of [[1440,960],[1280,720],[1280,480],[390,844]] as const)test(`random question stays centered in ready, list and pad preview ${width}x${height}`,async({page})=>{
  await page.setViewportSize({width,height});await page.addInitScript(()=>{localStorage.setItem('bricks-war:language:v1','ru');const pad={index:0,id:'Xbox question QA',mapping:'standard',connected:true,axes:[0,0],buttons:Array.from({length:16},()=>({pressed:false,value:0,touched:false})),timestamp:0};Object.defineProperty(navigator,'getGamepads',{value:()=>[pad]});Object.assign(window,{questionPad:pad});});
  await page.goto('/?muted=1');await page.locator('[data-play-entry]').click();await centered(page);await page.screenshot({path:`${out}/ready-${width}x${height}.png`,fullPage:true});
- await page.locator('[data-edit="0"]').click();await expect(page.locator('.lobby-theme-list')).toBeVisible();await centered(page);await page.screenshot({path:`${out}/list-${width}x${height}.png`,fullPage:true});await page.keyboard.press('Escape');
+ await page.locator('[data-edit="0"]').click();await expect(page.locator('.lobby-theme-wheel')).toBeVisible();await centered(page);await page.screenshot({path:`${out}/list-${width}x${height}.png`,fullPage:true});await page.keyboard.press('Escape');
  await pulse(page,3);await pulse(page,0);await expect(page.locator('.lobby-theme-wheel')).toBeVisible();await centered(page);await page.screenshot({path:`${out}/pad-${width}x${height}.png`,fullPage:true});
 });

@@ -4,7 +4,7 @@ async function open(page:Page,pad=false,index=0){await page.addInitScript(({pad,
 async function pulse(page:Page,i:number){await page.evaluate(i=>(window as any).actionPad.buttons[i].pressed=true,i);await page.waitForTimeout(100);await page.evaluate(i=>(window as any).actionPad.buttons[i].pressed=false,i);await page.waitForTimeout(100);}
 for(const [width,height] of [[1440,960],[1280,480],[390,844]])test(`explicit card actions and visible hover/hints ${width}`,async({page})=>{
  await page.setViewportSize({width:width!,height:height!});await open(page);if(width!<=760)await expect(page.locator('.input-confirm')).toBeHidden();else await expect(page.locator('.input-confirm')).toBeVisible();await expect(page.locator('.input-back')).toHaveCount(0);await page.locator('[data-play-entry]').click();
- const occupied=page.locator('[data-edit="0"]');await expect(occupied).toBeVisible();await expect(page.locator('.lobby-edit')).toHaveCount(0);await occupied.locator('h2').click();await expect(page.locator('[data-style]')).toHaveCount(7);await expect(page.locator('[data-draft-name]')).toHaveCount(0);await page.locator('[data-cancel="0"]').click();
+ const occupied=page.locator('[data-edit="0"]');await expect(occupied).toBeVisible();await expect(page.locator('.lobby-edit')).toHaveCount(0);await occupied.locator('h2').click();await expect(page.locator('[data-style]')).toHaveCount(1);await expect(page.locator('[data-draft-name]')).toHaveCount(0);await page.locator('[data-cancel="0"]').click();
  const empty=page.locator('.is-empty').first();await empty.locator('.lobby-plus').click();await expect(page.locator('[data-level]')).toHaveCount(4);await page.locator('[data-cancel="1"]').click();
  await empty.click({position:{x:5,y:5}});await expect(page.locator('[data-level]')).toHaveCount(4);await page.locator('[data-cancel="1"]').click();
  const joins=empty.locator('[data-join]'),bots=empty.locator('[data-bot]');await joins.click();await expect(page.locator('[data-level]')).toHaveCount(0);if(width!>760){await expect(page.locator('[data-draft-name]')).toHaveCount(1);await page.locator('[data-cancel="1"]').click();}
@@ -23,7 +23,7 @@ test('keyboard default, W admission and generic names stay unique without histor
 test('activating controller owns initial player and later Y uses generic numbering',async({page})=>{
  await open(page,true,1);await pulse(page,0);await expect(page.locator('.unified-lobby')).toBeVisible();await expect(page.locator('[data-edit="0"] [data-controller="gamepad"]')).toHaveCount(1);await expect(page.locator('[data-edit="0"] .lobby-ready')).toContainText('Готов');
  await page.keyboard.press('w');await page.locator('[data-generic-name]').click();await page.locator('[data-style="random"]').click();await expect(page.locator('[data-edit="1"] h2')).toHaveText('Игрок 2');
- await pulse(page,3);await expect(page.locator('[data-lobby-slot="0"].is-editing [data-style]')).toHaveCount(7);await pulse(page,1);await expect(page.locator('.is-editing')).toHaveCount(0);
+ await pulse(page,3);await expect(page.locator('[data-lobby-slot="0"].is-editing [data-style]')).toHaveCount(1);await pulse(page,1);await expect(page.locator('.is-editing')).toHaveCount(0);
 });
 
 test('generic numbers reserve concurrent keyboard and controller drafts',async({page})=>{

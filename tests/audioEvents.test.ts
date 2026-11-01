@@ -1,3 +1,5 @@
+import { vi } from 'vitest';
+import { GameAudio } from '../src/audio/GameAudio';
 import { describe, expect, it } from 'vitest';
 import { AudioEventTracker, gameTempo } from '../src/audio/audioEvents';
 import type { ParticipantConfig } from '../src/domain/types';
@@ -19,15 +21,16 @@ describe('game audio events', () => {
     expect(gameTempo(10, 800, true)).toBe(176);
   });
 
-  it('emits preparation, start, and final ten-second ticks once per second', () => {
+  it('emits no numerical preparation ticks, one start, and final ten-second ticks', () => {
     const engine = new MatchEngine(configs, 12, 2);
     const tracker = new AudioEventTracker();
-    expect(tracker.sync(engine.state)).toContainEqual({ type: 'countdown', second: 3 });
-    engine.state.countdownMs = 1_900;
-    expect(tracker.sync(engine.state)).toContainEqual({ type: 'countdown', second: 2 });
+    expect(tracker.sync(engine.state)).toEqual([]);
+    engine.state.countdownMs = 900;
+    expect(tracker.sync(engine.state)).toEqual([]);
     engine.state.phase = 'playing';
     engine.state.remainingMs = 59_000;
     expect(tracker.sync(engine.state)).toContainEqual({ type: 'round-start' });
+    expect(tracker.sync(engine.state)).toEqual([]);
     const ticks: number[] = [];
     for (let second = 10; second >= 1; second -= 1) {
       engine.state.remainingMs = second * 1000 - 100;
@@ -149,4 +152,21 @@ describe('game audio events', () => {
     expect(types).not.toContain('shield-half-charge');
     expect(tracker.sync(engine.state)).toEqual([]);
   });
+});
+
+it('plays one network start cue and keeps reconnect baselines silent', () => {
+  const engine = new MatchEngine(configs, 12, 2);
+  const audio = new GameAudio(true);
+  const play = vi.spyOn(audio as unknown as {playEvent: (e: unknown) => void}, 'playEvent').mockImplementation(() => {});
+  audio.syncNetworkAnomalies(engine.state, true);
+  audio.syncNetworkAnomalies(engine.state);
+  expect(play).not.toHaveBeenCalled();
+  engine.step(1_000);
+  audio.syncNetworkAnomalies(engine.state);
+  audio.syncNetworkAnomalies(engine.state);
+  expect(play).toHaveBeenCalledExactlyOnceWith({type:'round-start'});
+  play.mockClear();
+  audio.syncNetworkAnomalies(engine.state, true);
+  audio.syncNetworkAnomalies(engine.state);
+  expect(play).not.toHaveBeenCalled();
 });

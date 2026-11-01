@@ -14,7 +14,7 @@ function continueBoth(engine: MatchEngine, restored: MatchEngine, steps = 500) {
   }
 }
 describe('complete engine checkpoint', () => {
-  it.each([2, 3, 4])('rejects checkpoint version %s before the deferred shield impact contract', (version) => {
+  it.each([2, 3, 4, 5, 6])('rejects checkpoint version %s before the current pressure timing contract', (version) => {
     const engine = new MatchEngine(humanPair(), 1);
     const old = { ...engine.checkpoint(), version };
     expect(() => MatchEngine.restore(old as unknown as ReturnType<MatchEngine['checkpoint']>)).toThrow('Unsupported checkpoint version');

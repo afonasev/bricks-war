@@ -1,7 +1,8 @@
 import type { GameAction, AiDifficulty, BattleDifficulty, SoftDropPreset, TileStyleSelection, MatchOptionSelections, TeamId } from '../domain/types';
 import type { EncodedMatchState, PredictionCheckpoint } from '../simulation/match';
 export const PROTOCOL_VERSION = 3;
-export const RULES_VERSION = 'bottom-anomaly-protection-v1';
+export const RULES_VERSION = 'ready-start-survival-pressure-v2';
+export const ARENA_PREPARATION_TIMEOUT_MS = 30_000;
 export const RETURN_WINDOW_MS = 30_000;
 export const HEARTBEAT_MS = 2_000;
 export const HEALTH_TIMEOUT_MS = 6_000;
@@ -31,6 +32,7 @@ export type ClientCommand = InputEnvelope
   | { type: 'ack'; revision: number; visible: boolean }
   | { type: 'heartbeat'; visible: boolean }
   | { type: 'ready'; ready: boolean }
+  | { type: 'arena-prepared'; matchId: string }
   | { type: 'profile'; name: string; tileStyle: TileStyleSelection }
   | { type: 'team'; teamId: TeamId }
   | { type: 'rules'; rules: RoomRules }
@@ -56,6 +58,8 @@ export interface ClientSnapshot {
   inputResult?: {sequence: number; appliedTick: number; lateCount: number; mismatchCount: number; disposition: 'applied' | 'late' | 'piece-mismatch'};
   prediction?: PredictionCheckpoint | null;
   matchId: string | null; tick: number; state: EncodedMatchState | null;
+  /** Retained human arenas still preparing; the server holds pre-play time. */
+  preparing?: string[];
   manualPausedBy: string | null; events: RoomEvent[];
 }
 export interface RoomEvent { id: string; kind: 'start' | 'pause' | 'resume' | 'absence' | 'return' | 'elimination' | 'results' | 'creator'; participantId?: string }

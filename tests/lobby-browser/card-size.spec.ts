@@ -23,5 +23,5 @@ for(const [width,height] of [[1440,960],[1280,720],[1280,480],[390,844]] as cons
  await stable();await page.locator('[data-bot]').first().click();await stable();await page.locator('[data-level="hard"]').click();await stable();
  await pulse(page,3);await expect(page.locator('.lobby-name-wheel')).toBeVisible();await stable();await page.screenshot({path:`${out}/mixed-name-${width}x${height}.png`,fullPage:true});
  await pulse(page,12);await pulse(page,0);await expect(page.locator('.lobby-name-keys')).toBeVisible();await stable();await page.screenshot({path:`${out}/mixed-typing-${width}x${height}.png`,fullPage:true});
- await pulse(page,1);await stable();await pulse(page,1);await stable();await page.locator('[data-edit="0"]').click();await expect(page.locator('.lobby-theme-list')).toBeVisible();await stable();await page.screenshot({path:`${out}/mixed-theme-${width}x${height}.png`,fullPage:true});
+ await pulse(page,1);await stable();await pulse(page,1);await stable();await page.locator('[data-edit="0"]').click();await expect(page.locator('.lobby-theme-wheel')).toBeVisible();await stable();await page.screenshot({path:`${out}/mixed-theme-${width}x${height}.png`,fullPage:true});
 });

@@ -5,7 +5,7 @@ import { MatchEngine, encodeMatchState, FIXED_STEP_MS } from '../src/simulation/
 import { isTileStyle } from '../src/domain/tileStyles';
 import { AiController } from '../src/controllers/ai';
 import { HeldInput } from '../src/network/heldInput';
-import { PROTOCOL_VERSION, RULES_VERSION, RETURN_WINDOW_MS, HEALTH_TIMEOUT_MS, MAX_PENDING_INPUTS,
+import { PROTOCOL_VERSION, RULES_VERSION, RETURN_WINDOW_MS, HEALTH_TIMEOUT_MS, MAX_PENDING_INPUTS, ARENA_PREPARATION_TIMEOUT_MS,
   validHeld, type ClientCommand, type ClientSnapshot, type Credential, type InputEnvelope,
   type LobbySummary, type RoomEvent, type RoomRules, type CreateSetup, type BotTemplate, type SeatPreferences } from '../src/network/protocol';
 import type { CommonSnapshot } from '../src/network/snapshotAssembly';
@@ -40,6 +40,7 @@ export interface Room {
   aiControllers: Map<string, AiController>; aiActionCount: number;
   seats: Seat[]; creatorId: string | null; rules: RoomRules; engine: MatchEngine | null;
   matchId: string | null; tick: number; revision: number; inputEpoch: number;
+  preparing: Map<string, number>;
   manualPausedBy: string | null; events: RoomEvent[]; eventSerial: number;
   lastAt: number; accumulator: number; terminalAt: number | null; nextSeatOrder: number;
 }
@@ -54,7 +55,7 @@ export class RoomService {
     const rules = normalizeRoomRules(setup.rules ?? defaultRoomRules());
     requireCondition(rules && validProfile(setup.profile ?? {}) && (setup.bots === undefined || Array.isArray(setup.bots) && setup.bots.length <= 6 && setup.bots.every(b=>b && b.tileStyle !== undefined && ['team-1','team-2'].includes(b.teamId) && validProfile(b) && ['easy','medium','hard','expert'].includes(b.difficulty))), 'rules', 'Некорректные настройки комнаты.');
     const room: Room = { id: randomUUID(), name: name(roomName), password: null, seats: [], creatorId: null, aiControllers: new Map(), aiActionCount: 0,
-      rules, engine: null, matchId: null, tick: 0, revision: 0,
+      rules, engine: null, matchId: null, tick: 0, revision: 0, preparing: new Map(),
       inputEpoch: 1, manualPausedBy: null, events: [], eventSerial: 0, lastAt: this.now(), accumulator: 0,
       terminalAt: null, nextSeatOrder: 0 };
     if (password) {
@@ -141,6 +142,7 @@ export class RoomService {
       requireCondition(typeof command.revision === 'number' && command.visible === true && seat.awaitingRevision !== null
         && command.revision >= seat.awaitingRevision && command.revision <= room.revision, 'ack', 'Сначала восстановите текущее состояние.');
       seat.connected = true; seat.lastHealth = this.now(); seat.awaitingRevision = null;
+      if (room.preparing.has(seat.id)) room.preparing.set(seat.id, this.now() + ARENA_PREPARATION_TIMEOUT_MS);
       if (seat.absence) {seat.absence = null; this.event(room, 'return', seat.id);}
       this.chooseCreator(room); this.syncPause(room); this.changed(room); return;
     }
@@ -152,6 +154,14 @@ export class RoomService {
       return;
     }
     requireCondition(seat.connected && seat.awaitingRevision === null, 'restore', 'Ожидается возврат в матч.');
+    if (command.type === 'arena-prepared') {
+      requireCondition(room.engine && command.matchId === room.matchId, 'match', 'Ввод устарел; дождитесь состояния.');
+      if (room.preparing.delete(seat.id)) {
+        // Discard time spent preparing, including time since the last advance callback.
+        room.lastAt = this.now(); room.accumulator = 0; this.changed(room);
+      }
+      return;
+    }
     if (command.type === 'leave') {this.remove(room, seat); this.syncPause(room); this.changed(room); return;}
     if (command.type === 'input') {
       requireCondition(room.engine?.acceptsGameplayInput() && room.engine.state.participants.find(p=>p.config.id===seat.id)?.board.alive && room.matchId === command.matchId
@@ -181,6 +191,7 @@ export class RoomService {
     if (command.type === 'lobby') {
       requireCondition(room.engine?.state.phase === 'results', 'phase', 'Сначала завершите матч.');
       room.engine = null; room.aiControllers.clear(); room.aiActionCount = 0; room.matchId = null; room.terminalAt = null; room.manualPausedBy = null;
+      room.preparing.clear();
       room.seats = room.seats.filter(s => s.retained); this.resetReady(room); this.resetInputs(room); this.changed(room); return;
     }
     requireCondition(!room.engine, 'phase', 'Настройки доступны до старта.');
@@ -232,6 +243,7 @@ export class RoomService {
       room.aiControllers = new Map(retained.filter(s => s.kind === 'ai').map(s => [s.id, new AiController(seed, s.id, s.difficulty!, rules.conflictEnabled)]));
       room.aiActionCount = 0;
       room.matchId = randomUUID(); room.tick = 0; room.lastAt = this.now(); room.accumulator = 0;
+      room.preparing = new Map(retained.filter(s => s.kind === 'human').map(s => [s.id, this.now() + ARENA_PREPARATION_TIMEOUT_MS]));
       this.resetInputs(room); this.event(room, 'start');
     } else throw new RoomError('message', 'Неизвестная команда.');
     this.changed(room);
@@ -254,6 +266,7 @@ export class RoomService {
   private changed(room: Room): void {room.revision++;}
   private remove(room: Room, seat: Seat): void {
     if (!seat.retained) return;
+    room.preparing.delete(seat.id);
     const playing=room.engine?.state.participants.find(p=>p.config.id===seat.id)?.board.alive;
     room.engine?.eliminate(seat.id); seat.retained = false; seat.connected = false; seat.absence = null; seat.awaitingRevision = null;
     if(playing)this.event(room, 'elimination', seat.id); this.resetInputs(room,playing?undefined:seat); this.resetReady(room);
@@ -279,6 +292,7 @@ export class RoomService {
   }
   private terminal(room: Room): void {
     if (room.engine?.state.phase === 'results' && room.terminalAt === null) {
+      room.preparing.clear();
       room.terminalAt = this.now(); room.manualPausedBy = null;
       room.engine.state.pauseReasons = []; this.resetInputs(room); this.event(room, 'results'); this.changed(room);
     }
@@ -288,6 +302,7 @@ export class RoomService {
     const due = room.seats.filter(s => s.kind === 'human' && s.retained && s.absence && now >= s.absence.deadline);
     // Resolve every due seat before succession and pause decisions.
     for (const s of due) {
+      room.preparing.delete(s.id);
       const alive=room.engine?.state.participants.find(p=>p.config.id===s.id)?.board.alive;
       room.engine?.eliminate(s.id); s.retained = false; s.connected = false; s.absence = null; s.awaitingRevision = null;
       if (room.creatorId === s.id) room.creatorId = null;
@@ -301,11 +316,16 @@ export class RoomService {
     for (const room of this.rooms.values()) {
       for (const s of room.seats) if (s.kind === 'human' && s.retained && !s.absence && now - s.lastHealth >= HEALTH_TIMEOUT_MS) this.absent(room, s);
       this.expire(room);
+      const unprepared = room.seats.filter(s => !s.absence && room.preparing.has(s.id) && now >= room.preparing.get(s.id)!);
+      if (unprepared.length) {
+        for (const seat of unprepared) this.remove(room, seat);
+        this.syncPause(room); this.changed(room);
+      }
       if ((!room.seats.some(s => s.kind === 'human' && s.retained) && (!room.engine || room.seats.some(s => s.kind === 'ai'))) || (room.terminalAt !== null && now-room.terminalAt >= TERMINAL_RETENTION_MS)) {
         this.rooms.delete(room.id); continue;
       }
       const elapsed = Math.max(0, now - room.lastAt); room.lastAt = now;
-      if (!room.engine || room.engine.state.phase === 'paused' || room.engine.state.phase === 'results') {room.accumulator = 0; continue;}
+      if (!room.engine || room.preparing.size || room.engine.state.phase === 'paused' || room.engine.state.phase === 'results') {room.accumulator = 0; continue;}
       room.accumulator += elapsed;
       // Bound per-callback work while retaining debt; do not skip authoritative simulation ticks.
       let steps = 0;
@@ -358,6 +378,7 @@ export class RoomService {
         absence: s.absence ? {episodeId: s.absence.episodeId, remainingMs: Math.max(0,s.absence.deadline-sampledAt), blocksGameplay: s.absence.blocksGameplay} : null})),
 
       prediction: room.engine?.predictionCheckpoint() ?? null,
+      preparing: [...room.preparing.keys()],
       matchId: room.matchId, tick: room.tick, state: includeState && room.engine ? encodeMatchState(room.engine.state) : null,
       manualPausedBy: room.manualPausedBy, events: room.events.map(e => ({...e}))};
   }
