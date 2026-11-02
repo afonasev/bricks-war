@@ -11,6 +11,6 @@
   background:linear-gradient(to bottom,var(--identity-header) 0 var(--identity-header-height),transparent var(--identity-header-height));
 }
 #app .arena-screen.has-team-surface:not(.mobile-solo-arena):not(.network-arena) {
-  background-image:linear-gradient(var(--team-surface-direction,90deg),#dfb76c 0 var(--team-surface-split),#87afce var(--team-surface-split) 100%),var(--maple-texture);
+  background-image:linear-gradient(var(--team-surface-direction,90deg),#dfb76c 0 var(--team-surface-split),#87afce var(--team-surface-split) 100%),var(--match-background-image,var(--maple-texture));
   background-position:center; background-size:cover; background-blend-mode:color,normal;
 }

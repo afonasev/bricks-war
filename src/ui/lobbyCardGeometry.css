@@ -45,9 +45,29 @@
   fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round;
 }
 
-/* Ordinary and compact style editing use the same phone card footprint. */
+/* Phone style previews share the desktop-sized centered figure, both at rest
+   and while editing. Content may grow for wrapped player/style names. */
 #app[data-layout="mobile"] .unified-lobby .lobby-card[class][data-lobby-slot]:not(.is-empty):is(:not(.is-editing),.is-style-editing) {
-  height:236px; min-height:236px; max-height:236px;
+  display:grid;
+  grid-template-columns:minmax(0,1fr);
+  grid-template-rows:min-content min-content minmax(235px,1fr);
+  gap:6px;
+  height:auto; min-height:350px; max-height:none;
+  padding:28px 16px 14px;
+}
+#app[data-layout="mobile"] .unified-lobby .lobby-card[class][data-lobby-slot] .lobby-style-preview {
+  grid-column:1; grid-row:3; width:100%;
+  grid-template-rows:44px auto 44px;
+  gap:4px;
+}
+#app[data-layout="mobile"] .unified-lobby .lobby-card[class][data-lobby-slot] .lobby-style-preview .lobby-well {
+  width:100%; height:96px;
+}
+#app[data-layout="mobile"] .unified-lobby .lobby-card[class][data-lobby-slot] .lobby-style-preview .lobby-piece {
+  width:144px; height:96px;
+}
+#app[data-layout="mobile"] .unified-lobby .lobby-card[class][data-lobby-slot] .lobby-style-preview .lobby-style-label {
+  width:100%; font-size:14px; line-height:1.25;
 }
 @media(max-width:360px) {
   #app[data-layout="mobile"] .unified-lobby .lobby-card.is-style-editing h2 { font-size:22px; }

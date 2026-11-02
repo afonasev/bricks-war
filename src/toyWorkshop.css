@@ -2,7 +2,7 @@
 /* Presentation-only skin: board metrics and interaction layers are unchanged. */
 #app .arena-screen {
   --workshop-wood: repeating-linear-gradient(2deg, transparent 0 8px, #a66e3020 9px, transparent 11px 25px), repeating-linear-gradient(178deg, #fff4d529 0 2px, transparent 3px 43px), linear-gradient(105deg, #e9bd87, #f6d9b0 38%, #edc493 75%, #e4b780);
-  background: var(--workshop-wood);
+  background: var(--match-background-image, var(--workshop-wood)) center/cover no-repeat;
 }
 #app .arena-backdrop { display: none; }
 #app .arena-screen > .game-stage { background: transparent; }
@@ -50,7 +50,7 @@
 
 /* F1 material review: only one local desktop board until visual acceptance. */
 #app[data-layout="desktop"] .arena-screen:not(.network-arena):has(.hud-grid[data-count="1"]) {
-  background: linear-gradient(#fff4db18, #b9752910), var(--maple-texture) center / cover;
+  background: var(--match-background-image, var(--maple-texture)) center / cover no-repeat;
 }
 #app[data-layout="desktop"] .arena-screen:not(.network-arena):has(.hud-grid[data-count="1"]) > .game-stage {
   margin: 16px 24px 26px;
@@ -155,7 +155,7 @@
 #app .hud-card .hud-next-cell:not(.is-anomaly)::after { display:none; }
 
 /* F12: one actual wood backdrop, with no opaque mobile/network canvas wash. */
-#app .arena-screen { background:linear-gradient(#fff4db18,#b9752910),var(--maple-texture) center/cover; }
+#app .arena-screen { background:var(--match-background-image, var(--maple-texture)) center/cover no-repeat; }
 /* Network miniatures retain their compact single edge. */
 #app[data-layout="mobile"] .network-arena .network-mini-card .wood-panel-shell { inset:-1px; border:1px solid var(--panel-edge); border-radius:1px; filter:none; }
 #app :is(.mobile-solo-arena,.network-arena) .wood-panel-shell::after { display:none; }
@@ -201,4 +201,9 @@
     --mobile-frame-rim:3px; --mobile-frame-overhang:4px;
     --mobile-frame-foot-bottom:6px; --mobile-frame-foot-height:7px;
   }
+}
+
+/* Keep edge props in view when a shallow arena leaves wide side bands. */
+@media (min-aspect-ratio: 2/1) {
+  #app .arena-screen { background-position:center top; }
 }

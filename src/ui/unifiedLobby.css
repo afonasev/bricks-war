@@ -1983,3 +1983,48 @@
 #app[data-layout="mobile"] .unified-lobby .lobby-card[class][data-lobby-slot] .lobby-style-preview .lobby-well { position:static; width:104px; height:56px; }
 #app[data-layout="mobile"] .unified-lobby .lobby-card[class][data-lobby-slot] .lobby-style-preview .lobby-style-label { min-height:2.5em; width:104px; font-size:11px; line-height:1.25; }
 #app[data-layout] .unified-lobby .lobby-card.is-style-editing .lobby-card-mark { width:calc(100% - 36px); }
+
+/* Mouse-only roster movement leaves touch scrolling and controller focus intact. */
+@media (hover:hover) and (pointer:fine) and (min-width:761px), (hover:hover) and (pointer:fine) and (orientation:landscape) {
+  #app .unified-lobby[data-menu-owner="pointer"]:not(:has(.is-editing)) .lobby-card[data-edit] { cursor: grab; }
+}
+#app.is-roster-dragging, #app.is-roster-dragging * { cursor: grabbing!important; user-select: none; }
+#app .unified-lobby .lobby-card.is-drag-source { opacity: .3; }
+#app .unified-lobby .lobby-card.is-drop-destination { outline: 4px solid #eab32c; outline-offset: 3px; }
+#app .unified-lobby .lobby-card.lobby-drag-ghost {
+  position: fixed;
+  z-index: 1000;
+  margin: 0;
+  pointer-events: none;
+  box-shadow: 0 18px 28px #38250955;
+}
+
+/* Three illustrated mode steps; detailed rules and the basics reader remain separate. */
+#app .unified-lobby .lobby-rules-dialog:has(.lobby-mode-guide) {
+  display:flex; flex-direction:column; width:520px;
+}
+#app .unified-lobby .lobby-rules-dialog:has(.lobby-mode-guide) > :is(header,footer,.lobby-rules-tabs) { flex:none; }
+#app .unified-lobby .lobby-rules-dialog:has(.lobby-mode-guide) .lobby-mode-rules { min-height:0; overflow:auto; padding:20px 22px; }
+#app .unified-lobby .lobby-mode-guide ol { display:flex; flex-direction:column; gap:22px; margin:0; padding:0; list-style:none; }
+#app .unified-lobby .lobby-mode-guide ol > li { display:grid; grid-template-columns:64px minmax(0,1fr); align-items:center; gap:16px; margin:0; }
+#app .unified-lobby .lobby-mode-guide h3 { margin:0 0 5px; font-size:17px; line-height:1.3; color:#244663; overflow-wrap:anywhere; }
+#app .unified-lobby .lobby-mode-guide li p { margin:0; font-size:14px; line-height:1.45; color:#65747a; overflow-wrap:anywhere; }
+#app .unified-lobby .lobby-mode-art { display:block; width:64px; height:64px; flex:none; border:3px solid #b5a073; border-bottom-width:5px; border-radius:10px; background:#f0e2bd; fill:#46abd0; stroke:#2787a7; stroke-width:1; }
+#app .unified-lobby .art-attack { fill:#e99a6a; stroke:#b77949; }
+#app .unified-lobby .lobby-mode-art .guide-grey { fill:#b7b7a9; stroke:#97988c; }
+#app .unified-lobby :is(.art-trophy,.art-record) { background:#e8edcf; border-color:#9aa66d; }
+#app .unified-lobby .lobby-mode-art .guide-cup { fill:none; stroke:#7b8a47; stroke-width:3; stroke-linecap:round; stroke-linejoin:round; }
+#app .unified-lobby .lobby-mode-art text { fill:#7b8a47; stroke:none; font:700 21px sans-serif; }
+#app .unified-lobby .lobby-mode-note { margin:20px 0 0; font-size:12px; line-height:1.5; color:#7b816e; }
+#app .unified-lobby .lobby-rules-dialog > footer { border-top:1px solid #e4d9c2; align-items:center; }
+#app .unified-lobby .lobby-rules-dialog > footer button { min-height:44px; background:#fff8e5; border-color:#c7af81; border-bottom-width:3px; color:#244663; }
+#app .unified-lobby .lobby-rules-dialog > footer .lobby-mode-more { background:transparent; border:0; box-shadow:none; padding:8px 4px; color:#75814e; font-size:13px; text-align:start; }
+@media(max-width:760px) {
+  #app .unified-lobby .lobby-rules-dialog:has(.lobby-mode-guide) { width:100%; }
+  #app .unified-lobby .lobby-mode-guide ol { gap:20px; }
+  #app .unified-lobby .lobby-mode-guide ol > li { grid-template-columns:60px minmax(0,1fr); gap:13px; }
+  #app .unified-lobby .lobby-mode-art { width:60px; height:60px; }
+  #app .unified-lobby .lobby-mode-guide h3 { font-size:16px; }
+  #app .unified-lobby .lobby-rules-dialog > header button { width:44px; height:44px; }
+  #app .unified-lobby .lobby-rules-tabs button { min-height:44px; }
+}

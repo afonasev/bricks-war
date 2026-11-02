@@ -39,22 +39,11 @@
 #app .arena-screen:not(.network-arena) > .round-timer #match-clock::before,
 #app .arena-screen:not(.network-arena) > .round-timer #match-clock::after { display: none; }
 #app .arena-screen:not(.network-arena):not(.mobile-solo-arena) > .round-timer.is-final #match-clock { color: #ffd4b4; }
-#app .arena-backdrop .arena-shape { display: none; }
-#app .arena-backdrop::before, #app .arena-backdrop::after {
-  content: ''; position: absolute; top: 0; bottom: 0; width: var(--arena-free-side, 0px);
-  display: none; background-image: url('./assets/arena/workshop-corners.webp');
-  background-size: var(--arena-art-width) auto; background-repeat: no-repeat;
-}
-#app .has-workshop-corners .arena-backdrop::before, #app .has-workshop-corners .arena-backdrop::after { display: block; }
-#app .arena-backdrop::before { left: 0; background-position: left bottom; }
-#app .arena-backdrop::after { right: 0; background-position: right bottom; }
-
 #app .arena-screen:not(.network-arena):not(.mobile-solo-arena) #hud-grid[data-count="1"] .desktop-field-heading {
   width: calc(100% / var(--solo-hud-scale, 1)); height: 80px;
   transform: scale(var(--solo-hud-scale, 1)); transform-origin: top left;
 }
 
-#app .has-workshop-corners .arena-backdrop { display: block; }
 /* Keep the header legible at large sizes and use three compact rows on narrow fields. */
 #app #hud-grid .desktop-field-heading .hud-identity { position: absolute; top: 2px; left: 4px; right: 4px; padding: 0; }
 #app #hud-grid .desktop-field-heading .hud-identity strong {
@@ -77,14 +66,3 @@
   #app #hud-grid .desktop-field-heading .shield-slot svg { width: 10px; height: 12px; }
   #app #hud-grid .desktop-field-heading .hud-next-piece { top: min(38px, calc(100% - var(--preview-height) * .55 - 1px)); right: 4px; transform: scale(.55); }
 }
-
-/* Original workshop greenery occupies only the transparent source's top-left strip.
-   The lower corner objects begin below .29 of its source width; .26 includes
-   all foliage while excluding them. This layer follows the same free-side gate. */
-#app .arena-foliage {
-  display: none; position: absolute; top: 0; left: 0;
-  width: var(--arena-free-side, 0px); height: calc(var(--arena-art-width) * .26);
-  background: url('./assets/arena/workshop-foliage.webp') left top / var(--arena-art-width) auto no-repeat;
-  pointer-events: none;
-}
-#app .has-workshop-corners .arena-foliage { display: block; }

@@ -352,7 +352,8 @@ export class RoomService {
         if (acceptedBefore) for (const participant of room.engine.state.participants) {
           const controller = room.aiControllers.get(participant.config.id);
           if (!controller) continue;
-          const decisions = controller.actions(participant.board, room.engine.state.elapsedMs);
+          const defenseRequired = (room.engine.state.pendingConflict?.incomingRows[participant.config.id] ?? 0) > 0;
+          const decisions = controller.actions(participant.board, room.engine.state.elapsedMs, defenseRequired);
           actions.set(participant.config.id, decisions); room.aiActionCount += decisions.length;
         }
         room.engine.step(FIXED_STEP_MS, actions);

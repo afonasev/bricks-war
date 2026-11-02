@@ -72,6 +72,50 @@ export class UnifiedLobby {
     private actingPad: number | null = null;
     private readonly yGesture = new LobbyYGesture();
     private returnSlot: number | null = null;
+    private mouseDrag: { pointer: number; from: number; x: number; y: number; card: HTMLElement; ghost: HTMLElement | null; to: number | null } | null = null;
+    private suppressDragClick = false;
+
+    private dragCard(target: HTMLElement): HTMLElement | null {
+        if (!this.active() || this.overlay || this.editors.size || this.menuOwner.kind !== 'pointer' || (isMobilePlayViewport() && innerHeight >= innerWidth) || target.closest('button,input,select,a')) return null;
+        return target.closest<HTMLElement>('[data-edit]');
+    }
+    private cancelMouseDrag(): void {
+        const drag = this.mouseDrag;
+        if (!drag) return;
+        if (drag.ghost) this.suppressDragClick = true;
+        drag.ghost?.remove();
+        drag.card.classList.remove('is-drag-source');
+        this.root.querySelectorAll('.is-drop-destination').forEach(card => card.classList.remove('is-drop-destination'));
+        this.root.classList.remove('is-roster-dragging');
+        this.mouseDrag = null;
+    }
+    private updateMouseDrag(event: PointerEvent, releasing = false): void {
+        const drag = this.mouseDrag;
+        if (!drag || event.pointerId !== drag.pointer) return;
+        if ((!event.buttons && !releasing) || !this.dragCard(drag.card)) { this.cancelMouseDrag(); return; }
+        if (!drag.ghost) {
+            if (Math.hypot(event.clientX - drag.x, event.clientY - drag.y) < 6) return;
+            const rect = drag.card.getBoundingClientRect();
+            drag.ghost = drag.card.cloneNode(true) as HTMLElement;
+            drag.ghost.removeAttribute('data-edit');
+            drag.ghost.removeAttribute('data-lobby-slot');
+            drag.ghost.removeAttribute('tabindex');
+            drag.ghost.setAttribute('aria-hidden', 'true');
+            drag.ghost.inert = true;
+            drag.ghost.classList.add('lobby-drag-ghost');
+            Object.assign(drag.ghost.style, {left: `${rect.left}px`, top: `${rect.top}px`, width: `${rect.width}px`, height: `${rect.height}px`});
+            this.root.querySelector('.unified-lobby')!.append(drag.ghost);
+            drag.card.classList.add('is-drag-source');
+            this.root.classList.add('is-roster-dragging');
+        }
+        event.preventDefault();
+        drag.ghost.style.transform = `translate(${event.clientX - drag.x + 14}px, ${event.clientY - drag.y - 14}px) rotate(-2deg)`;
+        this.root.querySelectorAll('.is-drop-destination').forEach(card => card.classList.remove('is-drop-destination'));
+        const target = this.root.ownerDocument.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>('[data-lobby-slot]');
+        const to = Number(target?.dataset.lobbySlot);
+        drag.to = target && this.root.contains(target) && to !== drag.from ? to : null;
+        if (drag.to !== null) target!.classList.add('is-drop-destination');
+    }
     enter(index: number | null): void {
         const live = index === null ? null : this.host.pads().get(index);
         this.menuOwner = index !== null && live ? { kind: 'gamepad', index, token: live.token } : { kind: 'pointer' };
@@ -97,11 +141,35 @@ export class UnifiedLobby {
         const guard = (event: Event) => {
             if (!this.active() || this.actingPad !== null) return;
             const target = event.target as HTMLElement;
+            if (event.type === 'pointerdown') this.suppressDragClick = false;
+            if (event.type === 'click' && (event as MouseEvent).detail > 0 && this.suppressDragClick) { this.suppressDragClick = false; event.preventDefault(); event.stopImmediatePropagation(); return; }
+            if (event.type === 'pointerdown' && (event as PointerEvent).pointerType === 'mouse' && (event as PointerEvent).button === 0 && this.dragCard(target)) { this.root.dataset.inputMode = 'pointer'; return; }
             if (!this.pointerAllowed(target)) { event.preventDefault(); event.stopImmediatePropagation(); return; }
             if (event.type === 'pointerdown') this.root.dataset.inputMode = 'pointer';
         };
         root.addEventListener('pointerdown', guard, true);
         root.addEventListener('click', guard, true);
+        root.addEventListener('pointerdown', event => {
+            if (event.pointerType !== 'mouse' || event.button !== 0) return;
+            const card = this.dragCard(event.target as HTMLElement);
+            if (card) this.mouseDrag = {pointer: event.pointerId, from: Number(card.dataset.lobbySlot), x: event.clientX, y: event.clientY, card, ghost: null, to: null};
+        });
+        root.addEventListener('dragstart', event => { if (this.mouseDrag) event.preventDefault(); });
+        root.ownerDocument.addEventListener('pointermove', event => this.updateMouseDrag(event), {passive: false});
+        root.ownerDocument.addEventListener('pointerup', event => {
+            const drag = this.mouseDrag;
+            if (!drag || event.pointerId !== drag.pointer) return;
+            // Re-evaluate the release point; it may differ from the last move event.
+            this.updateMouseDrag(event, true);
+            const to = drag.ghost ? drag.to : null;
+            this.cancelMouseDrag();
+            if (to !== null && this.active() && !this.overlay && !this.editors.size && this.menuOwner.kind === 'pointer') this.host.move(drag.from, to);
+        });
+        root.ownerDocument.addEventListener('pointercancel', () => this.cancelMouseDrag());
+        root.ownerDocument.defaultView?.addEventListener('blur', () => this.cancelMouseDrag());
+        root.ownerDocument.addEventListener('keydown', event => {
+            if (event.key === 'Escape' && this.mouseDrag) { event.preventDefault(); event.stopImmediatePropagation(); this.cancelMouseDrag(); }
+        }, true);
         root.ownerDocument.addEventListener('keydown', event => {
             if (!this.active()) return;
             const target = event.target as HTMLElement;
@@ -153,7 +221,7 @@ export class UnifiedLobby {
     }
     active(): boolean { return !!this.root.querySelector('.unified-lobby'); }
     editing(): boolean { return this.editors.size > 0; }
-    leave(): void { this.editors.clear(); this.overlay = null; this.removeHold.clear(); this.deleteSince.clear(); this.yGesture.clear(); }
+    leave(): void { this.cancelMouseDrag(); this.editors.clear(); this.overlay = null; this.removeHold.clear(); this.deleteSince.clear(); this.yGesture.clear(); }
     private indices(): number[] {
         const h = this.host;
         const indices = new Set([...visibleLobbySlots(h.slots, h.mode(), new Set(this.editors.keys())), ...this.editors.keys()]);
@@ -163,6 +231,7 @@ export class UnifiedLobby {
         return [...indices].sort((a, b) => a - b);
     }
     render(): void {
+        this.cancelMouseDrag();
         const active = this.root.ownerDocument.activeElement as HTMLElement | null;
         const focusSlot = active?.closest<HTMLElement>('[data-lobby-slot]')?.dataset.lobbySlot;
         const focusAttrs = ['data-style','data-name','data-generic-name','data-create-name','data-wheel-center','data-typing-name','data-level','data-edit','data-lobby-back','data-cycle-mode'];
@@ -522,7 +591,7 @@ export class UnifiedLobby {
         return `<header class="lobby-rating-heading"><span>★</span><div><h2>${copy('Рейтинг')}</h2><small>${escape(modeName('survival'))}</small></div></header>${rows.length ? `<ol class="lobby-rating-list">${rows.map((row, i) => `<li class="${names.has(row.name.toLocaleLowerCase(getLocale())) ? 'is-own-rating' : ''}"><b class="result-place medal-${i + 1}">${i + 1}</b><span class="record-identity"><strong>${escape(row.name)}</strong>${recordDateMarkup(row.finishedAt, getLocale())}</span><span class="record-metrics"><time>${row.lineScore.toLocaleString(getLocale())}</time><small>◷ ${formatDuration(row.elapsedMs).slice(0, -2)}</small></span></li>`).join('')}</ol>` : `<p class="rating-message">${copy('Первый рекорд впереди.')}<br>${copy('Сыграйте в «Кто больше».')}</p>`}`;
     }
     private mountRating(panel: HTMLElement): void { this.host.ratings.mount(panel, () => this.host.slots.flatMap((s, i) => isLobbyHuman(s) ? [this.host.names[i]!] : []), () => true, () => { }, { local: copy('На устройстве'), global: copy('Общий'), title: copy('Рейтинг') }); }
-    private openOverlay(overlay: 'rating' | 'rules'): void { this.overlay = overlay; this.modalPadCursor = 0; this.ruleIndex = 0; this.renderOverlay(); }
+    private openOverlay(overlay: 'rating' | 'rules'): void { this.cancelMouseDrag(); this.overlay = overlay; this.modalPadCursor = 0; this.ruleIndex = 0; this.renderOverlay(); }
     private closeOverlay(): void { const closed = this.overlay; this.overlay = null; this.root.querySelector<HTMLElement>('.lobby-overlay')!.hidden = true; this.root.querySelectorAll<HTMLElement>('.unified-lobby > :not(.lobby-overlay)').forEach(e => e.inert = false); const rating = this.root.querySelector<HTMLElement>('.lobby-rating'); if (rating) {
         rating.innerHTML = this.rating();
         this.mountRating(rating);
@@ -560,12 +629,21 @@ export class UnifiedLobby {
         const cards = ruleCardsForLocale(getLocale());
         const chosen = cards;
         const card = chosen[this.ruleIndex % chosen.length]!;
-        overlay.innerHTML = `<section class="lobby-dialog ${this.overlay === 'rules' ? 'lobby-rules-dialog' : ''}" role="dialog" aria-modal="true" aria-label="${this.overlay === 'rating' ? copy('Рейтинг') : copy('Правила игры')}"><header><h2>${this.overlay === 'rating' ? copy('Рейтинг') + ' · ' + escape(modeName('survival')) : copy('Правила игры')}</h2><button data-close-overlay aria-label="${copy('Закрыть')}">×</button></header>${this.overlay === 'rating' ? `<div class="lobby-rating">${this.rating()}</div>` : `<nav class="lobby-rules-tabs"><button data-rules-tab="mode" aria-pressed="${this.rulesTab === 'mode'}">${escape(modeName(this.host.mode()))}</button><button data-rules-tab="basics" aria-pressed="${this.rulesTab === 'basics'}">${copy('Основы игры')}</button></nav>${this.rulesTab === 'mode' ? `<div class="lobby-mode-rules">${this.host.rules()}</div>` : `<div class="lobby-rule-content"><figure>${card.art}</figure><div><h3>${escape(card.title)}</h3><p>${escape(card.lead)}</p><ul>${card.notes.map(note => `<li>${escape(getLocale() === 'ru' ? note.replace('Выживание', 'Кто больше') : note)}</li>`).join('')}</ul></div></div><nav class="lobby-rule-pages"><button data-rule-prev aria-label="${copy('Предыдущее правило')}">←</button><span>${this.ruleIndex % chosen.length + 1} / ${chosen.length}</span><button data-rule-next aria-label="${copy('Следующее правило')}">→</button></nav>`}`}<footer><span>${this.overlay === 'rating' ? copy('Очки за собранные ряды') : copy('Собирайте ряды. Берегите место.')}</span><button data-close-overlay>${key('B')} ${copy('В лобби')}</button></footer></section>`;
+        overlay.innerHTML = `<section class="lobby-dialog ${this.overlay === 'rules' ? 'lobby-rules-dialog' : ''}" role="dialog" aria-modal="true" aria-label="${this.overlay === 'rating' ? copy('Рейтинг') : copy('Правила игры')}"><header><h2>${this.overlay === 'rating' ? copy('Рейтинг') + ' · ' + escape(modeName('survival')) : copy('Как играть')}</h2><button data-close-overlay aria-label="${copy('Закрыть')}">×</button></header>${this.overlay === 'rating' ? `<div class="lobby-rating">${this.rating()}</div>` : `<nav class="lobby-rules-tabs"><button data-rules-tab="mode" aria-pressed="${this.rulesTab === 'mode'}">${escape(modeName(this.host.mode()))}</button><button data-rules-tab="basics" aria-pressed="${this.rulesTab === 'basics'}">${copy('Основы игры')}</button></nav>${this.rulesTab === 'mode' ? `<div class="lobby-mode-rules">${this.host.rules()}</div>` : `<div class="lobby-rule-content"><figure>${card.art}</figure><div><h3>${escape(card.title)}</h3><p>${escape(card.lead)}</p><ul>${card.notes.map(note => `<li>${escape(getLocale() === 'ru' ? note.replace('Выживание', 'Кто больше') : note)}</li>`).join('')}</ul></div></div><nav class="lobby-rule-pages"><button data-rule-prev aria-label="${copy('Предыдущее правило')}">←</button><span>${this.ruleIndex % chosen.length + 1} / ${chosen.length}</span><button data-rule-next aria-label="${copy('Следующее правило')}">→</button></nav>`}`}<footer>${this.overlay === 'rules' && this.rulesTab === 'mode' ? `<button class="lobby-mode-more" data-mode-details aria-expanded="false" aria-controls="lobby-mode-details">${copy('Все правила')}</button>` : `<span>${this.overlay === 'rating' ? copy('Очки за собранные ряды') : copy('Собирайте ряды. Берегите место.')}</span>`}<button data-close-overlay>${key('B')} ${copy('В лобби')}</button></footer></section>`;
         this.refreshHints();
         overlay.querySelectorAll('[data-close-overlay]').forEach(b => b.addEventListener('click', () => this.closeOverlay()));
         overlay.querySelectorAll<HTMLElement>('[data-rules-tab]').forEach(b => b.addEventListener('click', () => { this.rulesTab = b.dataset.rulesTab as 'mode' | 'basics'; this.ruleIndex = 0; this.renderOverlay(); }));
         overlay.querySelector('[data-rule-prev]')?.addEventListener('click', () => { this.ruleIndex = (this.ruleIndex - 1 + chosen.length) % chosen.length; this.renderOverlay(); });
         overlay.querySelector('[data-rule-next]')?.addEventListener('click', () => { this.ruleIndex++; this.renderOverlay(); });
+        overlay.querySelector<HTMLButtonElement>('[data-mode-details]')?.addEventListener('click', event => {
+            const button = event.currentTarget as HTMLButtonElement;
+            const showDetails = button.getAttribute('aria-expanded') !== 'true';
+            overlay.querySelector<HTMLElement>('.lobby-mode-brief')!.hidden = showDetails;
+            overlay.querySelector<HTMLElement>('.lobby-mode-details')!.hidden = !showDetails;
+            button.setAttribute('aria-expanded', String(showDetails));
+            button.textContent = copy(showDetails ? 'Кратко' : 'Все правила');
+            overlay.querySelector('.lobby-mode-rules')!.scrollTop = 0;
+        });
         const panel = overlay.querySelector<HTMLElement>('.lobby-rating');
         if (panel)
             this.mountRating(panel);

@@ -1,5 +1,5 @@
 import { startPreparedMatch } from './helpers/networkArena';
-import {describe,it,expect} from 'vitest';
+import {describe,it,expect,vi} from 'vitest';
 import {RoomService} from '../server/rooms';
 import {PROTOCOL_VERSION,RULES_VERSION,type Credential} from '../src/network/protocol';
 import {AiController} from '../src/controllers/ai';
@@ -21,6 +21,16 @@ function fixture(){
   return {service,connect,create,advance};
 }
 describe('network AI roster and authority',()=>{
+  it('passes incoming attack warnings to authoritative AI decisions',async()=>{
+    const f=fixture();const g=await f.create();startPreparedMatch(f.service,g.room,g.host.seat,g.host.epoch);f.advance(5000);
+    const participant=g.room.engine!.state.participants.find(p=>p.config.controller==='ai')!;
+    const controller=g.room.aiControllers.get(participant.config.id)!;
+    const decisions=vi.spyOn(controller,'actions');
+    g.room.engine!.enqueueBoardAttack(participant.config.id,1,'conflict',g.host.seat.id);
+    f.advance(20);
+    expect(decisions.mock.calls.some(call=>call[0]===participant.board&&call[2]===true)).toBe(true);
+    decisions.mockRestore();
+  });
   it('requires another human and caps AI at six while reserving the second human seat',async()=>{
     const f=fixture();const g=await f.create(1,6);
     expect(()=>startPreparedMatch(f.service,g.room,g.host.seat,g.host.epoch)).toThrow('два');

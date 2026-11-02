@@ -1,3 +1,5 @@
+import { MatchBackgroundSelection, applyMatchBackground } from './matchBackground';
+import { lobbyModeGuideMarkup } from './lobbyModeGuide';
 import { lobbyText } from '../i18n/lobbyCopy';
 import { UnifiedLobby } from './unifiedLobby';
 import { freshBattleSetup, lobbyAdmission, LobbyRosterMemory, type CardDraft } from './lobbyState';
@@ -215,6 +217,8 @@ function releaseFooterMarkup({ confirm, back, start, roster, reset, ai, metadata
 }
 
 export class BricksWarApp {
+  private readonly matchBackgrounds = new MatchBackgroundSelection();
+  private matchBackgroundSequence = 0;
   private readonly ratings = new RatingPanels();
   private game: Phaser.Game | null = null;
   private matchLoading: MatchLoading | null = null;
@@ -291,9 +295,9 @@ export class BricksWarApp {
         this.renderSetup();
       },
       start: () => this.startMatch(), back: () => this.navigateBack(), validate: () => { this.showValidation(); },
-      settings: () => this.modeSettingsMarkup(), rules: () => this.selectedMode === 'survival'
+      settings: () => this.modeSettingsMarkup(), rules: () => lobbyModeGuideMarkup(this.selectedMode, this.pacing.battleTimeMode !== 'until-victory', this.selectedMode === 'survival'
         ? `<ul>${(['ruleNoAttacks','rulePressure','ruleAnomalies','ruleShields','ruleIndependent'] as const).map(k => `<li>${tr(k)}</li>`).join('')}</ul>`
-        : this.modeRulesMarkup(this.selectedMode), bindSettings: () => {
+        : this.modeRulesMarkup(this.selectedMode)), bindSettings: () => {
         this.bindModeSettings();
       },
     });
@@ -1272,7 +1276,7 @@ export class BricksWarApp {
 
     this.root.innerHTML = `
       <main class="arena-screen premium-surface${mobileMatch ? ' mobile-solo-arena' : ''}" data-match-variant="${engine.state.options.matchVariant}" data-battle-difficulty="${engine.state.options.battleDifficulty}" data-soft-drop="${engine.state.options.softDrop}" data-pressure="${engine.state.options.pressure}" data-conflict="${engine.state.options.conflictEnabled ? 'on' : 'off'}" data-debug-tuning="${activeTuning ? 'on' : 'off'}" data-tile-styles="${engine.state.participants.map((participant) => participant.resolvedTileStyle).join(',')}" data-pressure-start-ms="${engine.state.pressureStartMs}" data-gravity-interval-ms="${engine.state.gravityIntervalMs}" data-soft-drop-interval-ms="${engine.state.options.softDropIntervalMs}">
-        ${mobileMatch ? '' : `<div class="arena-backdrop" aria-hidden="true"><div class="arena-foliage"></div></div><div id="round-timer" class="round-timer" aria-label="${initialClock.ariaLabel}"><span id="match-clock" class="round-timer-value">${formatClock(initialClock.milliseconds)}</span></div>`}
+        ${mobileMatch ? '' : `<div id="round-timer" class="round-timer" aria-label="${initialClock.ariaLabel}"><span id="match-clock" class="round-timer-value">${formatClock(initialClock.milliseconds)}</span></div>`}
         <div class="game-stage" id="game-stage">
           <div id="game-canvas" class="game-canvas"></div>
           <div id="hud-grid" class="hud-grid" aria-live="polite"></div>
@@ -1301,6 +1305,9 @@ export class BricksWarApp {
         <div id="results-layer"></div>
       </main>
     `;
+
+    applyMatchBackground(this.root.querySelector<HTMLElement>('.arena-screen')!,
+      this.matchBackgrounds.forMatch(`local-${++this.matchBackgroundSequence}`));
 
     const scene = new PlayScene({
       engine: new LocalMatchSession(engine),
@@ -1551,9 +1558,6 @@ export class BricksWarApp {
         arena.style.setProperty('--team-surface-direction', divider.axis === 'x' ? '90deg' : '180deg');
       }
       const decoration = localArenaDecoration(hud.clientWidth, layout.participantCards);
-      arena.style.setProperty('--arena-free-side', `${decoration.sideWidth}px`);
-      arena.style.setProperty('--arena-art-width', `${decoration.artWidth}px`);
-      arena.classList.toggle('has-workshop-corners', decoration.visible);
       arena.classList.toggle('has-compact-arena-clock', decoration.compactClock);
     }
     hud.dataset.layout = layout.mode;

@@ -1,3 +1,4 @@
+import { MatchBackgroundSelection, applyMatchBackground } from '../ui/matchBackground';
 import { WORKSHOP_THEME_TEXTURES } from '../rendering/workshopSprites';
 import { readyTitleMarkup, localizeReadyTitle } from '../ui/readyPresentation';
 import { gamepadFooterHintsMarkup } from '../ui/gamepadFooterHints';
@@ -48,6 +49,7 @@ const styleOptions=(selected:TileStyleSelection)=>[...TILE_STYLES.map(t=>({id:t.
 const phaseLabels={waiting:'waiting',countdown:'countdown',playing:'playing',paused:'networkPaused',results:'networkResults'} as const;
 type Controls = NetworkControls;
 export class NetworkApp {
+  private readonly matchBackgrounds = new MatchBackgroundSelection();
   private menuFocus:MenuFocusController;
   private session:NetworkMatchSession|null=null;
   private audioGeneration:string|null=null;
@@ -379,6 +381,7 @@ export class NetworkApp {
       <output id="network-mobile-status" class="network-mobile-status" role="status" hidden></output>
       <div class="network-touch" hidden><button data-control="left" aria-label="${h('left')}">←</button><button data-control="down" aria-label="${h('down')}">↓</button><button data-control="right" aria-label="${h('right')}">→</button><button data-control="rotate" aria-label="${h('rotate')}">↻</button>${this.controls==='tilt'?this.button(u('tilt'),'tilt'):''}</div>
       <div id="network-pause" class="pause-overlay" role="dialog" aria-modal="true" aria-labelledby="network-pause-title" hidden></div></main>`;
+    applyMatchBackground(this.root.querySelector<HTMLElement>('.network-arena')!, this.matchBackgrounds.forMatch(identity));
     this.bind();
     const stage=this.root.querySelector<HTMLElement>('#network-stage')!;
     const touch=(event:PointerEvent,action?:string)=>{

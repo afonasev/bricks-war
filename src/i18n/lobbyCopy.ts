@@ -1,6 +1,9 @@
 import { getLocale, type Locale } from './locale';
 // New lobby vocabulary follows the existing seven-language preference. Keys are the approved Russian copy.
 const rows: Record<string, readonly string[]> = {
+    'Как играть': ['How to play', 'Comment jouer', 'So wird gespielt', 'Cómo jugar', '玩法说明', '遊び方'],
+    'Все правила': ['All rules', 'Toutes les règles', 'Alle Regeln', 'Todas las reglas', '全部规则', 'すべてのルール'],
+    'Кратко': ['Brief guide', 'En bref', 'Kurzanleitung', 'Guía breve', '简明指南', 'かんたんガイド'],
     'Гость': ['Guest','Invité','Gast','Invitado','访客','ゲスト'],
     'Создать новое': ['Create new','Créer un nom','Neu erstellen','Crear nuevo','新建姓名','新規作成'],
     'Предыдущее': ['Previous','Précédent','Zurück','Anterior','上一个','前へ'],
