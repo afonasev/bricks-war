@@ -7,10 +7,9 @@
 | --- | --- |
 | **[Download EXE](https://github.com/afonasev/bricks-war/releases/download/v1.13.0/Bricks-War-1.13.0-win-x64.exe)** | **[Download DMG](https://github.com/afonasev/bricks-war/releases/download/v1.13.0/Bricks-War-1.13.0-mac-universal.dmg)** |
 
-[Installer releases / Только установщики](https://github.com/afonasev/bricks-war/releases?q=tag%3Av1) · [Play in browser / Играть в браузере](https://bricks.afonasev.tech/)
+[Installer releases / Только установщики](https://github.com/afonasev/bricks-war/releases?q=tag%3Av1%20prerelease%3Afalse) · [Play in browser / Играть в браузере](https://bricks.afonasev.tech/)
 
 Installer version: **1.13.0**. The installed game receives newer game content through its updater.
-
 <!-- bricks-war-downloads:end -->
 
 Browser and desktop block-puzzle arena with local and network play, human players and AI opponents.
