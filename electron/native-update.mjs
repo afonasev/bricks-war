@@ -84,7 +84,7 @@ export class NativeUpdate extends ShellUpdate {
     const space = await statfs(this.root);
     if (space.bavail * space.bsize < manifest.file.unpackedSize * 2 + manifest.file.size + 64 * 1024 ** 2) throw Error('Not enough space for native update');
     this.progress = progress;
-    const bytes = await this.bytes(release.tag_name, manifest.file.name, manifest.file.size, signal);
+    const bytes = await this.bytes(release.tag_name, manifest.file.name, manifest.file.size, signal, {payload:true});
     phase('verifying');
     if (bytes.length !== manifest.file.size || hash(bytes) !== manifest.file.sha256) throw Error('Native package hash mismatch');
     signal.throwIfAborted();

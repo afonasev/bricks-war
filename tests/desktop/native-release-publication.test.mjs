@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {generateKeyPairSync,sign,createHash} from 'node:crypto';
-import {mkdtemp,writeFile,rm} from 'node:fs/promises';
+import {mkdtemp,writeFile,readFile,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {verifyNativeReceipt} from '../../scripts/desktop/native-receipt.mjs';
@@ -24,6 +24,12 @@ test('migration receipt binds both native packages and installers to exact signe
   await file('native-manifest.json',signed({schema:1,game:'bricks-war',component:'native-release',channel:'stable',rootAbi:1,version,contentAbi:3,contentSequence:1,files:native}));
   await writeFile(join(directory,'migration-only.json'),signed({schema:1,installationKind:'migration',version,source,contentSequence:1,protectedRollbackAbi:1,freshInstallerVersion:'1.16.0',files}));
   assert.equal((await verifyNativeReceipt(directory,keys.publicKey,version,source)).version,version);
+  const originalReceipt=await readFile(join(directory,'migration-only.json'),'utf8');
+  for(const freshInstallerVersion of ['1.16.1','2.0.0','invalid']){
+   const receipt=JSON.parse(JSON.parse(originalReceipt).payload);receipt.freshInstallerVersion=freshInstallerVersion;await writeFile(join(directory,'migration-only.json'),signed(receipt));
+   await assert.rejects(verifyNativeReceipt(directory,keys.publicKey,version,source),/identity/);
+  }
+  await writeFile(join(directory,'migration-only.json'),originalReceipt);
   await assert.rejects(verifyNativeReceipt(directory,keys.publicKey,version,'c'.repeat(40)),/identity/);
   await writeFile(join(directory,files[2].name),'changed installer');
   await assert.rejects(verifyNativeReceipt(directory,keys.publicKey,version,source),/Changed migration asset/);

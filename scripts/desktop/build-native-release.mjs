@@ -6,7 +6,7 @@ import {sign,createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {signNativeTree,assembleMacRoot,assembleWindowsLayout,createNativeArchive,nativeReleaseEnvelope} from './native-package.mjs';
 import {verifyNativeReceipt} from './native-receipt.mjs';
-const [output,macRoot,winRoot]=process.argv.slice(2);if(!output||!macRoot||!winRoot)throw Error('Pass external output, universal production root, Windows production root');
+const [output,macRoot,winRoot,freshInstallerVersion]=process.argv.slice(2);if(!output||!macRoot||!winRoot||!/^\d+\.\d+\.\d+$/.test(freshInstallerVersion??''))throw Error('Pass external output, universal production root, Windows production root, fresh bridge version');
 const out=resolve(output),version=JSON.parse(await readFile('package.json')).version;
 const source=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
 if(execFileSync('git',['status','--porcelain','--untracked-files=no'],{encoding:'utf8'}).trim())throw Error('Commit source before packaging');
@@ -35,7 +35,7 @@ const files=[];
 for(const name of [`Bricks-War-${version}-mac-universal.dmg`,`Bricks-War-${version}-mac-universal.zip`,`Bricks-War-${version}-win-x64.exe`,...packages.map(file=>file.name),'native-manifest.json']){
  const bytes=await readFile(join(installers,name));files.push({name,size:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex')});
 }
-const payload=JSON.stringify({schema:1,installationKind:'migration',version,source,contentSequence:bundled.sequence,protectedRollbackAbi:1,freshInstallerVersion:'1.16.0',files});
+const payload=JSON.stringify({schema:1,installationKind:'migration',version,source,contentSequence:bundled.sequence,protectedRollbackAbi:1,freshInstallerVersion,files});
 await writeFile(join(installers,'migration-only.json'),JSON.stringify({payload,signature:sign(null,Buffer.from(payload),privateKey).toString('base64')}));
 await verifyNativeReceipt(installers,publicKey,version,source);
 await writeFile(join(out,'assembly.json'),JSON.stringify({source,version,assembly,packages},null,2));

@@ -38,11 +38,13 @@ export class ShellUpdate {
   constructor({ root, gate, fetcher, publicKey, version, platform = process.platform, arch = process.arch, executable = process.execPath, args = process.argv.slice(1), helper }) {
     Object.assign(this, { root, gate, fetcher, publicKey, version, platform, arch, executable, args, helper });
   }
-  async bytes(tag, name, limit, signal) {
+  async bytes(tag, name, limit, signal, { payload = false } = {}) {
     const origin = `https://github.com/${CONTENT_REPOSITORY}/releases/download/${encodeURIComponent(tag)}/${encodeURIComponent(name)}`;
     return this.gate.run(async activitySignal => {
       let url = origin;
-      const combined = signal ? AbortSignal.any([signal,activitySignal,AbortSignal.timeout(120000)]) : AbortSignal.any([activitySignal,AbortSignal.timeout(30000)]);
+      // Payloads run until completion or explicit/activity cancellation, regardless of connection speed.
+      // Metadata remains bounded, including the separate 3-second startup discovery budget.
+      const combined = AbortSignal.any([activitySignal, ...(signal ? [signal] : []), ...(payload ? [] : [AbortSignal.timeout(30000)])]);
       for (let hop = 0; hop <= 5; hop++) {
         combined.throwIfAborted();
         const response = await abortable(() => this.fetcher(url,{signal:combined,redirect:'manual'}), combined);
@@ -94,7 +96,7 @@ export class ShellUpdate {
     await mkdir(this.root,{recursive:true});
     const space = await statfs(this.root); if (space.bavail * space.bsize < manifest.file.size * 4) throw Error('Not enough space');
     this.controller.signal.throwIfAborted(); this.progress = progress;
-    const bytes = await this.bytes(release.tag_name,manifest.file.name,manifest.file.size,this.controller.signal);
+    const bytes = await this.bytes(release.tag_name,manifest.file.name,manifest.file.size,this.controller.signal,{payload:true});
     phase('verifying');
     if (bytes.length !== manifest.file.size || createHash('sha256').update(bytes).digest('hex') !== manifest.file.sha256) throw Error('Shell hash mismatch');
     this.controller.signal.throwIfAborted();

@@ -45,7 +45,7 @@ let release = published.find(release => release.tag_name === tag);
 const previous = published.filter(r=>!r.draft && !r.prerelease && /^v\d+\.\d+\.\d+$/.test(r.tag_name) && r.tag_name !== tag).sort((a,b)=>new Date(b.published_at)-new Date(a.published_at))[0];
 let previousSource;
 if (previous) previousSource = Buffer.from(gh(['api',`repos/${repo}/contents/SOURCE_REVISION?ref=${encodeURIComponent(previous.tag_name)}`,'--jq','.content']),'base64').toString().trim();
-const notes = withInstallerDownloads(await generateReleaseNotes(previousSource), receipt?.freshInstallerVersion ?? version) + (migration ? '\nMigration only: install v1.16.0 first, then accept the in-game update. Windows/UAC execution: NotRun, deferred by the user. Subsequent native updates replace signed launcher/client components.\n' : '');
+const notes = withInstallerDownloads(await generateReleaseNotes(previousSource), receipt?.freshInstallerVersion ?? version) + (migration ? `\nMigration only: install v${receipt.freshInstallerVersion} first, then accept the in-game update. Windows/UAC execution: NotRun, deferred by the user. Subsequent native updates replace signed launcher/client components.\n` : '');
 
 if (!release) {
   const request = 'build/github-native-release-request.json';
