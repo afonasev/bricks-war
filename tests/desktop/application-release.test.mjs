@@ -31,3 +31,10 @@ test('release identity and out-of-order bundle sequence cannot conceal an older 
   const f=fixture(change);await assert.rejects(requirePublishedShell(content,[f.release],async()=>f.envelope,keys.publicKey),/Publish complete/);
  }
 });
+
+test('newer migration cannot replace the complete fresh installer download',async()=>{
+ const fresh=fixture();const migration=fixture({version:'2.0.1',updaterAbi:2,installationKind:'migration'});migration.release.tag_name='v2.0.1';
+ const envelopes={'v2.0.0':fresh.envelope,'v2.0.1':migration.envelope};
+ assert.equal(await requirePublishedShell(content,[migration.release,fresh.release],async tag=>envelopes[tag],keys.publicKey),'v2.0.0');
+ await assert.rejects(requirePublishedShell(content,[migration.release],async()=>migration.envelope,keys.publicKey),/Publish complete/);
+});

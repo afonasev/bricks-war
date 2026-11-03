@@ -51,6 +51,13 @@ class FakeGitHub:
         raise AssertionError((method,path,data))
 
 class InstallerAutomation(unittest.TestCase):
+    def test_migration_only_release_does_not_replace_fresh_downloads(self):
+        fresh=release('afonasev/bricks-war')
+        migration=release('afonasev/bricks-war',2,'2.0.0')
+        migration['assets'].append({'name':'migration-only.json'})
+        self.assertIsNone(installer_pair('afonasev/bricks-war',migration))
+        self.assertEqual(latest_native('afonasev/bricks-war',[migration,fresh]),fresh)
+
     def test_new_native_release_updates_all_projects_and_keeps_payloads_channels_and_prose(self):
         for repo in sorted(REPOSITORIES):
             with self.subTest(repository=repo):

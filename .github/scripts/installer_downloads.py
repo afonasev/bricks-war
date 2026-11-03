@@ -43,6 +43,7 @@ def version_key(release):
 
 def installer_pair(repository, release):
     if release.get('draft') or release.get('prerelease') or version_key(release) is None: return None
+    if any(a.get('name') == 'migration-only.json' for a in release.get('assets',[])): return None
     windows = [a for a in release.get('assets',[]) if a.get('name','').endswith('.exe')]
     mac = [a for a in release.get('assets',[]) if a.get('name','').endswith('.dmg')]
     if not mac: mac = [a for a in release.get('assets',[]) if a.get('name','').endswith('.pkg')]

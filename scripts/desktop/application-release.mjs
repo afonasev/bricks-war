@@ -15,7 +15,7 @@ export async function requirePublishedShell(content, releases, readEnvelope, pub
       // never schedules a legacy installer or authorizes its activation.
       try { shell = validateShell(envelope,publicKey,platform,arch,'0.0.0',minimumOS,{activation:false}); }
       catch (error) { if (error.code !== 'INCOMPATIBLE') throw error; compatible=false; break; }
-      if (shell.version !== release.tag_name.slice(1) || !supportsContent(content,shell.contentAbi ?? 2,shell.version)
+      if (shell.installationKind === 'migration' || shell.version !== release.tag_name.slice(1) || !supportsContent(content,shell.contentAbi ?? 2,shell.version)
         || !release.assets.some(a=>a.name===shell.file.name && a.size===shell.file.size && a.digest===`sha256:${shell.file.sha256}`)
         || (compareVersions(shell.version,content.gameVersion)<0 && shell.contentSequence>=content.sequence)) {
         compatible=false; break;

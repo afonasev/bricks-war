@@ -1,3 +1,4 @@
+import {isPublicSource} from './public-source.mjs';
 import { installerDownloadSection } from './download-presentation.mjs';
 import { readFile } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
@@ -6,12 +7,7 @@ import { dirname, resolve } from 'node:path';
 const destination = process.argv[2];
 if (!destination) throw Error('Pass a clean public repository checkout path');
 const files = execFileSync('git', ['ls-files', '-z'], { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 }).split('\0').filter(Boolean);
-const selected = files.filter(file => /^(src|server|electron|public|scripts|tests|config)\//.test(file)
-  || /^tools\//.test(file) && !/^tools\/(flow|test_flow)\.py$/.test(file)
-  || !file.includes('/') && /^(package.*\.json|tsconfig.*\.json|vite.*\.ts|vitest.*\.ts|playwright.*\.ts|index\.html|\.gitignore|Makefile)$/.test(file)
-  || file.startsWith('docs/release-notes/')
-  || ['.github/workflows/installer-downloads.yml', '.github/scripts/installer_downloads.py', '.github/scripts/test_installer_downloads.py'].includes(file)
-  || ['electron-builder.yml', 'docs/desktop-distribution.md', 'docs/player-guide.md', 'docs/credits.md'].includes(file));
+const selected = files.filter(isPublicSource);
 for (const file of selected) {
   const target = resolve(destination, file); await mkdir(dirname(target), { recursive: true }); await copyFile(file, target);
 }
