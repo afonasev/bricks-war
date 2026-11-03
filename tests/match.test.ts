@@ -741,11 +741,11 @@ describe('match engine', () => {
     expect(participant.shieldReady).toBe(false);
   });
 
-  it('holds the ready phase for exactly one second without advancing gameplay', () => {
+  it('holds the ready phase for exactly two seconds without advancing gameplay', () => {
     const engine = createFixture();
     const before = structuredClone(engine.state.participants);
-    expect(engine.state.countdownMs).toBe(1_000);
-    engine.step(999);
+    expect(engine.state.countdownMs).toBe(2_000);
+    engine.step(1_999);
     expect(engine.state.phase).toBe('countdown');
     expect(engine.state.countdownMs).toBe(1);
     expect(engine.state.elapsedMs).toBe(0);

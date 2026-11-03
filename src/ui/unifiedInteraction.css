@@ -1,0 +1,64 @@
+/* Approved A: one navigation palette across menus, network, dialogs and match UI.
+   Persistent values, player identity and destructive-action meanings stay separate. */
+#app {
+  --interaction-focus-fill:#dce9b8;
+  --interaction-hover-fill:#eaf1d5;
+  --interaction-ink:#29441e;
+  --interaction-line:#6c873a;
+  --interaction-hover-line:#92a669;
+}
+#app#app[data-layout],
+#app#app[data-layout] :is(main,.pause-panel,[role="dialog"],.settings-screen,.pause-settings-panel,[data-network-preferences]) {
+  --menu-focus-fill:var(--interaction-focus-fill);
+  --menu-focus-ink:var(--interaction-ink);
+  --menu-focus-line:var(--interaction-line);
+  --menu-hover-fill:var(--interaction-hover-fill);
+}
+/* Material is shared; control sizing and icon/artwork geometry belong to each screen. */
+#app#app[data-layout] :is(.section-shell,.results-panel,.pause-panel,.profile-choice,.virtual-keyboard,.network-screen)
+  button:not(.menu-select-option,.lobby-mode,.lobby-cycle,.lobby-help,.lobby-remove):not(:disabled) {
+  background:#fff9eb; color:var(--workshop-ink,#193f70);
+  border-color:#c6a06c;
+}
+/* Two IDs deliberately outrank historical screen-specific !important states. */
+#app#app[data-layout][data-input-mode="pointer"]
+  :is(button,summary,[data-edit]):not(:disabled):not(.lobby-mode,.lobby-cycle,.lobby-help,.lobby-card,.lobby-add-bot,.lobby-remove):hover {
+  background:var(--interaction-hover-fill)!important; color:var(--interaction-ink)!important;
+  box-shadow:inset 0 0 0 2px var(--interaction-hover-line)!important;
+  outline:none!important; filter:none!important;
+}
+#app#app[data-layout]:is([data-input-mode="keyboard"],[data-input-mode="gamepad"])
+  :is(button,summary,select,input:not([type="range"]):not([type="checkbox"]),[data-edit]):not(:disabled):not(.lobby-mode,.lobby-cycle,.lobby-help,.lobby-card,.lobby-add-bot,.lobby-remove):is(:focus-visible,.is-ui-selected,.pad-selected,[class*="-target"]),
+#app#app[data-layout] .menu-select-option.is-highlighted {
+  background:var(--interaction-focus-fill)!important; color:var(--interaction-ink)!important;
+  box-shadow:inset 0 0 0 2px var(--interaction-line)!important;
+  outline:none!important; border-color:var(--interaction-line)!important; filter:none!important;
+}
+#app#app[data-layout] .menu-select-option:is(.is-highlighted,:hover)::after { content:none; }
+#app#app[data-layout] .menu-select-option:is(.is-highlighted,:hover) :is(strong,small),
+#app#app[data-layout] .mode-choice:is(.is-ui-selected,:focus-visible) :is(strong,small,span) { color:inherit; }
+#app#app[data-layout]:is([data-input-mode="keyboard"],[data-input-mode="gamepad"])
+  :is(.volume-control,.settings-action):has(> input:is(.is-ui-selected,:focus-visible)),
+#app#app[data-layout][data-input-mode="pointer"] :is(.volume-control,.settings-action):has(> input):hover {
+  background:var(--interaction-focus-fill)!important; color:var(--interaction-ink)!important;
+  box-shadow:inset 0 0 0 2px var(--interaction-line)!important; border-radius:12px;
+}
+#app#app[data-layout] input:is([type="range"],[type="checkbox"]) { accent-color:var(--interaction-line); }
+#app#app[data-layout] .volume-control > input[type="range"] { background:transparent!important; box-shadow:none!important; }
+#app#app[data-layout] button:disabled { filter:none; cursor:default; }
+@media(prefers-reduced-motion:reduce) {
+  #app#app :is(button,input,summary) { transition:none!important; }
+}
+/* Shared Back has one viewport anchor even when a reference page has denser padding. */
+#app#app[data-layout] .section-navigation .section-back { position:fixed; left:32px; bottom:18px; min-height:38px; }
+#app#app[data-layout] .section-navigation:has(> [data-reset-preferences]) { justify-content:flex-end; }
+@media(max-width:1000px) {
+  #app#app[data-layout] .section-navigation .section-back { left:14px; bottom:max(12px,env(safe-area-inset-bottom)); }
+}
+@media(max-height:500px) {
+  #app#app[data-layout] .section-navigation .section-back { left:14px; bottom:8px; min-height:32px; }
+}
+
+#app#app[data-layout] .unified-lobby .lobby-theme-current:is(:focus-visible,.pad-selected) { border-radius:12px!important; }
+#app#app[data-layout][data-input-mode="pointer"] .unified-lobby[data-screen] :is(.lobby-cycle,.lobby-mode,.lobby-help) { --lobby-interaction-fill:var(--interaction-hover-fill); }
+#app#app[data-layout][data-input-mode="pointer"] :is(.volume-control,.settings-action):has(> input):hover { background:var(--interaction-hover-fill)!important; box-shadow:inset 0 0 0 2px var(--interaction-hover-line)!important; }

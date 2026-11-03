@@ -1,6 +1,6 @@
 import {test,expect,type Page,type Locator} from '@playwright/test';
 const out=process.env.BRICKS_LOBBY_EVIDENCE??'evidence/refine-owned-lobby-controls/F3/runtime';
-const sage='rgb(237, 242, 223)', hover='rgb(243, 246, 235)', variantA='rgb(220, 233, 199)';
+const sage='rgb(220, 233, 184)', hover='rgb(234, 241, 213)', variantA='rgb(220, 233, 184)';
 async function boot(page:Page){
  await page.addInitScript(()=>{
   localStorage.setItem('bricks-war:language:v1','ru');
@@ -61,12 +61,12 @@ for(const width of [1440,390])test(`pointer hover uses the sage family without m
  await page.setViewportSize({width,height:960});await boot(page);await page.locator('[data-play-entry]').click();
  for(const selector of ['#match-duration','.lobby-help','[data-edit="0"]','[data-remove="0"]','[data-bot]',...(width===390?[]:['[data-join]']),'[data-lobby-back]']){
   const control=page.locator(selector).first();await control.scrollIntoViewIfNeeded();const before=await control.boundingBox();await control.hover();
-  if(await control.evaluate(e=>e.matches('.lobby-cycle'))){expect(await control.evaluate(e=>getComputedStyle(e,'::before').backgroundColor)).toBe(variantA);expect(await control.evaluate(e=>getComputedStyle(e,'::before').opacity)).toBe('1');}
+  if(await control.evaluate(e=>e.matches('.lobby-cycle'))){expect(await control.evaluate(e=>getComputedStyle(e,'::before').backgroundColor)).toBe(hover);expect(await control.evaluate(e=>getComputedStyle(e,'::before').opacity)).toBe('1');}
  else if(await control.evaluate(e=>e.matches('[data-remove]'))){await expect(control).toHaveCSS('background-color','rgba(0, 0, 0, 0)');await expect(control).toHaveCSS('box-shadow','none');}
   else if(await control.evaluate(e=>e.matches('[data-edit],[data-bot]'))){
    const card=control.locator('xpath=ancestor-or-self::*[contains(@class,"lobby-card")][1]');await expect(card).toHaveCSS('background-image',/linear-gradient/);expect(await card.evaluate(e=>getComputedStyle(e).backgroundColor)).not.toBe(hover);await expect(card).toHaveCSS('box-shadow',/2px.*inset/);
    if(await control.getAttribute('data-bot')!==null)await expect(control).toHaveCSS('background-color','rgba(0, 0, 0, 0)');
-  }else{await expect(control).toHaveCSS('background-color',await control.evaluate(e=>e.matches('.lobby-help'))?variantA:hover);await expect(control).toHaveCSS('background-image','none');}
+  }else{await expect(control).toHaveCSS('background-color',await control.evaluate(e=>e.matches('.lobby-help'))?hover:hover);await expect(control).toHaveCSS('background-image','none');}
   expect(await control.boundingBox()).toEqual(before);
  }
  await page.locator('[data-bot]').first().hover();await shot(page,`bot-mouse-${width}`);

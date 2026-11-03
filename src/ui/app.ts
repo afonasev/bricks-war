@@ -22,6 +22,7 @@ import { desktop, installerDownload, type DisplayPreferences } from '../platform
 import { bindMenuAudio } from './menuAudio';
 import { faceGlyph } from './inputGlyph';
 import { configureSectionShell } from './sectionShell';
+import { configureResponsivePreferences } from './responsivePreferences';
 import { shieldInventoryMarkup, shieldInventoryKey } from './shieldInventory';
 import { configureDesktopStage } from './desktopStage';
 import { nextPiecePreviewMarkup } from './nextPiecePreview';
@@ -66,7 +67,6 @@ import { DEFAULT_DURATION_MINUTES, FINAL_PUSH_PULSE_MS, LEVEL_UP_PULSE_MS, Match
 import { scoreLeaderIds, teamIdForSlot, teamLeaderIds, teamScores } from '../simulation/competition';
 import { formatClock, formatDuration, formatPieces, matchClockPresentation } from './format';
 import {
-  formatParticipantEventMarkup,
   globalMatchEvent,
   matchEventIconMarkup,
   matchEventPlaqueMarkup,
@@ -87,7 +87,6 @@ import { releaseMetadataMarkup } from './releaseMetadata';
 import { webReleaseHistory, type ReleaseHistoryRow } from './releaseHistory';
 import { releaseNotesElement } from './releaseNotes';
 import { loadGameTuning, resetGameTuning, saveGameTuning } from './gameTuningPersistence';
-import { PlayerEventRegionLatch } from './playerEventPlacement';
 import { participantLevelUpNoticeKey } from './hudInvalidation';
 import { resetSoloRecords, saveSurvivalRecords } from './soloRecords';
 import { RatingPanels } from './ratingPanel';
@@ -238,7 +237,6 @@ export class BricksWarApp {
   private lastHudKey = '';
   private lastActiveYKey = '';
   private lastChromeKey = '';
-  private readonly playerEventRegions = new PlayerEventRegionLatch();
   private latestHudState: MatchState | null = null;
   private latestArenaLayout: ArenaLayout | null = null;
   private countdownReady = false;
@@ -316,6 +314,7 @@ export class BricksWarApp {
   private readonly updateDesktopLayout = (): void => {
     this.root.dataset.layout = isMobilePlayViewport() ? 'mobile' : 'desktop';
     configureDesktopStage(this.root);
+    configureResponsivePreferences(this.root);
     this.lobby?.resize();
     // Viewport-sized overlays must stay outside the scaled desktop composition.
     const modalBackdrop = this.root.querySelector('[data-ai-choice]')?.parentElement;
@@ -1219,7 +1218,6 @@ export class BricksWarApp {
     if (!await loading.painted() || this.matchLoading !== loading) return;
     this.disconnectPlayerNameResizeObserver();
     this.countdownReady = false;
-    this.playerEventRegions.clear();
     this.audio.startGame();
     desktop?.setSafeMenu(false);
     this.menuFocus.suspend();
@@ -1280,7 +1278,7 @@ export class BricksWarApp {
         <div class="game-stage" id="game-stage">
           <div id="game-canvas" class="game-canvas"></div>
           <div id="hud-grid" class="hud-grid" aria-live="polite"></div>
-          <div id="arena-event-layer" class="arena-event-layer" aria-live="assertive"><div id="arena-event-notice" class="match-event-plaque arena-event-notice" hidden></div></div>
+          <div id="arena-event-layer" class="arena-event-layer" aria-live="assertive"><div id="arena-event-notice" class="arena-event-notice" hidden></div></div>
           <div id="countdown" class="countdown" role="status" hidden>${readyTitleMarkup()}</div>
           <div id="pause-overlay" class="pause-overlay" role="dialog" aria-modal="true" aria-labelledby="pause-title" hidden>
             <section id="pause-menu-panel" class="pause-panel">
@@ -1623,13 +1621,6 @@ export class BricksWarApp {
         const cleanupRows = state.cleanupEvents.find((event) => event.participantId === participant.config.id)?.rows ?? 0;
         const reflecting = state.shieldPresentations.some((event) => event.participantId === participant.config.id && event.remainingMs > 0);
         const participantEvent = reflecting ? null : participantMatchEvent(state, participant.config.id, this.tuning.messages, senderNames, getLocale());
-        const noticeEventKey = participantEvent
-          ? `${participantEvent.kind}:${participant.levelUpEvent?.serial ?? 0}:${state.anomalyBurnSerial}:${state.shieldChargeSerial}:${state.cleanupSerial}:${state.pendingConflict?.serial ?? state.conflictImpactEvent?.serial ?? 0}:${participant.config.id}`
-          : null;
-        const noticeRegion = noticeEventKey
-          ? this.playerEventRegions.resolve(participant.config.id, noticeEventKey, participant.board.grid, participant.board.active)
-          : null;
-        if (!noticeEventKey) this.playerEventRegions.release(participant.config.id);
         const identity = hudIdentityForParticipant(index, state.options.matchVariant, getLocale(), participant.config.teamId);
         const shieldInventory = shieldInventoryMarkup(participant, state, getLocale());
         const compactMobileAi = isMobilePlayViewport() && participant.config.controller === 'ai';
@@ -1649,7 +1640,7 @@ export class BricksWarApp {
           ${mobilePlayerMarkup}
           ${participant.board.alive ? '' : `<b class="out-plaque"><span class="out-plaque-symbol" aria-hidden="true">×</span><span class="out-plaque-text" lang="${getLocale()}">${tr('eliminated').toLocaleLowerCase(getLocale())}</span></b>`}
 
-          ${participantEvent ? `<span class="player-event-symbol" data-kind="${participantEvent.kind}" data-accent="${participantEvent.accent}" style="--event-duration:${participantEvent.lifetimeMs}ms" aria-hidden="true">${matchEventIconMarkup(participantEvent.icon)}</span><div class="match-event-plaque player-event-notice is-${noticeRegion}" data-kind="${participantEvent.kind}" data-accent="${participantEvent.accent}" style="--event-duration:${participantEvent.lifetimeMs}ms" role="status" aria-label="${escapeHtml([participantEvent.title, participantEvent.detail].filter(Boolean).join('. '))}">${matchEventPlaqueMarkup(participantEvent, participantEvent.template && participantEvent.values ? formatParticipantEventMarkup(participantEvent.template, participantEvent.values) : escapeHtml(participantEvent.title))}</div>` : ''}
+          ${participantEvent ? `<span class="player-event-symbol" data-kind="${participantEvent.kind}" data-accent="${participantEvent.accent}" style="--event-duration:${participantEvent.lifetimeMs}ms" aria-hidden="true">${matchEventIconMarkup(participantEvent.icon)}</span>` : ''}
         </article>
       `; }).join('');
     }
@@ -1718,7 +1709,7 @@ export class BricksWarApp {
         eventNotice.dataset.kind = globalEvent.kind;
         eventNotice.dataset.accent = globalEvent.accent;
         eventNotice.style.setProperty('--event-duration', `${globalEvent.lifetimeMs}ms`);
-        eventNotice.setAttribute('aria-label', [globalEvent.title, globalEvent.detail].filter(Boolean).join('. '));
+        eventNotice.setAttribute('aria-label', globalEvent.title);
         eventNotice.innerHTML = matchEventPlaqueMarkup(globalEvent);
       } else {
         eventNotice.removeAttribute('aria-label');
@@ -1915,7 +1906,7 @@ export class BricksWarApp {
     panel.querySelector('[data-pause-fullscreen]')?.addEventListener('click', () => { void (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch(() => { const status = panel.querySelector('[data-preferences-status]'); if (status) status.textContent = localeText('displayFailed'); }); });
     const change = () => { const resolution = panel.querySelector<HTMLSelectElement>('[data-pause-resolution]')?.value ?? 'auto'; const [width = 1280,height = 720] = resolution.split('x').map(Number); void this.previewDisplay({ width,height, auto: resolution === 'auto', fullscreen: panel.querySelector<HTMLSelectElement>('[data-pause-window]')?.value === 'fullscreen' }); };
     panel.querySelector('[data-pause-resolution]')?.addEventListener('change', change); panel.querySelector('[data-pause-window]')?.addEventListener('change', change);
-    this.bindVolumeControl(); this.bindPreferenceExtras(); this.bindLanguageSelector(); enhanceMenuSelects(panel); if (!panel.hasAttribute('data-network-preferences')) this.activateMenuFocus('settings'); else panel.querySelectorAll<HTMLElement>('button,input,select').forEach(el=>{if(!el.hidden)el.dataset.uiFocus='';});
+    this.bindVolumeControl(); this.bindPreferenceExtras(); this.bindLanguageSelector(); enhanceMenuSelects(panel); configureResponsivePreferences(this.root); if (!panel.hasAttribute('data-network-preferences')) this.activateMenuFocus('settings'); else panel.querySelectorAll<HTMLElement>('button,input,select').forEach(el=>{if(!el.hidden)el.dataset.uiFocus='';});
   }
 
   private bindLanguageSelector(): void {

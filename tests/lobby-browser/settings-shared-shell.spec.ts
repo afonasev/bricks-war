@@ -1,3 +1,4 @@
+import { openPreferencesCategory } from '../helpers/preferences';
 import {test,expect} from '@playwright/test';
 const notes='Latest changes\n'+Array.from({length:45},(_,i)=>`- Improvement ${i+1}: readable controls and clear player boards.`).join('\n');
 for(const [width,height]of [[1440,960],[1280,480],[390,844],[844,390]]as const)test(`shared sections ${width}x${height}`,async({page})=>{
@@ -13,7 +14,7 @@ for(const [width,height]of [[1440,960],[1280,480],[390,844],[844,390]]as const)t
  };
  const first=await check('settings');
  for(const [launcher,screen]of [['#open-controls','controls'],['#open-rules','rules'],['#open-settings-lab','laboratory'],['#open-release-history','history']]as const){
-  await page.locator(launcher).click();const geometry=await check(screen);expect(Math.abs(geometry.backLeft-first.backLeft)).toBeLessThanOrEqual(1);expect(Math.abs(geometry.backBottom-first.backBottom)).toBeLessThanOrEqual(1);
+  await openPreferencesCategory(page,launcher==='#open-controls'?'controls':'more');await page.locator(launcher).click();const geometry=await check(screen);expect(Math.abs(geometry.backLeft-first.backLeft)).toBeLessThanOrEqual(1);expect(Math.abs(geometry.backBottom-first.backBottom)).toBeLessThanOrEqual(1);
   if(screen==='rules'){await page.evaluate(()=>{(window as any).shellPad.buttons[15].pressed=true;});await expect(page.locator('#rules-progress')).toHaveText('2 / 8');await page.evaluate(()=>{(window as any).shellPad.buttons[15].pressed=false;});await page.waitForTimeout(90);}
   if(screen==='history'){await expect(page.locator('[data-history-scroll]')).toContainText('Improvement 45');await page.evaluate(()=>{(window as any).shellPad.axes[3]=.8;});await expect.poll(()=>page.locator('[data-history-scroll]').evaluate(e=>e.scrollTop)).toBeGreaterThan(30);await page.evaluate(()=>{(window as any).shellPad.axes[3]=0;});}
   await page.evaluate(()=>{(window as any).shellPad.buttons[1].pressed=true;});await expect(page.locator('main[data-screen="settings"]')).toBeVisible();await page.evaluate(()=>{(window as any).shellPad.buttons[1].pressed=false;});await page.waitForTimeout(90);

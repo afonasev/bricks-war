@@ -1,10 +1,10 @@
-/* The approved sage navigation treatment belongs only to these two screens.
+/* Shared sage navigation tokens are supplied by unifiedInteraction.css.
    Stored choices and player identity colours remain independent of focus. */
 #app[data-layout] :is(.main-menu-screen,.unified-lobby) {
-  --menu-focus-fill:#edf2df;
-  --menu-focus-ink:#344c2d;
-  --menu-focus-line:#829764;
-  --menu-hover-fill:#f3f6eb;
+  --menu-focus-fill:var(--interaction-focus-fill);
+  --menu-focus-ink:var(--interaction-ink);
+  --menu-focus-line:var(--interaction-line);
+  --menu-hover-fill:var(--interaction-hover-fill);
 }
 
 /* Replace idle gradients, not merely the colour underneath them. Inset rings
@@ -35,8 +35,8 @@
    Input-mode guards keep a parked pointer or stale pad class from lighting a
    second target. Stored values and control geometry stay independent. */
 #app[data-layout] .unified-lobby[data-screen] :is(.lobby-cycle,.lobby-mode,.lobby-help) {
-  --lobby-interaction-fill:#dce9c7;
-  --lobby-interaction-line:#6b874c;
+  --lobby-interaction-fill:var(--interaction-focus-fill);
+  --lobby-interaction-line:var(--interaction-line);
 }
 #app[data-layout][data-input-mode="pointer"] .unified-lobby[data-screen] :is(.lobby-cycle,.lobby-mode,.lobby-help)[class]:hover,
 #app[data-layout]:is([data-input-mode="keyboard"],[data-input-mode="gamepad"]) .unified-lobby[data-screen] :is(.lobby-cycle,.lobby-mode,.lobby-help)[class]:is(:focus-visible,.pad-selected,[class*="-target"]) {
@@ -52,7 +52,7 @@
 }
 #app[data-layout][data-input-mode="pointer"] .unified-lobby[data-screen] .lobby-cycle[class]:hover::before,
 #app[data-layout]:is([data-input-mode="keyboard"],[data-input-mode="gamepad"]) .unified-lobby[data-screen] .lobby-cycle[class]:is(:focus-visible,.pad-selected,[class*="-target"])::before {
-  inset:-4px -8px;
+  inset:0;
   border-radius:8px;
   background:var(--lobby-interaction-fill);
   box-shadow:inset 0 0 0 2px var(--lobby-interaction-line);

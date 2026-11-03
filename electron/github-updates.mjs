@@ -1,6 +1,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { validateManifest } from './content.mjs';
 import { CONTENT_REPOSITORY, githubContentDownload } from './update-source.mjs';
+import { abortable } from './abortable.mjs';
 
 import { compareVersions, supportsContent } from './compatibility.mjs';
 export { compareVersions } from './compatibility.mjs';
@@ -27,51 +28,72 @@ export class GithubUpdates {
     this.download = (path, limit, file) => gate.run(signal => raw(path, limit, { ...file,
       signal: file?.signal ? AbortSignal.any([signal,file.signal]) : signal }), file?.signal);
   }
-  async api(path) {
-    return this.gate.run(async signal => {
+  async api(path, options = {}) {
+    const { signal: cancellation, assertActive = () => cancellation?.throwIfAborted() } = options;
+    assertActive();
+    return this.gate.run(async activitySignal => {
+      const signal = AbortSignal.any([activitySignal, AbortSignal.timeout(30000), ...(cancellation ? [cancellation] : [])]);
+      assertActive();
       const cached = this.cache[path];
-      const response = await this.fetcher(`https://api.github.com/repos/${CONTENT_REPOSITORY}/${path}`, {
-        signal: AbortSignal.any([signal, AbortSignal.timeout(30000)]), redirect: 'error',
+      const response = await abortable(() => this.fetcher(`https://api.github.com/repos/${CONTENT_REPOSITORY}/${path}`, {
+        signal, redirect: 'error',
         headers: { Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28', ...(cached?.etag ? { 'If-None-Match': cached.etag } : {}) },
-      });
+      }), signal);
+      assertActive();
       if (response.status === 304 && cached) return cached.value;
-      if (!response.ok) { await response.body?.cancel(); throw Error('GitHub unavailable or rate limited'); }
+      if (!response.ok) { await abortable(() => response.body?.cancel(), signal); throw Error('GitHub unavailable or rate limited'); }
       const reader = response.body.getReader(); let size = 0; const chunks = [];
-      try { for (;;) { const {value,done} = await reader.read(); if (done) break; size += value.length; if (size > 4 * 1024 * 1024) throw Error('Oversized GitHub response'); chunks.push(Buffer.from(value)); } }
-      finally { await reader.cancel(); }
-      const value = JSON.parse(Buffer.concat(chunks)); this.cache[path] = { etag: response.headers.get('etag'), value };
-      await writeFile(this.cachePath, JSON.stringify(this.cache)); return value;
-    });
+      try { for (;;) { const {value,done} = await abortable(() => reader.read(), signal); assertActive(); if (done) break; size += value.length; if (size > 4 * 1024 * 1024) throw Error('Oversized GitHub response'); chunks.push(Buffer.from(value)); } }
+      finally {
+        const cancelled = reader.cancel(); cancelled.catch(() => {});
+        if (!signal.aborted) await abortable(() => cancelled, signal);
+      }
+      const value = JSON.parse(Buffer.concat(chunks)); assertActive(); this.cache[path] = { etag: response.headers.get('etag'), value };
+      await abortable(() => writeFile(this.cachePath, JSON.stringify(this.cache)), signal); assertActive(); return value;
+    }, cancellation);
   }
-  async list() {
+  async list(options = {}) {
+    const active = () => { options.signal?.throwIfAborted(); options.assertActive?.(); };
+    active();
     try { this.cache = JSON.parse(await readFile(this.cachePath,'utf8')); } catch { /* first run */ }
+    active();
     const releases = [];
     for (let page = 1; page <= 10; page++) {
-      const entries = await this.api(`releases?per_page=100&page=${page}`);
+      active();
+      const entries = await this.api(`releases?per_page=100&page=${page}`, options);
+      active();
       if (!Array.isArray(entries)) throw Error('Invalid release list');
       releases.push(...entries.filter(r => !r.draft && !r.prerelease));
       if (entries.length < 100) break;
     }
     this.releases = releases; return releases;
   }
-  async discover() {
-    const releases = await this.list();
+  async discover(options = {}) {
+    const active = () => { options.signal?.throwIfAborted(); options.assertActive?.(); };
+    active();
+    const releases = await this.list(options);
+    active();
     for (const release of releases.filter(r => /^content-\d+$/.test(r.tag_name)).sort((a,b) => Number(b.tag_name.slice(8)) - Number(a.tag_name.slice(8)))) {
       const sequence = Number(release.tag_name.slice(8));
       const pending = this.store.state.pending === `release-${sequence}` || this.store.state.cancelledSequence === sequence;
       if (sequence <= this.store.manifest.sequence || sequence < this.store.state.highWater
         || (!pending && sequence <= Math.max(this.store.state.highWater, this.store.ready?.sequence ?? 0))) continue;
       if (!release.assets?.some(a => a.name === 'manifest.json')) continue;
-      const envelope = JSON.parse((await this.download('manifest.json',512000,{sequence,sha256:'0'.repeat(64)})).toString());
+      active();
+      const bytes = await this.download('manifest.json',512000,{sequence,sha256:'0'.repeat(64), signal:options.signal});
+      active();
+      const envelope = JSON.parse(bytes.toString());
       let manifest, requiresShell = false;
       try { manifest = validateManifest(envelope,this.publicKey,this.store.shellVersion,this.store.shellRelease); }
       catch (error) { if (error.code !== 'INCOMPATIBLE') throw error; manifest = error.manifest; requiresShell = true; }
       if (manifest.game !== 'bricks-war' || manifest.channel !== 'stable' || manifest.component !== 'content' || manifest.sequence !== sequence
         || compareVersions(manifest.gameVersion,this.store.manifest.gameVersion) <= 0) continue;
       if (!manifest.files.every(f => release.assets.some(a => a.name === f.sha256 && a.size === f.size && a.digest === `sha256:${f.sha256}`))) continue;
+      active();
       const content = { component:'content', manifest, envelope, releaseId:release.id, tag:release.tag_name };
       if (!requiresShell) return content;
-      const shell = await this.shell?.discover(releases);
+      const shell = await this.shell?.discover(releases, options);
+      active();
       if (!shell?.compatibility || !supportsContent(manifest,shell.compatibility.abi,shell.compatibility.version)) {
         // Do not hide an authenticated newer game behind an older compatible release.
         return { ...content, component:'shell-required', requiresShell:true };
@@ -95,7 +117,8 @@ export class GithubUpdates {
         discard:async()=>{await shell.discard();await this.store.discardPrepared(manifest.sequence);},
       };
     }
-    const shell = await this.shell?.discover(releases);
+    const shell = await this.shell?.discover(releases, options);
+    active();
     if (!shell) return null;
     if (!supportsContent(this.store.manifest,shell.compatibility?.abi ?? 2,shell.compatibility?.version)) return null;
     if (compareVersions(shell.manifest.gameVersion,this.store.manifest.gameVersion) < 0) {

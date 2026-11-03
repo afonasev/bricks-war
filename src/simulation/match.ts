@@ -43,7 +43,7 @@ import {
 } from './matchOptions';
 
 export const FIXED_STEP_MS = 1000 / 60;
-export const COUNTDOWN_MS = 1000;
+export const COUNTDOWN_MS = 2000;
 export const LOCK_DELAY_MS = 500;
 export const SOFT_DROP_INTERVAL_MS = 150;
 export const MAX_LOCK_RESETS = 15;
@@ -385,7 +385,9 @@ export class MatchEngine {
   step(deltaMs: number, actions: ActionsByParticipant = new Map()): void {
     if (deltaMs <= 0 || this.state.phase === 'paused' || this.state.phase === 'results') return;
     if (this.state.phase === 'countdown') {
-      this.state.countdownMs = Math.max(0, this.state.countdownMs - deltaMs);
+      const remainingMs = this.state.countdownMs - deltaMs;
+      // Equivalent fractional steps must finish on the same boundary as one whole step.
+      this.state.countdownMs = remainingMs <= Number.EPSILON * COUNTDOWN_MS ? 0 : remainingMs;
       if (this.state.countdownMs === 0) {
         this.state.phase = 'playing';
         this.state.roundStartPulseMs = ROUND_START_PULSE_MS;

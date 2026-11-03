@@ -129,6 +129,7 @@ export class MenuFocusController {
     root.ownerDocument.addEventListener('keydown', this.onDocumentKeyDown, true);
     root.ownerDocument.addEventListener('keyup', this.onDocumentKeyUp, true);
     root.addEventListener('keydown', this.onKeyDown);
+    root.addEventListener('focusin', this.onFocusIn);
     root.addEventListener('pointermove', this.onPointerMove);
     root.addEventListener('pointerdown', this.onPointerDown, true);
     window.addEventListener('blur', this.onBlur);
@@ -215,6 +216,7 @@ export class MenuFocusController {
     window.cancelAnimationFrame(this.frame);
     window.removeEventListener('blur', this.onBlur);
     this.root.removeEventListener('keydown', this.onKeyDown);
+    this.root.removeEventListener('focusin', this.onFocusIn);
     this.root.removeEventListener('pointermove', this.onPointerMove);
     this.root.removeEventListener('pointerdown', this.onPointerDown, true);
   }
@@ -441,6 +443,22 @@ export class MenuFocusController {
     event.preventDefault();
     event.stopPropagation();
     this.perform(action, 'keyboard');
+  };
+
+  // Native Tab/touch/programmatic focus and controller navigation share one cursor.
+  // Without this, switching to a gamepad can activate the previously visited item.
+  private readonly onFocusIn = (event: FocusEvent): void => {
+    if (!this.screen || this.screen === 'results' && !this.resultsGuard.ready()) return;
+    const target = event.target;
+    if (!(target instanceof HTMLElement) || target === this.selectedItem) return;
+    const index = this.items().indexOf(target);
+    if (index < 0) return;
+    if (target !== this.editingControl?.element) this.finishControlEditing();
+    this.clearSelection();
+    this.index = index;
+    this.selectedItem = target;
+    refreshMenuActionHints(this.root, target);
+    this.options.onSelectionChange?.(target);
   };
 
   private readonly onPointerDown = (): void => {

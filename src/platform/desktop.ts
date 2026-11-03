@@ -33,15 +33,29 @@ export async function installerDownload(): Promise<{ url: string; platform: stri
   if (desktop) return null;
   const platform = installerPlatform(navigator.userAgent, navigator.platform, /Mac/i.test(navigator.platform) && navigator.maxTouchPoints > 1);
   if (!platform) return null;
+  // Public, verified recovery installers: never require the multiplayer VPS.
+  const version = '1.13.0';
+  const name = `Bricks-War-${version}-${platform === 'mac' ? 'mac-universal.dmg' : 'win-x64.exe'}`;
+  const fallback = { url: `https://github.com/afonasev/bricks-war/releases/download/v${version}/${name}`, platform };
+  const controller = new AbortController();
+  let timeout: ReturnType<typeof setTimeout> | undefined;
   try {
-    const response = await fetch('/desktop/latest.json', { cache: 'no-store' });
-    if (!response.ok) return null;
-    const catalog = await response.json();
-    const file = catalog?.[platform];
-    if (!file || typeof file.url !== 'string') return null;
-    const url = installerUrl(file.url, location.origin);
-    return url ? { url, platform } : null;
-  } catch { return null; }
+    // Race the entire response/body read, so even a stalled API cannot hide the action.
+    return await Promise.race([
+      (async () => {
+        const response = await fetch('https://api.github.com/repos/afonasev/bricks-war/releases/latest', { cache: 'no-store', signal: controller.signal });
+        if (!response.ok) return fallback;
+        const release = await response.json();
+        if (release.draft || release.prerelease || !/^v\d+\.\d+\.\d+$/.test(release.tag_name)) return fallback;
+        const expected = `Bricks-War-${release.tag_name.slice(1)}-${platform === 'mac' ? 'mac-universal.dmg' : 'win-x64.exe'}`;
+        const file = Array.isArray(release.assets) ? release.assets.find((asset: { name?: string }) => asset.name === expected) : null;
+        const url = typeof file?.browser_download_url === 'string' ? installerUrl(file.browser_download_url, location.origin) : null;
+        return url?.startsWith(`https://github.com/afonasev/bricks-war/releases/download/${release.tag_name}/`) ? { url, platform } : fallback;
+      })(),
+      new Promise<typeof fallback>(resolve => { timeout = setTimeout(() => { controller.abort(); resolve(fallback); }, 2500); }),
+    ]);
+  } catch { return fallback; }
+  finally { clearTimeout(timeout); controller.abort(); }
 }
 
 // Only our release assets and legacy same-origin installer paths are trusted.

@@ -1,6 +1,6 @@
 {
   "name": "bricks-war",
-  "version": "1.15.0",
+  "version": "1.15.1",
   "private": true,
   "type": "module",
   "scripts": {
@@ -32,7 +32,9 @@
     "desktop:publish:content": "node scripts/desktop/publish-content-github.mjs --publish",
     "desktop:publish:content:plan": "node scripts/desktop/publish-content-github.mjs",
     "desktop:publish:content:legacy": "node scripts/desktop/publish.mjs",
-    "desktop:release": "node scripts/desktop/github-release.mjs"
+    "desktop:release": "node scripts/desktop/github-release.mjs",
+    "qa:artifacts:check": "python3 tools/qa_artifacts.py check-staged",
+    "qa:artifacts:install": "python3 tools/qa_artifacts.py install"
   },
   "dependencies": {
     "electron-updater": "^6.8.9",

@@ -13,7 +13,7 @@
 | Ссылки для скачивания | `/desktop/latest.json`, прямые URL assets в GitHub Releases |
 | Совместимость старых оболочек | `/desktop/installers/latest*.yml` на VPS с абсолютными GitHub URL |
 
-На VPS нет EXE/DMG/ZIP/blockmap. Новые оболочки получают подписанный игровой контент через GitHub Pages и Releases. Старые оболочки продолжают использовать VPS до одноразовой замены приложения. Загруженный контент применяется кнопкой «Обновить» в безопасном главном меню и не прерывает матч.
+На VPS нет EXE/DMG/ZIP/blockmap. Новые оболочки получают подписанный игровой контент через GitHub Pages и Releases. Старые оболочки продолжают использовать VPS до одноразовой замены приложения. В исходниках нового стартового сценария проверка обновлений выполняется до окна игры и ограничена 3 секундами. Без обновления, при ошибке сети или таймауте окно лаунчера не появляется. По согласию игрока совместимые компоненты загружаются, проверяются и применяются, затем игра открывается сама; отмена дожидается остановки загрузки. Готовая транзакция с предыдущего запуска имеет приоритет. Кнопка обновления в безопасном главном меню и остановка передач перед матчем сохраняются. Этот кодовый срез не означает, что новый лаунчер опубликован: независимый bootstrap, миграция установленных клиентов и проверки Windows/UAC ведутся отдельно в `seamless-launcher-updates`.
 
 ## Перед началом
 
@@ -191,3 +191,22 @@ The inline-image renderer and the native image transport must be delivered toget
 The runner adds a launcher and signed local transport fixtures only inside the generated QA `app.asar`. Production trust validation is unchanged. QA-only versions A=1.11.0, B=1.12.2 and failing C=1.12.3 are not public release identities. A uses the current shell with the image route disabled to model the old capability; it is not the immutable published v1.11.0 binary. It exercises download, digest/signature verification, helper acknowledgement, replacement, actual new main-process route (404→403 for a deliberately forbidden image URL), startup health, preserved localStorage/display preferences, offline restart, next-launch application and real failed-startup rollback with the existing 90-second timeout. It never targets `/Applications`, changes system volume or publishes assets. Generated apps run muted from startup. Keep exact retained artifacts and hashes for open acceptance; remove intermediate owned build/profile copies after evidence preservation.
 
 Windows helper and elevated restore launch PowerShell with `-NoProfile -NonInteractive -ExecutionPolicy Bypass -File`. This is a process-scoped policy for the copied application helper, not a persistent system/user setting; Group Policy retains priority. See [Microsoft's Windows PowerShell execution policy documentation](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_execution_policies?view=powershell-5.1). NSIS remains per-machine and still requests UAC. Real Windows installation/UAC/shortcut retention and alternate administrator credentials require a Windows host; macOS/source checks do not establish them. An already installed old shell lacking this argument cannot acquire the fix before its first shell update; test the actual installed baseline under its effective policy, and preserve the normal installer recovery option if that baseline cannot start its helper. Do not describe a new-package test as proof that all existing Windows installations can complete their first update.
+
+
+## Web installer button without VPS
+
+The browser discovers the latest native release at `https://api.github.com/repos/afonasev/bricks-war/releases/latest`; it does not request `/desktop/latest.json` from the game/network VPS. Only matching macOS DMG / Windows EXE assets in this repository are accepted. API errors, malformed responses, missing assets and a 2.5-second discovery deadline recover to the verified public v1.13.0 installer. Refresh this recovery version in `src/platform/desktop.ts` after a separately authorized native publication. Phones/unknown platforms/native runtime remain excluded; a ready PWA update retains priority.
+
+Content release assets are the signed manifest plus files named by SHA256. Deduplication currently applies within one release; unchanged music/images are uploaded again for each content sequence. Removing files from published sequences breaks existing download URLs. Reducing cross-release duplication requires a separately scoped publisher/client compatibility change; this download-button fix does not alter that contract.
+
+
+## Player-facing GitHub downloads
+
+Player links use `https://github.com/afonasev/bricks-war/releases?q=tag%3Av1`, a native-tag-only release list, or direct Windows EXE/macOS DMG links. The public README export and newly created native/content release descriptions begin with `download-presentation.mjs`'s download section. Native publication uses its own installer version; content publication uses the compatible native tag returned by the existing signed-shell publication gate. Installer versions are labelled separately from game-content versions.
+
+The repository's unfiltered Releases tab remains a technical archive: GitHub cannot hide selected public releases while exposing them to unauthenticated clients. Keep existing content release IDs, tags, visibility, assets and digests unchanged. Installed shells ignore draft/prerelease content. Do not convert stable content to prerelease/draft or delete/move assets to tidy the UI. The filtered installer list leaves existing updater discovery/download/history intact. Updating this presentation does not rebuild or republish the game.
+
+
+## Адресная QA стартового окна
+
+`node scripts/desktop/smoke-startup-launcher.mjs` запускает настоящий Electron с `-muted`, отдельными профилями и временным ключом подписи. Копия исходников, тестовый контент, отчёт и снимки сохраняются вне Git в уникальном каталоге QA store. Установленная игра и настоящий ключ релиза не используются. Проверяются скрытый обычный запуск, отказ, обновление A→B с сохранением профиля, offline restart, отмена, повреждённые байты/повтор, свежие нажатия клавиатуры/имитированного контроллера и восстановление при сбое до/после content activation. Это source-fixture QA, не проверка установщика, физического устройства, независимого bootstrap или Windows/UAC.

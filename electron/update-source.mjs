@@ -1,3 +1,5 @@
+import { abortable } from './abortable.mjs';
+
 export const CONTENT_REPOSITORY = 'afonasev/bricks-war';
 export const CONTENT_FEED = 'https://afonasev.github.io/bricks-war/desktop/game/latest.json';
 const CDN_HOSTS = new Set(['release-assets.githubusercontent.com', 'objects.githubusercontent.com']);
@@ -25,26 +27,31 @@ export function githubContentDownload(fetcher) {
     let url = original;
     const signal = file?.signal ? AbortSignal.any([AbortSignal.timeout(30_000), file.signal]) : AbortSignal.timeout(30_000);
     for (let hops = 0; hops <= 5; hops++) {
-      const response = await fetcher(url, { bypassCustomProtocolHandlers: true, redirect: 'manual', cache: 'no-store', signal });
+      signal.throwIfAborted();
+      const response = await abortable(() => fetcher(url, { bypassCustomProtocolHandlers: true, redirect: 'manual', cache: 'no-store', signal }), signal);
       if ([301, 302, 303, 307, 308].includes(response.status)) {
-        await response.body?.cancel();
+        await abortable(() => response.body?.cancel(), signal);
         const location = response.headers.get('location');
         if (original === CONTENT_FEED || !location || hops === 5) throw Error('Invalid update redirect');
         url = trustedRedirect(location, original);
         continue;
       }
-      if (!response.ok || !response.body) { await response.body?.cancel(); throw Error('Update unavailable'); }
+      if (!response.ok || !response.body) { await abortable(() => response.body?.cancel(), signal); throw Error('Update unavailable'); }
       if (Number(response.headers.get('content-length') ?? 0) > limit) {
-        await response.body.cancel(); throw Error('Oversized update');
+        await abortable(() => response.body.cancel(), signal); throw Error('Oversized update');
       }
       const reader = response.body.getReader(), chunks = []; let size = 0;
       try {
         for (;;) {
-          const { value, done } = await reader.read(); if (done) break;
+          const { value, done } = await abortable(() => reader.read(), signal); signal.throwIfAborted(); if (done) break;
           size += value.length; if (size > limit) throw Error('Oversized update');
           chunks.push(Buffer.from(value));
         }
-      } finally { await reader.cancel(); }
+      } finally {
+        const cancelled = reader.cancel(); cancelled.catch(() => {});
+        if (!signal.aborted) await abortable(() => cancelled, signal);
+      }
+      signal.throwIfAborted();
       return Buffer.concat(chunks);
     }
     throw Error('Too many update redirects');

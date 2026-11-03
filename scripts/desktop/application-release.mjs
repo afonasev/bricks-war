@@ -11,7 +11,9 @@ export async function requirePublishedShell(content, releases, readEnvelope, pub
     let compatible = true;
     for (const [platform,arch,minimumOS] of [['darwin','arm64','13.0.0'],['win32','x64','10.0.0']]) {
       let shell;
-      try { shell = validateShell(envelope,publicKey,platform,arch,'0.0.0',minimumOS); }
+      // Inspect published client/content compatibility; this read-only gate
+      // never schedules a legacy installer or authorizes its activation.
+      try { shell = validateShell(envelope,publicKey,platform,arch,'0.0.0',minimumOS,{activation:false}); }
       catch (error) { if (error.code !== 'INCOMPATIBLE') throw error; compatible=false; break; }
       if (shell.version !== release.tag_name.slice(1) || !supportsContent(content,shell.contentAbi ?? 2,shell.version)
         || !release.assets.some(a=>a.name===shell.file.name && a.size===shell.file.size && a.digest===`sha256:${shell.file.sha256}`)

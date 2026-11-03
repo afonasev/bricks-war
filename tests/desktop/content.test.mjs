@@ -138,3 +138,13 @@ test('corrupt prepared content is a visible recovery, never a completed update',
  await writeFile(join(store.root,store.state.pending,'index.html'),'corrupt');
  const restarted=await new ContentStore(f.options).open();assert.equal(restarted.recovered,true);assert.equal(restarted.ready,null);assert.equal(restarted.manifest.sequence,1);
 });
+
+test('rejecting a failed activation retains replay protection against automatic restaging', async t => {
+  const f = await fixture(t), store = await new ContentStore(f.options).open();
+  await store.check(); const sequence = store.ready.sequence;
+  await store.discardPrepared(sequence, { retryable: false });
+  const restarted = await new ContentStore(f.options).open();
+  assert.equal(restarted.ready, null); assert.equal(restarted.state.pending, null);
+  assert.equal(restarted.state.highWater, sequence); assert.equal(restarted.state.cancelledSequence, undefined);
+  assert.equal(await restarted.check(), false);
+});

@@ -1,7 +1,7 @@
 import {test,expect} from '@playwright/test';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {openLocalLobby} from '../helpers/localLobby';
-const out='evidence/replace-countdown-with-ready/runtime';
+const out='evidence/match-announcements/ready';
 for(const item of [
   {locale:'ru',width:1440,height:960}, {locale:'en',width:1440,height:960},
   {locale:'ru',width:390,height:844}, {locale:'en',width:320,height:568},
@@ -31,12 +31,12 @@ for(const item of [
   await mkdir(out,{recursive:true});await page.screenshot({path:`${out}/${item.locale}-${item.width}x${item.height}.png`});
   await expect(title).toBeHidden();const samples=await page.evaluate(()=>(window as any).__readySamples);
   expect(samples.label).toBe(item.locale==='ru'?'Готовы?':'Ready?');
-  expect(samples.hidden-samples.shown).toBeGreaterThanOrEqual(950);expect(samples.hidden-samples.shown).toBeLessThan(1_300);
+  expect(samples.hidden-samples.shown).toBeGreaterThanOrEqual(1_950);expect(samples.hidden-samples.shown).toBeLessThan(2_300);
   expect(errors).toEqual([]);await writeFile(`${out}/${item.locale}-${item.width}x${item.height}.json`,JSON.stringify({layout,samples,errors},null,2));
  }finally{await context.close();}
 });
 
-test('ready title is static with reduced motion and controller pause freezes the second',async({browser,baseURL})=>{
+test('ready title is static with reduced motion and controller pause freezes the ready phase',async({browser,baseURL})=>{
  const context=await browser.newContext({baseURL,locale:'en',viewport:{width:1280,height:720},reducedMotion:'reduce'});
  await context.addInitScript(()=>{const pad={index:0,id:'Ready QA Pad',connected:true,mapping:'standard',axes:[0,0],buttons:Array.from({length:16},()=>({pressed:false,touched:false,value:0})),timestamp:0};(window as any).__readyPad=pad;Object.defineProperty(navigator,'getGamepads',{configurable:true,value:()=>[pad]});});
  const page=await context.newPage();

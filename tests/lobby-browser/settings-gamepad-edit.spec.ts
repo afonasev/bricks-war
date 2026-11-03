@@ -1,3 +1,4 @@
+import { openPreferencesCategory } from '../helpers/preferences';
 import { test, expect, type Page } from '@playwright/test';
 import { openLocalLobby } from '../helpers/localLobby';
 async function pulse(page: Page, button: number) {
@@ -22,7 +23,7 @@ for(const [width,height,native] of [[1440,960,false],[1280,480,true],[390,844,fa
   const ranges=page.locator('.settings-screen input[type="range"]');
   const count=await ranges.count();expect(count).toBeGreaterThanOrEqual(5);
   for(let i=0;i<count;i++){
-    const range=ranges.nth(i);const before=await range.inputValue();
+    const range=ranges.nth(i);await openPreferencesCategory(page,await range.evaluate(e=>e.closest<HTMLElement>('[data-preferences-category]')!.dataset.preferencesCategory!));const before=await range.inputValue();
     await range.focus();await range.press('Enter'); // Keyboard focuses the controller target without changing its value.
     await pulse(page,15);await expect(range).toHaveValue(before);
     await range.focus();await range.press('Enter');
@@ -32,23 +33,24 @@ for(const [width,height,native] of [[1440,960,false],[1280,480,true],[390,844,fa
     await pulse(page,1);await expect(range).toHaveValue(before);await expect(range).not.toHaveAttribute('data-gamepad-editing');
     await expect(page.locator('.settings-screen')).toBeVisible();
   }
-  const music=page.locator('#music-volume');await music.focus();await music.press('Enter');await pulse(page,0);await pulse(page,14);
+  await openPreferencesCategory(page,'sound');const music=page.locator('#music-volume');await music.focus();await music.press('Enter');await pulse(page,0);await pulse(page,14);
   const saved=await music.inputValue();await pulse(page,0);await expect(music).not.toHaveAttribute('data-gamepad-editing');
   await pulse(page,15);await expect(music).toHaveValue(saved);
-  if(width>700){
+  if(width>1000 && height>760){
     await page.locator('#master-volume').focus();await page.locator('#master-volume').press('Enter');await pulse(page,15);
     expect(await page.locator('.is-ui-selected').evaluate(e=>Boolean(e.closest('.settings-right-column')))).toBe(true);
+  }
     const selects=page.locator('.settings-screen select[data-menu-select-enhanced]');
     for(let i=0;i<await selects.count();i++){
-      const select=selects.nth(i);const original=await select.inputValue();
+      const select=selects.nth(i);await openPreferencesCategory(page,await select.evaluate(e=>e.closest<HTMLElement>('[data-preferences-category]')!.dataset.preferencesCategory!));const original=await select.inputValue();
       const trigger=select.locator('xpath=following-sibling::*[1]').locator('[data-menu-select-trigger]');
-      await trigger.hover();await pulse(page,15);await expect(select).toHaveValue(original);await expect(trigger).toHaveAttribute('aria-expanded','false');
-      await trigger.hover();await pulse(page,0);await expect(trigger).toHaveAttribute('aria-expanded','true');
+      await trigger.press('Shift');await pulse(page,15);await expect(select).toHaveValue(original);await expect(trigger).toHaveAttribute('aria-expanded','false');
+      await trigger.press('Shift');await pulse(page,0);await expect(trigger).toHaveAttribute('aria-expanded','true');
       await pulse(page,1);await expect(trigger).toHaveAttribute('aria-expanded','false');await expect(select).toHaveValue(original);
     }
-    const check=page.locator('#calm-effects');const before=await check.isChecked();await check.hover();await pulse(page,15);expect(await check.isChecked()).toBe(before);
-    await check.hover();await pulse(page,0);expect(await check.isChecked()).toBe(!before);
-  }
+    await openPreferencesCategory(page,'graphics');const check=page.locator('#calm-effects');const before=await check.isChecked();await check.press('Shift');await pulse(page,15);expect(await check.isChecked()).toBe(before);
+    await check.press('Shift');await pulse(page,0);expect(await check.isChecked()).toBe(!before);
+  await openPreferencesCategory(page,'sound');
   await page.screenshot({path:`${process.env.BRICKS_LOBBY_EVIDENCE}/navigation-${width}.png`});
   await music.focus();await music.press('Enter');await pulse(page,0);await expect(music).toHaveAttribute('data-gamepad-editing','true');
   await page.screenshot({path:`${process.env.BRICKS_LOBBY_EVIDENCE}/editing-${width}.png`});

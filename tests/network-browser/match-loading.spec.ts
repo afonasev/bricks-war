@@ -49,19 +49,19 @@ for (const mode of ['Выживание', 'Битва', 'Командный бо
       }
       await host!.getByRole('button', { name: 'Начать', exact: true }).click();
       await expect(host!.locator('.match-loading')).toBeVisible(); await expect(guest!.locator('.match-loading')).toBeVisible();
-      await mkdir('evidence/replace-countdown-with-ready/network', { recursive: true });
-      if (mode === 'Выживание') await Promise.all([host!.screenshot({ path: 'evidence/replace-countdown-with-ready/network/loading-wide.png' }), guest!.screenshot({ path: 'evidence/replace-countdown-with-ready/network/loading-phone.png' })]);
+      await mkdir('evidence/match-announcements/network', { recursive: true });
+      if (mode === 'Выживание') await Promise.all([host!.screenshot({ path: 'evidence/match-announcements/network/loading-wide.png' }), guest!.screenshot({ path: 'evidence/match-announcements/network/loading-phone.png' })]);
       for (const p of [host!, guest!]) {
         await expect(p.locator('.match-loading')).toHaveCount(0);
         const timing = await p.evaluate(() => (window as any).__loading);
         expect(timing.count).toBe(1); expect(timing.removed - timing.added).toBeGreaterThanOrEqual(2_000);
-        // Loading ends at the shared ready phase; the authoritative server owns the one-second clock.
+        // Loading ends at the shared ready phase; the authoritative server owns the two-second clock.
         expect(timing.countdown).toBe('Готовы?');
         const credential = await p.evaluate(() => JSON.parse(localStorage.getItem('bricks-network-seat-v1')!));
         const response = await p.request.post(`${baseURL}/api/network/current`, { headers: { Origin: baseURL! }, data: { credential } });
         expect(response.ok()).toBe(true); const snapshot = await response.json();
-        await writeFile(`evidence/replace-countdown-with-ready/network/diagnostic-${modeId}-${p === host ? 'host' : 'guest'}.json`, JSON.stringify({ timing, state: snapshot.state, tick: snapshot.tick }, null, 2));
-        expect(snapshot.state.countdownMs).toBeLessThanOrEqual(1_000);
+        await writeFile(`evidence/match-announcements/network/diagnostic-${modeId}-${p === host ? 'host' : 'guest'}.json`, JSON.stringify({ timing, state: snapshot.state, tick: snapshot.tick }, null, 2));
+        expect(snapshot.state.countdownMs).toBeLessThanOrEqual(2_000);
         expect(snapshot.preparing).toEqual([]);
         expect(timing.countdown).toBe('Готовы?');
         results.push({ mode, timing, serverCountdownMs: snapshot.state.countdownMs });
@@ -70,8 +70,8 @@ for (const mode of ['Выживание', 'Битва', 'Командный бо
       await expect(guest!.locator('.network-arena')).toHaveAttribute('data-phase', 'playing');
       const timelines=await Promise.all([host!,guest!].map(p=>p.evaluate(()=>(window as any).__loading)));
       for(const sample of timelines){
-        expect(sample.readyHidden-sample.readyShown).toBeGreaterThanOrEqual(800);
-        expect(sample.readyHidden-sample.readyShown).toBeLessThan(1_300);
+        expect(sample.readyHidden-sample.readyShown).toBeGreaterThanOrEqual(1_800);
+        expect(sample.readyHidden-sample.readyShown).toBeLessThan(2_300);
         if(mode==='Выживание')expect(sample.removed-sample.added).toBeGreaterThanOrEqual(3_100);
       }
       results.push({timelines});
@@ -84,7 +84,7 @@ for (const mode of ['Выживание', 'Битва', 'Командный бо
       expect(await guest!.evaluate(() => document.querySelector('canvas') === (window as any).__canvas)).toBe(true);
       await expect(guest!.locator('.match-loading')).toHaveCount(0); expect(await guest!.evaluate(() => (window as any).__loading.count)).toBe(1);
       expect(errors).toEqual([]);
-      await writeFile(`evidence/replace-countdown-with-ready/network/${mode === 'Выживание' ? 'survival' : mode === 'Битва' ? 'battle' : 'teams'}.json`, JSON.stringify({ results, errors }, null, 2));
+      await writeFile(`evidence/match-announcements/network/${mode === 'Выживание' ? 'survival' : mode === 'Битва' ? 'battle' : 'teams'}.json`, JSON.stringify({ results, errors }, null, 2));
     } finally { for (const context of contexts) await context.close(); }
   });
 }

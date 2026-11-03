@@ -4,9 +4,8 @@ import { startClientUpdateServer } from '../helpers/clientUpdateServer.mjs';
 // This scenario requires no ready web update. Real PWA discovery/priority is covered by client-update.spec.ts.
 test.use({ serviceWorkers: 'block' });
 test('desktop download automatically selects OS and stays absent on phone', async ({ page }) => {
-  await page.route('**/desktop/latest.json', route => route.fulfill({ json: {
-    mac: { url: 'https://github.com/afonasev/bricks-war/releases/download/v1.1.1/Bricks-War-1.1.1-mac-universal.dmg' },
-    win: { url: 'https://github.com/afonasev/bricks-war/releases/download/v1.1.1/Bricks-War-1.1.1-win-x64.exe' },
+  await page.route('https://api.github.com/repos/afonasev/bricks-war/releases/latest', route => route.fulfill({ json: {
+    tag_name: 'v1.1.1', assets: ['mac-universal.dmg', 'win-x64.exe'].map(suffix => ({ name: `Bricks-War-1.1.1-${suffix}`, browser_download_url: `https://github.com/afonasev/bricks-war/releases/download/v1.1.1/Bricks-War-1.1.1-${suffix}` })),
   } }));
   await page.goto('/?muted=1');
   const download = page.getByRole('button', { name: 'Скачать игру для установки' });
@@ -39,8 +38,8 @@ test.describe('download and real PWA priority', () => {
     const server = await startClientUpdateServer();
     try {
       server.setRelease('A');
-      await page.route('**/desktop/latest.json', route => route.fulfill({ json: {
-        mac: { url: '/desktop/installers/current.dmg' }, win: { url: '/desktop/installers/current.exe' },
+      await page.route('https://api.github.com/repos/afonasev/bricks-war/releases/latest', route => route.fulfill({ json: {
+        tag_name: 'v1.13.0', assets: ['mac-universal.dmg', 'win-x64.exe'].map(suffix => ({ name: `Bricks-War-1.13.0-${suffix}`, browser_download_url: `https://github.com/afonasev/bricks-war/releases/download/v1.13.0/Bricks-War-1.13.0-${suffix}` })),
       } }));
       await page.goto(`${server.origin}/?muted=1`);
       await page.evaluate(async () => { await navigator.serviceWorker.ready; });
@@ -55,3 +54,31 @@ test.describe('download and real PWA priority', () => {
     } finally { await server.close(); }
   });
 });
+
+for (const failure of ['offline', 'rate-limit', 'stalled'] as const) {
+  test(`download survives unavailable VPS and GitHub API ${failure}`, async ({ page }) => {
+    let vpsRequests = 0;
+    await page.route('**/desktop/latest.json', route => { vpsRequests++; return route.abort(); });
+    await page.route('https://api.github.com/repos/afonasev/bricks-war/releases/latest', async route => {
+      if (failure === 'offline') return route.abort();
+      if (failure === 'rate-limit') return route.fulfill({ status: 403, json: { message: 'API rate limit exceeded' } });
+      // Keep discovery pending until the production timeout, then release this fixture.
+      await new Promise(resolve => setTimeout(resolve, 3500));
+      await route.abort().catch(() => {});
+    });
+    await page.addInitScript(() => localStorage.setItem('bricks-war:language:v1', 'en'));
+    await page.goto('/?muted=1');
+    const button = page.locator('.desktop-download');
+    await expect(button).toBeVisible();
+    await page.route('https://github.com/afonasev/bricks-war/releases/download/**', route => route.fulfill({ body: 'installer fixture', contentType: 'application/octet-stream', headers: { 'Content-Disposition': 'attachment' } }));
+    const downloaded = page.waitForEvent('download'); await button.click();
+    expect((await downloaded).url()).toContain('/v1.13.0/Bricks-War-1.13.0-');
+    expect(vpsRequests).toBe(0);
+    if (failure === 'offline') {
+      await page.screenshot({ path: 'evidence/download-without-vps/desktop.png' });
+      await page.setViewportSize({ width: 390, height: 844 });
+      await expect(button).toBeHidden();
+      await page.screenshot({ path: 'evidence/download-without-vps/phone.png' });
+    }
+  });
+}

@@ -58,8 +58,8 @@ test('post-health partial backup cleanup failure never rolls back the healthy ap
 test('coordinated shell preparation cannot advertise readiness until all content is verified',async t=>{
  const root=await mkdtemp(join(tmpdir(),'bricks-shell-deferred-'));t.after(()=>rm(root,{recursive:true,force:true}));
  const bytes=Buffer.from('signed installer fixture');
- const file={name:'Bricks-War-2.0.0-win-x64.exe',platform:'win32',arch:'x64',minimumOS:'10.0.0',size:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex')};
- const signed=envelope({contentAbi:3,files:[file]});const manifest=validateShell(signed,keys.publicKey,'win32','x64','1.0.0','10.0.0');
+ const file={name:'Bricks-War-2.0.0-win-x64.exe',protectedRollbackAbi:1,platform:'win32',arch:'x64',minimumOS:'10.0.0',size:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex')};
+ const signed=envelope({updaterAbi:2,contentAbi:3,files:[file]});const manifest=validateShell(signed,keys.publicKey,'win32','x64','1.0.0','10.0.0');
  const shell=new ShellUpdate({root,platform:'win32'});shell.selected={release:{tag_name:'v2.0.0'},manifest,envelope:signed};shell.bytes=async()=>bytes;
  const plan=await shell.prepare(()=>{},()=>{},{deferReady:true});
  assert.equal(shell.ready,undefined);await assert.rejects(readFile(join(root,'ready.json')),{code:'ENOENT'});
@@ -76,7 +76,18 @@ test('Windows helper launch permits only its process script and preserves spaced
  const helper='C:\\Users\\Game Player\\shell-helper.ps1',plan='C:\\Users\\Game Player\\apply.json';
  assert.deepEqual(shellHelperCommand('win32',helper,plan),['powershell.exe',['-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',helper,plan]]);
  const recovery=await readFile(new URL('../../electron/shell-helper.ps1',import.meta.url),'utf8');
- assert.match(recovery, /'-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File'/);
+ assert.doesNotMatch(recovery,/restore-shell\.ps1|Copy-Item|Start-Process powershell/);
+ assert.match(recovery,/ArgumentList @\('installer-restore'\)/);
+ assert.match(recovery,/Registry::HKEY_LOCAL_MACHINE/);
  assert.doesNotMatch(recovery,/Set-ExecutionPolicy/);
  assert.deepEqual(shellHelperCommand('darwin','/profile/helper.mjs','/profile/apply.json','/Applications/Bricks War.app/Contents/MacOS/Bricks War'),['/Applications/Bricks War.app/Contents/MacOS/Bricks War',['/profile/helper.mjs','/profile/apply.json']]);
+});
+
+
+test('Windows shell packages require a signed protected rollback capability',()=>{
+ const file={name:'Bricks-War-2.0.0-win-x64.exe',platform:'win32',arch:'x64',minimumOS:'10.0.0',size:100,sha256:'a'.repeat(64)};
+ assert.throws(()=>validateShell(envelope({updaterAbi:1,files:[{...file,protectedRollbackAbi:1}]}),keys.publicKey,'win32','x64','1.0.0','10.0.0'),/Incompatible shell/);
+ assert.equal(validateShell(envelope({updaterAbi:1,files:[file]}),keys.publicKey,'win32','x64','1.0.0','10.0.0',{activation:false}).updaterAbi,1);
+ assert.throws(()=>validateShell(envelope({updaterAbi:2,files:[file]}),keys.publicKey,'win32','x64','1.0.0','10.0.0'),/protected rollback/);
+ assert.equal(validateShell(envelope({updaterAbi:2,files:[{...file,protectedRollbackAbi:1}]}),keys.publicKey,'win32','x64','1.0.0','10.0.0').file.protectedRollbackAbi,1);
 });

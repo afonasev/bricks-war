@@ -1,3 +1,4 @@
+import { withInstallerDownloads } from './download-presentation.mjs';
 import { generateReleaseNotes } from './release-notes.mjs';
 import { execFileSync } from 'node:child_process';
 import { mkdtemp, mkdir, readFile, writeFile, rm, copyFile } from 'node:fs/promises';
@@ -31,7 +32,7 @@ if (!process.argv.includes('--publish')) {
   const releaseKey = await readFile('electron/content-public-key.pem','utf8');
   const releases = JSON.parse(gh('api','--paginate','--slurp',`repos/${CONTENT_REPOSITORY}/releases?per_page=100`)).flat();
   const transport = new ShellUpdate({gate:new TransferGate(),fetcher:fetch});
-  await requirePublishedShell(plan.manifest,releases,async tag=>JSON.parse(await transport.bytes(tag,'shell-manifest.json',512000)),releaseKey);
+  const installerTag = await requirePublishedShell(plan.manifest,releases,async tag=>JSON.parse(await transport.bytes(tag,'shell-manifest.json',512000)),releaseKey);
   const scratch = await mkdtemp(join(tmpdir(), 'bricks-github-content-'));
   try {
     const checkout = join(scratch, 'pages');
@@ -46,7 +47,7 @@ if (!process.argv.includes('--publish')) {
       if (old.sequence > plan.manifest.sequence || old.sequence === plan.manifest.sequence
         && JSON.stringify(previous) !== JSON.stringify(plan.envelope)) throw Error('Refusing discovery rollback or sequence reuse');
     }
-    const notes = await generateReleaseNotes(previous ? inspectManifest(previous,key).commit : undefined,plan.manifest.commit);
+    const notes = withInstallerDownloads(await generateReleaseNotes(previous ? inspectManifest(previous,key).commit : undefined,plan.manifest.commit), installerTag.slice(1));
     const find = async (tag, id) => {
       if (id) return JSON.parse(gh('api', `repos/${CONTENT_REPOSITORY}/releases/${id}`));
       // Listing a known endpoint distinguishes a missing release from authentication/network failure.
@@ -96,6 +97,7 @@ if (!process.argv.includes('--publish')) {
       await new Promise(resolve => setTimeout(resolve, 10_000));
     }
     if (!confirmed) throw Error('Pages pointer pushed; public readback pending. Retry the same prepared content; do not delete its release.');
+    gh('workflow', 'run', 'installer-downloads.yml', '--repo', CONTENT_REPOSITORY, '--ref', 'main', '-f', 'apply=true');
     console.log(`Published verified GitHub content ${plan.manifest.gameVersion}, sequence ${plan.manifest.sequence}`);
   } finally { await rm(scratch, { recursive: true, force: true }); }
 }

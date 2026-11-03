@@ -55,3 +55,15 @@ test('history forwards optional locale through the existing activity barrier wit
  const calls=[];const coordinator=new UpdateCoordinator({store:{manifest:{gameVersion:'1.0.0'}},gate:new TransferGate(),discover:async()=>{throw Error('must not discover');},history:async locale=>{calls.push(locale);return [];}});
  await coordinator.getHistory('ja');assert.deepEqual(calls,['ja']);await coordinator.setActivity(false);await assert.rejects(coordinator.getHistory('de'),/match/);assert.deepEqual(calls,['ja']);
 });
+
+test('confirmed recovery consumes failed candidate and cached readiness; pending transactions cannot be called recovered', async () => {
+  const f = fixture(); await f.coordinator.check();
+  f.store.ready = { gameVersion: '2.0.0' };
+  assert.throws(() => f.coordinator.completeRecovery(), /not confirmed/);
+  f.store.ready = null; f.coordinator.phase = 'ready';
+  f.coordinator.completeRecovery();
+  const state = await f.coordinator.check();
+  assert.equal(state.phase, 'idle'); assert.equal(state.available, false); assert.equal(state.version, undefined);
+  assert.equal(state.currentVersion, '1.0.0'); assert.equal(state.checkOutcome, 'recovered');
+  assert.deepEqual(f.counts(), { requests: 0, discovery: 1 });
+});

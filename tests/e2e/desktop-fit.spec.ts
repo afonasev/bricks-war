@@ -1,3 +1,4 @@
+import { openPreferencesCategory } from '../helpers/preferences';
 import { openLocalLobby } from '../helpers/localLobby';
 import { expect, test, type Page } from '@playwright/test';
 
@@ -100,8 +101,10 @@ for (const [width,height] of ([[1920,1080],[2560,1440],[1440,960],[1366,768],[12
       await page.locator('[data-lobby-back]').click();
     }
     await page.getByRole('button',{name:/^Настройки/}).click(); await expectDesktopFit(page);
+    await openPreferencesCategory(page,'controls');
     await page.getByRole('button',{name:/^Подробнее об управлении/}).click(); await expectDesktopFit(page);
     await page.locator('#controls-back').click();
+    await openPreferencesCategory(page,'more');
     await page.getByRole('button',{name:/^Лаборатория дизайна/}).click();
     const field = page.getByLabel('Предельное падение',{exact:true}); await field.fill('210');
     await expectDesktopFit(page);

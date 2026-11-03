@@ -94,11 +94,13 @@ export class ContentStore {
     return this.checking;
   }
   cancel() { this.downloadController?.abort(); }
-  async discardPrepared(sequence) {
+  async discardPrepared(sequence, { retryable = true } = {}) {
     if (this.state.pending !== `release-${sequence}`) return;
     const pending = this.state.pending; this.ready = null; this.state.pending = null;
     // An intentional cancellation may be offered again; a failed trial still may not.
-    this.state.cancelledSequence = sequence; await this.save();
+    if (retryable) this.state.cancelledSequence = sequence;
+    else delete this.state.cancelledSequence;
+    await this.save();
     if (pending && pending !== this.state.current && pending !== this.state.previous) await rm(join(this.root,pending),{recursive:true,force:true});
   }
   prepare(envelope, onBytes = () => {}, targetShell) {

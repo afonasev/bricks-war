@@ -1,3 +1,4 @@
+import { qaRunPaths } from './tools/qa-artifact-paths.mjs';
 import { defineConfig } from '@playwright/test';
 
 const rawPort = process.env.BRICKS_LOCAL_QA_PORT ?? '4187';
@@ -8,7 +9,10 @@ if (!/^[0-9]+$/.test(rawPort) || !Number.isInteger(localQaPort) || localQaPort <
 const origin = `http://127.0.0.1:${localQaPort}`;
 
 // Existing assertions, current source, one owned origin; no stale dist reuse.
+const qa = qaRunPaths('smoke');
 export default defineConfig({
+  outputDir: qa.artifacts,
+  reporter: [['list'], ['json', { outputFile: qa.report }]],
   testDir: './tests/e2e',
   testMatch: ['desktop-fit.spec.ts', 'mobile-release-parity.spec.ts'],
   grep: /(all desktop screens fit (1440x960|1280x480)|keeps the supported phone release flow touch-accessible|explains phone controls and omits desktop-only fullscreen settings)$/,

@@ -1,8 +1,12 @@
+import { qaRunPaths } from './tools/qa-artifact-paths.mjs';
 import { defineConfig } from '@playwright/test';
 
 const localQaPort = Number(process.env.BRICKS_LOCAL_QA_PORT ?? 4187);
 
+const qa = qaRunPaths('e2e');
 export default defineConfig({
+  outputDir: qa.artifacts,
+  reporter: [['list'], ['json', { outputFile: qa.report }]],
   testDir: './tests/e2e',
   workers: process.env.BRICKS_QA_WORKERS ? Number(process.env.BRICKS_QA_WORKERS) : undefined,
   use: {

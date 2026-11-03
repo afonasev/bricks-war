@@ -15,6 +15,18 @@ async function fillBattle(page: Page, count = 4): Promise<void> {
   }
 }
 
+// The affected arena scenarios enter through the current unified lobby.
+async function startAnnouncementBattle(page: Page, query: string, timed = false): Promise<void> {
+  await page.goto(`/${query}`);
+  await openLocalLobby(page, 'battle');
+  if (timed) await page.locator('#match-duration').click();
+  await page.locator('[data-bot]').first().click();
+  await page.locator('[data-level="easy"]').click();
+  await page.locator('#start-match').click();
+  await expect(page.locator('.match-loading')).toHaveCount(0);
+  await expect(page.locator('#countdown')).toBeHidden({ timeout: 6_000 });
+}
+
 async function chooseMenuOption(page: Page, label: string, option: string): Promise<void> {
   await page.getByRole('combobox', { name: label }).click();
   const list = page.getByRole('listbox', { name: label });
@@ -124,33 +136,24 @@ test('keeps shared team surfaces but personal names and non-numeric team cues', 
   expect(firstColor).not.toBe(secondColor);
 });
 
-test('uses a compact red current-sender caption and sword without resizing a field', async ({page}) => {
-  await resetAndOpen(page,'Битва','?muted=1&playtest-conflict=3');
-  await fillBattle(page);await page.getByLabel('Имя игрока 1').fill('Аня');
-  await page.getByRole('button',{name:'Start'}).click();
+test('keeps attack effects without a participant text plaque or field resize', async ({page}) => {
+  await startAnnouncementBattle(page,'?muted=1&playtest-conflict=3');
   const target=page.locator('.hud-card.is-conflict-target').first(),before=await target.boundingBox();
-  const notice=target.locator('.player-event-notice');
-  await expect(notice).toContainText('Аня');await expect(notice).toContainText('3');
-  await expect(notice.locator('strong .match-event-icon')).toHaveAttribute('data-icon','attack');
-  await expect(notice.locator('strong')).toHaveCSS('color','rgb(180, 42, 64)');
-  await expect(notice).toHaveCSS('background-color','rgba(0, 0, 0, 0)');
-  const caption=await notice.boundingBox();expect(caption!.y).toBeGreaterThan(before!.y+35);expect(caption!.width).toBeLessThan(before!.width);
+  await expect(target).toHaveAttribute('data-incoming-rows','3');
+  await expect(target.locator('.player-event-notice')).toHaveCount(0);
+  await expect(target.locator('.player-event-symbol .match-event-icon')).toHaveAttribute('data-icon','attack');
   expect(await target.boundingBox()).toEqual(before);
 });
 
 test('shows Final Push without anomaly copy in the timed global plaque without opening pause UI', async ({ page }) => {
-  await resetAndOpen(page, 'Битва', '?muted=1&playtest-global-combined');
-  await page.getByRole('combobox', { name: 'Длительность матча', exact: true }).click();
-  await page.getByRole('option', { name: /5 мин$/ }).click();
-  await expect(page.locator('#match-duration')).toHaveValue('5');
-  await fillBattle(page, 2);
-  await page.getByRole('button', { name: 'Start' }).click();
+  await startAnnouncementBattle(page, '?muted=1&playtest-global-combined', true);
 
   const plaque = page.locator('#arena-event-notice');
   await expect(plaque).toBeVisible({ timeout: 6_000 });
   await expect(plaque).toContainText('Финальный рывок');
   await expect(plaque).not.toContainText('Уровень');
-  await expect(plaque.locator('.match-event-icon')).toHaveAttribute('data-icon', 'pressure');
+  await expect(plaque.locator('.match-event-icon, small')).toHaveCount(0);
+  await expect(plaque).toHaveText('Финальный рывок');
   await expect(page.locator('#pause-overlay')).toBeHidden();
   const clock = await page.locator('#match-clock').textContent();
   await page.waitForTimeout(300);
@@ -158,17 +161,16 @@ test('shows Final Push without anomaly copy in the timed global plaque without o
 });
 
 test.describe('reduced-motion match events', () => {
-  test('keeps event scope, icon, color, and copy while removing travel animation', async ({ page }) => {
+  test('keeps attack scope and icon without participant text or travel animation', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
-    await resetAndOpen(page, 'Битва', '?muted=1&playtest-conflict=3');
-    await fillBattle(page, 2);
-    await page.getByRole('button', { name: 'Start' }).click();
-    const notice = page.locator('.player-event-notice').first();
-    await expect(notice).toBeVisible();
-    await expect(notice).toContainText('3');
-    await expect(notice.locator('strong .match-event-icon')).toHaveAttribute('data-icon', 'attack');
-    await expect(notice).toHaveCSS('animation-name', 'none');
-    await expect(notice).toHaveCSS('opacity', '1');
+    await startAnnouncementBattle(page, '?muted=1&playtest-conflict=3');
+    const target = page.locator('.hud-card.is-conflict-target').first();
+    await expect(target).toHaveAttribute('data-incoming-rows', '3');
+    await expect(target.locator('.player-event-notice')).toHaveCount(0);
+    const symbol = target.locator('.player-event-symbol');
+    await expect(symbol.locator('.match-event-icon')).toHaveAttribute('data-icon', 'attack');
+    await expect(symbol).toHaveCSS('animation-name', 'none');
+    await expect(symbol).toHaveCSS('opacity', '0.17');
   });
 });
 
@@ -325,22 +327,21 @@ test('retains board geometry without overflow at wide and narrow supported viewp
 for (const viewport of [{width: 1440, height: 960}, {width: 390, height: 844}]) {
   test(`attack notice and frame end with the three-second warning at ${viewport.width}`, async ({page}) => {
     await page.setViewportSize(viewport);
-    await resetAndOpen(page, 'Битва', '?muted=1&playtest-conflict=3&playtest-conflict-timed');
-    await page.getByRole('button', {name: /^Start/}).click();
+    await startAnnouncementBattle(page, '?muted=1&playtest-conflict=3&playtest-conflict-timed');
     const target = page.locator('.hud-card.is-conflict-target').first();
     await expect(target).toBeVisible();
     await expect(target).toHaveAttribute('data-event-kind', 'incoming-attack');
     await expect(page.locator('#countdown')).toBeHidden();
     await expect(page.locator('#arena-event-notice')).toBeHidden();
     const recipient = page.locator('.hud-card').first();
-    await expect(recipient.locator('.player-event-notice')).toHaveCSS('opacity', '1');
-    await expect(recipient.locator('.player-event-notice')).toHaveCSS('animation-name', 'none');
-    await page.screenshot({path: `evidence/increase-attack-defense-window/warning-${viewport.width}.png`});
+    await expect(recipient.locator('.player-event-notice')).toHaveCount(0);
+    await expect(recipient.locator('.player-event-symbol .match-event-icon')).toHaveAttribute('data-icon', 'attack');
+    await page.screenshot({path: `evidence/match-announcements/warning-${viewport.width}.png`});
     await expect(recipient).not.toHaveClass(/is-conflict-target/, {timeout: 8_000});
     await expect(recipient).not.toHaveAttribute('data-event-kind', 'incoming-attack');
     await expect(recipient).not.toHaveCSS('border-color', 'rgb(201, 71, 97)');
     expect(await recipient.evaluate(el => getComputedStyle(el, '::after').borderColor)).toBe('rgba(0, 0, 0, 0)');
-    await page.screenshot({path: `evidence/increase-attack-defense-window/after-${viewport.width}.png`});
+    await page.screenshot({path: `evidence/match-announcements/after-${viewport.width}.png`});
   });
 }
 

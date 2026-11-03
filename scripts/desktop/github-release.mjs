@@ -1,3 +1,4 @@
+import { withInstallerDownloads } from './download-presentation.mjs';
 import { sign, createPublicKey } from 'node:crypto';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -40,7 +41,7 @@ let release = published.find(release => release.tag_name === tag);
 const previous = published.filter(r=>!r.draft && !r.prerelease && /^v\d+\.\d+\.\d+$/.test(r.tag_name) && r.tag_name !== tag).sort((a,b)=>new Date(b.published_at)-new Date(a.published_at))[0];
 let previousSource;
 if (previous) previousSource = Buffer.from(gh(['api',`repos/${repo}/contents/SOURCE_REVISION?ref=${encodeURIComponent(previous.tag_name)}`,'--jq','.content']),'base64').toString().trim();
-const notes = await generateReleaseNotes(previousSource);
+const notes = withInstallerDownloads(await generateReleaseNotes(previousSource), version);
 
 if (!release) {
   const request = 'build/github-native-release-request.json';
@@ -67,4 +68,5 @@ for (const file of Object.values(catalog)) {
   if (!response.ok) throw Error('Public GitHub download unavailable; VPS untouched');
 }
 await writeFile('build/github-catalog.json', JSON.stringify(catalog, null, 2) + '\n');
+gh(['workflow', 'run', 'installer-downloads.yml', '--repo', repo, '--ref', 'main', '-f', 'apply=true']);
 console.log(JSON.stringify({ tag, url: release.html_url, hashes: Object.fromEntries(hashes), catalog }, null, 2));

@@ -16,18 +16,18 @@ async function pendingRoom() {
   return {service,links,room,credentials,prepared,advance};
 }
 
-describe('shared one-second ready start',()=>{
+describe('shared two-second ready start',()=>{
   it('waits for every rendered arena without charging loading time, then starts once',async()=>{
     const f=await pendingRoom(),engine=f.room.engine!;
     const initial=structuredClone(engine.state.participants);
     f.prepared(0);f.advance(2_000);f.prepared(1);f.advance(2_000);
-    expect(engine.state.countdownMs).toBe(1_000);expect(engine.state.elapsedMs).toBe(0);
+    expect(engine.state.countdownMs).toBe(2_000);expect(engine.state.elapsedMs).toBe(0);
     expect(engine.state.participants).toEqual(initial);expect(f.room.tick).toBe(0);
     expect(f.service.snapshot(f.room,f.links[0]!.seat).preparing).toEqual([f.links[2]!.seat.id]);
     expect(()=>f.prepared(2,'stale-match')).toThrow();expect(f.room.preparing.size).toBe(1);
     f.prepared(2);f.advance(500);const remaining=engine.state.countdownMs;
     f.prepared(2);expect(engine.state.countdownMs).toBe(remaining);
-    f.advance(490);expect(engine.state.phase).toBe('countdown');
+    f.advance(1_490);expect(engine.state.phase).toBe('countdown');
     f.advance(30);expect(engine.state.phase).toBe('playing');
   });
   it('preserves manual pause and connection recovery while arenas prepare',async()=>{
@@ -36,19 +36,19 @@ describe('shared one-second ready start',()=>{
     f.advance(2_000);f.prepared(2);expect(f.room.engine!.state.phase).toBe('paused');
     f.service.disconnect(f.room,guest.seat,guest.epoch);
     f.service.command(f.room,host.seat,host.epoch,{type:'resume'});f.advance(1_000);
-    expect(f.room.engine!.state.countdownMs).toBe(1_000);expect(f.room.engine!.state.phase).toBe('paused');
+    expect(f.room.engine!.state.countdownMs).toBe(2_000);expect(f.room.engine!.state.phase).toBe('paused');
     const returned=f.service.connect(f.credentials[2]!,PROTOCOL_VERSION,RULES_VERSION);
     f.service.command(f.room,returned.seat,returned.epoch,{type:'ack',revision:f.room.revision,visible:true});
-    f.advance(500);expect(f.room.engine!.state.countdownMs).toBeGreaterThan(450);
-    expect(f.room.engine!.state.countdownMs).toBeLessThanOrEqual(500 + FIXED_STEP_MS + 1e-8);
-    f.advance(520);expect(f.room.engine!.state.phase).toBe('playing');
+    f.advance(500);expect(f.room.engine!.state.countdownMs).toBeGreaterThan(1_450);
+    expect(f.room.engine!.state.countdownMs).toBeLessThanOrEqual(1_500 + FIXED_STEP_MS + 1e-8);
+    f.advance(1_520);expect(f.room.engine!.state.phase).toBe('playing');
   });
   it('removes only a timed-out unprepared participant instead of blocking forever',async()=>{
     const f=await pendingRoom();f.prepared(0);f.prepared(1);
     f.advance(ARENA_PREPARATION_TIMEOUT_MS-10);expect(f.links[2]!.seat.retained).toBe(true);
     f.advance(10);expect(f.links[2]!.seat.retained).toBe(false);
     expect(f.links.slice(0,2).every(l=>l.seat.retained)).toBe(true);expect(f.room.preparing.size).toBe(0);
-    f.advance(1_020);expect(f.room.engine!.state.phase).toBe('playing');
+    f.advance(2_020);expect(f.room.engine!.state.phase).toBe('playing');
   });
   it('does not shorten an absence return window when preparation times out',async()=>{
     const f=await pendingRoom();f.prepared(0);f.prepared(1);f.advance(25_000);
@@ -56,9 +56,9 @@ describe('shared one-second ready start',()=>{
     f.advance(10_000);expect(guest.seat.retained).toBe(true);expect(guest.seat.absence!.deadline).toBe(55_000);
     const returned=f.service.connect(f.credentials[2]!,PROTOCOL_VERSION,RULES_VERSION);
     f.service.command(f.room,returned.seat,returned.epoch,{type:'ack',revision:f.room.revision,visible:true});
-    f.advance(1_000);expect(guest.seat.retained).toBe(true);expect(f.room.engine!.state.countdownMs).toBe(1_000);
+    f.advance(1_000);expect(guest.seat.retained).toBe(true);expect(f.room.engine!.state.countdownMs).toBe(2_000);
     f.service.command(f.room,returned.seat,returned.epoch,{type:'arena-prepared',matchId:f.room.matchId!});
-    f.advance(1_020);expect(f.room.engine!.state.phase).toBe('playing');
+    f.advance(2_020);expect(f.room.engine!.state.phase).toBe('playing');
   });
   it('rejects clients from the former start contract at connection',async()=>{
     const f=await pendingRoom();

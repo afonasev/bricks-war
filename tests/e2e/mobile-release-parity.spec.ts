@@ -1,3 +1,4 @@
+import { openPreferencesCategory } from '../helpers/preferences';
 import { openLocalLobby } from '../helpers/localLobby';
 import { expect, test } from '@playwright/test';
 
@@ -91,6 +92,7 @@ test('keeps the supported phone release flow touch-accessible', async ({ page })
 test('explains phone controls and omits desktop-only fullscreen settings', async ({ page }) => {
   await page.getByRole('button', { name: /^Настройки/ }).click();
   await expect(page.getByRole('button', { name: /Полноэкранный режим/ })).toHaveCount(0);
+  await openPreferencesCategory(page,'controls');
   await expect(page.locator('#open-controls')).toBeVisible();
   await page.locator('#open-controls').click();
   await expect(page.locator('[data-phone-controls-help]')).toBeVisible();
@@ -99,6 +101,7 @@ test('explains phone controls and omits desktop-only fullscreen settings', async
   await expect(page.locator('.phone-controls-pause')).toContainText('Нажмите кнопку паузы в матче.');
   await page.locator('#controls-back').click();
   await expect(page.locator('[data-screen="settings"]')).toBeVisible();
+  await openPreferencesCategory(page,'controls');
   await expect(page.locator('#open-controls')).toBeVisible();
   await expect(page.locator('.mobile-controls-reference')).toHaveCount(0);
 });

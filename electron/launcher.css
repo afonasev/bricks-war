@@ -1,0 +1,22 @@
+:root { color-scheme: light; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #252b36; background: white; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+main { padding: 22px 26px 26px; min-height: 100vh; display: flex; flex-direction: column; }
+.brand { font-size: 13px; font-weight: 650; color: #555e6e; margin-bottom: 23px; }
+h1 { font-size: 25px; line-height: 1.2; margin: 0 0 18px; letter-spacing: -.4px; }
+p { margin: 0; line-height: 1.45; font-size: 15px; overflow-wrap: anywhere; }
+#description { min-height: 44px; }
+#transfer { margin-top: 15px; }
+progress { appearance: none; width: 100%; height: 8px; border: 0; border-radius: 8px; background: #e7eaf0; }
+progress::-webkit-progress-bar { background: #e7eaf0; border-radius: 8px; }
+progress::-webkit-progress-value { background: #3767d4; border-radius: 8px; }
+#percent { color: #555e6e; font-size: 13px; margin-top: 5px; }
+footer { margin-top: auto; padding-top: 24px; }
+#hint { color: #737781; font-size: 12px; margin-bottom: 16px; }
+#actions { display: flex; justify-content: flex-end; gap: 12px; flex-wrap: wrap; }
+button { border: 0; border-radius: 8px; background: #eceef3; color: #252b36; padding: 12px 18px; min-height: 44px; font: inherit; font-size: 14px; font-weight: 650; cursor: pointer; }
+button.primary { color: white; background: #3767d4; }
+button:focus-visible, button.controller-focus { outline: 2px solid #9a77d2; outline-offset: 4px; }
+button:disabled { opacity: .6; cursor: default; }
+button.link { background: transparent; color: #285bc5; text-decoration: underline; font-weight: 500; padding: 8px 0; margin-top: 4px; align-self: flex-start; min-height: 36px; }
+@media (max-width: 440px) { main { padding: 20px; } h1 { font-size: 23px; } #actions { gap: 10px; } button { flex: 1 1 auto; padding: 12px; } }

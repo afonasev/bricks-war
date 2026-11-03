@@ -15,7 +15,6 @@ Installer version: **1.13.0**. The installed game receives newer game content th
 Browser and desktop block-puzzle arena with local and network play, human players and AI opponents.
 
 - Play: https://bricks.afonasev.tech/
-- Installers: https://github.com/afonasev/bricks-war/releases/latest
 - [Quick start in seven languages](docs/player-guide.md)
 - [Credits and asset provenance](docs/credits.md)
 

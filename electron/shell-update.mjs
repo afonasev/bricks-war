@@ -1,4 +1,5 @@
 import {failedShellVersions,recordShellFailure} from './shell-helper.mjs';
+import { abortable } from './abortable.mjs';
 import os from 'node:os';
 import { verify, createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile, rm, statfs } from 'node:fs/promises';
@@ -9,17 +10,18 @@ import { compareVersions } from './github-updates.mjs';
 import { CONTENT_REPOSITORY } from './update-source.mjs';
 
 const exec = promisify(execFile);
-export function validateShell(envelope, key, platform, arch, version, systemVersion = process.getSystemVersion?.() ?? os.release()) {
+export function validateShell(envelope, key, platform, arch, version, systemVersion = process.getSystemVersion?.() ?? os.release(), { activation = true } = {}) {
   if (typeof envelope?.payload !== 'string' || envelope.payload.length > 512000 || typeof envelope.signature !== 'string'
     || !verify(null,Buffer.from(envelope.payload),key,Buffer.from(envelope.signature,'base64'))) throw Error('Invalid shell signature');
   const manifest = JSON.parse(envelope.payload);
   if (manifest.contentAbi !== undefined && (!Number.isSafeInteger(manifest.contentAbi) || manifest.contentAbi < 1)) throw Error('Invalid shell content ABI');
   if (manifest.contentAbi >= 3 && (!Number.isSafeInteger(manifest.contentSequence) || manifest.contentSequence < 1)) throw Error('Invalid bundled content identity');
   if (manifest.schema !== 1 || manifest.game !== 'bricks-war' || manifest.component !== 'shell' || manifest.channel !== 'stable'
-    || compareVersions(manifest.version,version) <= 0 || manifest.updaterAbi !== 1 || !Array.isArray(manifest.files)) throw Object.assign(Error('Incompatible shell update'),{code:'INCOMPATIBLE'});
+    || compareVersions(manifest.version,version) <= 0 || !(platform === 'win32' && activation ? manifest.updaterAbi === 2 : [1,2].includes(manifest.updaterAbi)) || !Array.isArray(manifest.files)) throw Object.assign(Error('Incompatible shell update'),{code:'INCOMPATIBLE'});
   const file = manifest.files.find(f => f.platform === platform && (f.arch === arch || f.arch === 'universal'));
   if (!file || (file.minimumOS && compareVersions(systemVersion.split('.').concat(['0','0']).slice(0,3).join('.'),file.minimumOS) < 0) || !/^[a-zA-Z0-9_.-]+\.(zip|exe)$/.test(file.name) || !/^[a-f0-9]{64}$/.test(file.sha256)
     || !/^\d+\.\d+\.\d+$/.test(file.minimumOS ?? '') || !Number.isSafeInteger(file.size) || file.size < 1 || file.size > 1024*1024*1024) throw Object.assign(Error('No compatible shell package'),{code:'INCOMPATIBLE'});
+  if (activation && platform === 'win32' && file.protectedRollbackAbi !== 1) throw Object.assign(Error('Windows package lacks protected rollback'),{code:'INCOMPATIBLE'});
   return { ...manifest, file };
 }
 
@@ -42,36 +44,45 @@ export class ShellUpdate {
       let url = origin;
       const combined = signal ? AbortSignal.any([signal,activitySignal,AbortSignal.timeout(120000)]) : AbortSignal.any([activitySignal,AbortSignal.timeout(30000)]);
       for (let hop = 0; hop <= 5; hop++) {
-        const response = await this.fetcher(url,{signal:combined,redirect:'manual'});
+        combined.throwIfAborted();
+        const response = await abortable(() => this.fetcher(url,{signal:combined,redirect:'manual'}), combined);
         if ([301,302,303,307,308].includes(response.status)) {
-          const location = response.headers.get('location'); await response.body?.cancel();
+          const location = response.headers.get('location'); await abortable(() => response.body?.cancel(), combined);
           const next = new URL(location ?? '',url);
           if (!location || hop === 5 || next.protocol !== 'https:' || next.username || next.password || next.port
             || !['release-assets.githubusercontent.com','objects.githubusercontent.com'].includes(next.hostname)) throw Error('Untrusted shell redirect');
           url = next.href; continue;
         }
-        if (!response.ok || !response.body) { await response.body?.cancel(); throw Error('Shell package unavailable'); }
-        if (Number(response.headers.get('content-length') ?? 0) > limit) { await response.body.cancel(); throw Error('Oversized shell package'); }
+        if (!response.ok || !response.body) { await abortable(() => response.body?.cancel(), combined); throw Error('Shell package unavailable'); }
+        if (Number(response.headers.get('content-length') ?? 0) > limit) { await abortable(() => response.body.cancel(), combined); throw Error('Oversized shell package'); }
         const chunks = []; let size = 0; const reader = response.body.getReader();
-        try { for (;;) { const {value,done} = await reader.read(); if (done) break; size += value.length; if (size > limit) throw Error('Oversized shell package'); chunks.push(Buffer.from(value)); this.progress?.(limit ? size/limit*100 : 0); } }
-        finally { await reader.cancel(); }
+        try { for (;;) { const {value,done} = await abortable(() => reader.read(), combined); combined.throwIfAborted(); if (done) break; size += value.length; if (size > limit) throw Error('Oversized shell package'); chunks.push(Buffer.from(value)); this.progress?.(limit ? size/limit*100 : 0); } }
+        finally { const cancelled = reader.cancel(); cancelled.catch(() => {}); if (!combined.aborted) await abortable(() => cancelled, combined); }
+        combined.throwIfAborted();
         return Buffer.concat(chunks);
       }
       throw Error('Shell download redirect limit');
     },signal);
   }
-  async discover(releases) {
+  async discover(releases, options = {}) {
+    const active = () => { options.signal?.throwIfAborted(); options.assertActive?.(); };
+    active();
     if (!['darwin','win32'].includes(this.platform)) return null;
     const blocked=await failedShellVersions(this.root);
+    active();
     const candidates = releases.filter(r => /^v\d+\.\d+\.\d+$/.test(r.tag_name) && r.assets?.some(a => a.name === 'shell-manifest.json'));
     candidates.sort((a,b) => compareVersions(b.tag_name.slice(1),a.tag_name.slice(1)));
     for (const release of candidates) {
       if (compareVersions(release.tag_name.slice(1),this.version) <= 0 || blocked.includes(release.tag_name.slice(1))) continue;
-      const envelope = JSON.parse(await this.bytes(release.tag_name,'shell-manifest.json',512000));
+      active();
+      const bytes = await this.bytes(release.tag_name,'shell-manifest.json',512000,options.signal);
+      active();
+      const envelope = JSON.parse(bytes);
       let manifest;try{manifest=validateShell(envelope,this.publicKey,this.platform,this.arch,this.version);}catch(error){if(error.code==='INCOMPATIBLE')continue;throw error;}
       if (manifest.version !== release.tag_name.slice(1) || !release.assets.some(a => a.name === manifest.file.name && a.size === manifest.file.size && a.digest === `sha256:${manifest.file.sha256}`)) continue;
+      active();
       this.selected = { release,manifest,envelope };
-      return { component:'shell',requiresShell:true,manifest:{gameVersion:manifest.version}, compatibility:{abi:manifest.contentAbi ?? 2,version:manifest.version,bundledSequence:manifest.contentSequence},
+      return { component:'shell',tag:release.tag_name,requiresShell:true,manifest:{gameVersion:manifest.version}, compatibility:{abi:manifest.contentAbi ?? 2,version:manifest.version,bundledSequence:manifest.contentSequence},
         prepare: (progress,phase,options) => this.prepare(progress,phase,options), commit:plan=>this.commitPrepared(plan),
         cancel:() => this.controller?.abort(),discard:async()=>{ this.ready=null; await rm(join(this.root,'ready.json'),{force:true}); } };
     }

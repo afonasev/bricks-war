@@ -1,3 +1,4 @@
+import { graphicTitleMarkup } from './readyPresentation';
 import { nearestAttackWarning } from '../simulation/attackQueue';
 import { translate, type Locale } from '../i18n/locale';
 import { DEFAULT_GAME_TUNING } from '../domain/gameTuning';
@@ -88,7 +89,6 @@ export function globalMatchEvent(
       detail,
     );
   }
-  if (state.roundStartPulseMs > 0) return descriptor('round-start', 'global', localizedDefaultMessage(messages, 'roundStart', locale));
   return null;
 }
 
@@ -157,6 +157,9 @@ export function matchEventPlaqueMarkup(
   event: MatchEventDescriptor,
   titleMarkup = escapeMatchEventHtml(event.title),
 ): string {
+  if (event.kind === 'final-push') {
+    return graphicTitleMarkup(event.title);
+  }
   if(event.kind==='incoming-attack') titleMarkup=titleMarkup.replace('⚔',matchEventIconMarkup('attack'));
   return `<span class="match-event-icon-tile" aria-hidden="true">${matchEventIconMarkup(event.icon)}</span><span class="match-event-copy"><strong>${titleMarkup}</strong>${event.detail ? `<small>${escapeMatchEventHtml(event.detail)}</small>` : ''}</span>`;
 }

@@ -1,5 +1,9 @@
+import { qaRunPaths } from './tools/qa-artifact-paths.mjs';
 import { defineConfig } from '@playwright/test';
+const qa = qaRunPaths('desktop-update');
 export default defineConfig({
+  outputDir: qa.artifacts,
+  reporter: [['list'], ['json', { outputFile: qa.report }]],
   testDir: './tests/e2e',
   testMatch: 'desktop-update.spec.ts',
   workers: 1,

@@ -638,20 +638,21 @@ kbd { min-width: 28px; padding: 6px 7px; border: 1px solid var(--line); border-b
   place-items: center;
   pointer-events: none;
   transition: background .18s ease;
+  container-type: inline-size;
 }
 .arena-event-layer.is-active { background: radial-gradient(circle at center, rgba(164, 116, 214, .15), transparent 43%); }
 .arena-event-notice {
-  width: min(42vw, 640px);
-  max-width: calc(100% - 36px);
-  min-height: 92px;
-  padding: 14px 20px 14px 14px;
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  width: min(94%, 1120px);
+  max-width: calc(100% - 24px);
+  padding: 12px;
+  text-align: center;
   animation: arena-event-plaque var(--event-duration, 1100ms) ease-out both;
 }
-.arena-event-notice .match-event-icon-tile { width: 66px; height: 66px; border-radius: 17px; }
-.arena-event-notice .match-event-icon { width: 38px; height: 38px; }
-.arena-event-notice .match-event-copy { gap: 5px; }
-.arena-event-notice .match-event-copy strong { font-size: clamp(1.05rem, 2vw, 1.7rem); }
-.arena-event-notice .match-event-copy small { font-size: clamp(.68rem, 1vw, .88rem); }
+.arena-event-notice .ready-title { font-size: clamp(1.35rem, 6.5cqw, 5.4rem); }
+.arena-event-notice .ready-label { line-height: 1.45; white-space: normal; overflow-wrap: anywhere; text-wrap: balance; }
 @keyframes arena-event-plaque {
   0% { opacity: 0; transform: translateY(-10px) scale(.95); }
   13%, 78% { opacity: 1; transform: translateY(0) scale(1); }
@@ -683,7 +684,6 @@ kbd { min-width: 28px; padding: 6px 7px; border: 1px solid var(--line); border-b
   .shield-inventory { right: 80px; gap: 3px; }
   .shield-slot, .shield-slot svg { width: 26px; height: 30px; }
   .shield-slot i { left: 4px; width: 18px; }
-  .arena-event-notice { width: min(52vw, 560px); }
   .player-event-notice { max-width: calc(100% - 12px); }
   .player-event-notice .match-event-copy strong { font-size: .72rem; }
   .player-event-notice .match-event-copy small { font-size: .56rem; }
@@ -696,11 +696,6 @@ kbd { min-width: 28px; padding: 6px 7px; border: 1px solid var(--line); border-b
   .premium-surface:not(.main-menu-screen) .release-heading > div { flex: 1 1 210px; }
   .premium-surface:not(.main-menu-screen) .release-heading h1 { font-size: clamp(2.55rem, 13vw, 3.5rem); }
   .mode-setup-screen .mode-setup-content, .mode-setup-screen .mode-settings, .mode-setup-screen .setup-error { width: calc(100% - 32px); }
-  .arena-event-notice { width: min(72vw, 460px); min-height: 76px; padding: 10px 14px 10px 10px; gap: 9px; }
-  .arena-event-notice .match-event-icon-tile { width: 54px; height: 54px; border-radius: 14px; }
-  .arena-event-notice .match-event-icon { width: 31px; height: 31px; }
-  .arena-event-notice .match-event-copy strong { font-size: clamp(.88rem, 3vw, 1.2rem); }
-  .arena-event-notice .match-event-copy small { font-size: clamp(.6rem, 2vw, .74rem); }
   .player-event-notice { min-height: 48px; gap: 7px; padding: 6px 8px 6px 6px; }
   .player-event-notice .match-event-icon-tile { width: 34px; height: 34px; border-radius: 9px; }
   .player-event-notice .match-event-icon { width: 20px; height: 20px; }

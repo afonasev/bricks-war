@@ -103,11 +103,18 @@ def check_browser_port(port):
                              'Do not stop or reuse a foreign server.') from error
 
 
+def artifact_parent():
+    home = os.environ.get('BRICKS_QA_HOME') or str(
+        Path(os.environ.get('XDG_STATE_HOME', str(Path.home() / '.local/state'))) / 'bricks-war/qa')
+    key = hashlib.sha256(str(ROOT.resolve()).encode()).hexdigest()[:12]
+    return Path(home).expanduser().resolve() / f'{ROOT.name}-{key}' / 'qa'
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('route', choices=['unit-ui', 'ui', 'focused', 'full'])
     parser.add_argument('--reason', required=True, help='Behavior, dependencies and why this scope is sufficient')
-    parser.add_argument('--output', default='test-results/qa', help='Parent directory; every run creates a unique child')
+    parser.add_argument('--output', default=str(artifact_parent()), help='External parent (BRICKS_QA_HOME); every run creates a unique child')
     parser.add_argument('files', nargs='*', help='focused: explicit tests/*.test.ts; not an integration gate alone')
     args = parser.parse_intermixed_args()
     files = args.files if args.route == 'focused' else (sorted(str(p.relative_to(ROOT)) for p in (ROOT / 'tests').rglob('*.test.ts')) if args.route == 'full' else UI_FILES)
@@ -150,7 +157,8 @@ def main():
         if args.route in ['ui', 'full']:
             report_path = directory / 'browser.json'
             env = {**os.environ, 'BRICKS_LOCAL_QA_PORT': str(port),
-                   'PLAYWRIGHT_JSON_OUTPUT_FILE': str(report_path)}
+                   'PLAYWRIGHT_JSON_OUTPUT_FILE': str(report_path),
+                   'BRICKS_QA_HOME': str(directory / 'browser-output')}
             config = 'playwright.smoke.config.ts' if args.route == 'ui' else 'playwright.config.ts'
             cmd = ['node', 'node_modules/@playwright/test/cli.js', 'test', '-c', config, '--reporter=list,json']
             check = run_command(cmd, directory, 'browser', env); state['checks'].append(check)

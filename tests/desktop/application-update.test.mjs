@@ -78,3 +78,17 @@ test('a newer shell cannot downgrade capabilities needed by the installed game',
  const f=await fixture(t);f.source.store.manifest={...f.store.manifest,gameVersion:'3.0.0',minShellVersion:4};
  f.shellCandidate.compatibility.abi=3;assert.equal(await f.source.discover(),null);
 });
+
+test('launcher content activation updates real store and consumes both snapshot and cached check offer', async t => {
+ const {StartupLauncherSession}=await import('../../electron/startup-launcher.mjs');
+ const f=await fixture(t);f.store.shellVersion=3;f.store.shellRelease='2.0.0';
+ let launches=0,offers=0;
+ const session=new StartupLauncherSession({coordinator:f.coordinator,
+  ui:{offer:async state=>{offers++;assert.equal(state.version,'2.0.0');return 'update';},progress:async()=>{},installing:async()=>{},failure:async()=>{throw Error('unexpected failure');},close:async()=>{}},
+  activate:async()=>({activated:await f.store.activate()}),recoverWorking:async()=>false,quit:async()=>{throw Error('unexpected quit');},
+  launchGame:async()=>{launches++;assert.equal(f.store.manifest.gameVersion,'2.0.0');}});
+ assert.equal(await session.run(),'play');assert.equal(launches,1);assert.equal(offers,1);
+ assert.equal(f.store.ready,null);assert.equal(f.store.state.pending,null);
+ for(const state of [f.coordinator.snapshot(),await f.coordinator.check()]){assert.equal(state.currentVersion,'2.0.0');assert.equal(state.phase,'idle');assert.equal(state.available,false);assert.equal(state.version,undefined);assert.equal(state.checkOutcome,'installed');}
+ assert.equal(f.events.filter(event=>event==='content').length,1);
+});

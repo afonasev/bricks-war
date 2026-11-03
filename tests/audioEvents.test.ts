@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { AudioEventTracker, gameTempo } from '../src/audio/audioEvents';
 import type { ParticipantConfig } from '../src/domain/types';
 import { generateAnomaly } from '../src/simulation/anomaly';
-import { MatchEngine } from '../src/simulation/match';
+import { COUNTDOWN_MS, MatchEngine } from '../src/simulation/match';
 
 const configs: ParticipantConfig[] = [
   { id: 'p1', label: 'Игрок 1', controller: 'human-1' },
@@ -161,7 +161,7 @@ it('plays one network start cue and keeps reconnect baselines silent', () => {
   audio.syncNetworkAnomalies(engine.state, true);
   audio.syncNetworkAnomalies(engine.state);
   expect(play).not.toHaveBeenCalled();
-  engine.step(1_000);
+  engine.step(COUNTDOWN_MS);
   audio.syncNetworkAnomalies(engine.state);
   audio.syncNetworkAnomalies(engine.state);
   expect(play).toHaveBeenCalledExactlyOnceWith({type:'round-start'});

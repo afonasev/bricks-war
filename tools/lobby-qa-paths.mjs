@@ -1,3 +1,4 @@
+import { qaArtifactRoot } from './qa-artifact-paths.mjs';
 import { mkdirSync, mkdtempSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 
@@ -6,7 +7,7 @@ export function lobbyQaPaths(env = process.env, cwd = process.cwd()) {
   if (env.TEST_WORKER_INDEX !== undefined && env.BRICKS_LOBBY_QA_PATHS) {
     return JSON.parse(env.BRICKS_LOBBY_QA_PATHS);
   }
-  const parent = resolve(cwd, env.BRICKS_LOBBY_OUTPUT ?? 'test-results/lobby');
+  const parent = resolve(cwd, env.BRICKS_LOBBY_OUTPUT ?? join(qaArtifactRoot(env, cwd), 'lobby'));
   mkdirSync(parent, { recursive: true });
   const runDir = mkdtempSync(join(parent, new Date().toISOString().replace(/[:.]/g, '-') + '-'));
   const runId = basename(runDir);

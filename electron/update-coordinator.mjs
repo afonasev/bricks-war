@@ -26,9 +26,12 @@ export class TransferGate {
   }
 }
 
+export const STARTUP_DISCOVERY_BUDGET_MS = 3_000;
+
 export class UpdateCoordinator {
-  constructor({ store, discover, gate, history, readyShell = () => null }) {
-    Object.assign(this, { store, discover, gate, history, readyShell });
+  constructor({ store, discover, gate, history, readyShell = () => null,
+    clock = { now: () => performance.now(), setTimeout, clearTimeout } }) {
+    Object.assign(this, { store, discover, gate, history, readyShell, clock });
     this.startupError = Boolean(store.recovered);
     this.phase = (store.ready || readyShell()) ? 'ready' : this.startupError ? 'install-error' : 'idle'; this.progress = 0;
     const previousProgress=store.onProgress; store.onProgress=phase=>{previousProgress?.(phase);if(phase==='verifying'&&this.consented)this.phase='verifying';};
@@ -36,23 +39,97 @@ export class UpdateCoordinator {
   }
   snapshot() {
     return { available: this.available, applying: false, error: this.phase.endsWith('error'), phase: this.phase,
-      progress: this.progress, version: this.candidate?.manifest?.gameVersion ?? this.readyShell()?.version ?? this.store.ready?.gameVersion,
+      progress: this.progress, version: this.candidate?.manifest?.gameVersion ?? this.store.ready?.gameVersion ?? this.readyShell()?.version,
       requiresShell: this.candidate?.requiresShell ?? Boolean(this.readyShell()),
-      currentVersion: this.store.manifest.gameVersion, shellVersion: this.shellVersion, component: this.candidate?.component ?? 'content' };
+      currentVersion: this.store.manifest.gameVersion, shellVersion: this.shellVersion, component: this.candidate?.component ?? 'content',
+      checkOutcome: this.checkOutcome };
   }
-  check() {
+  check({ signal } = {}) {
     if (this.discovery) return this.discovery;
-    this.discovery = (async () => {
-      if (!this.store.ready && !this.readyShell()) this.phase = 'checking';
-      try {
-        this.candidate = await this.discover();
+    if (this.store.ready || this.readyShell()) {
+      // A previously consented transaction owns startup; do not discover a competing target.
+      this.candidate = null;
+      this.available = true;
+      this.phase = 'ready';
+      this.checkOutcome = 'prepared';
+      this.discovery = Promise.resolve(this.snapshot());
+      return this.discovery;
+    }
+    const controller = new AbortController();
+    const deadline = this.clock.now() + STARTUP_DISCOVERY_BUDGET_MS;
+    const expired = () => new DOMException('Startup update check deadline', 'TimeoutError');
+    const assertActive = () => {
+      controller.signal.throwIfAborted();
+      if (this.clock.now() >= deadline) throw expired();
+    };
+    if (!this.store.ready && !this.readyShell()) this.phase = 'checking';
+    this.discovery = new Promise(resolve => {
+      let settled = false, timer;
+      const finish = (candidate, error) => {
+        if (settled) return;
+        if (this.clock.now() >= deadline) error = expired();
+        if (signal?.aborted) error = signal.reason;
+        settled = true;
+        this.clock.clearTimeout(timer);
+        signal?.removeEventListener('abort', aborted);
+        if (error) {
+          controller.abort(error);
+          this.candidate = null;
+          this.available = Boolean(this.store.ready || this.readyShell());
+          this.checkOutcome = error?.name === 'TimeoutError' ? 'timeout' : error?.name === 'AbortError' ? 'aborted' : 'failed';
+          this.phase = this.available ? 'ready' : 'check-error';
+          resolve(this.snapshot());
+          return;
+        }
+        this.candidate = candidate;
         this.available = Boolean(this.store.ready || this.readyShell() || this.candidate);
+        this.checkOutcome = candidate ? 'available' : 'current';
         this.phase = this.candidate?.component === 'shell-required' ? 'shell-required'
           : (this.store.ready || this.readyShell()) ? 'ready' : this.candidate ? 'available' : this.startupError ? 'install-error' : 'idle';
-      } catch { this.phase = (this.store.ready || this.readyShell()) ? 'ready' : 'check-error'; }
-      return this.snapshot();
-    })();
+        resolve(this.snapshot());
+      };
+      const aborted = () => finish(null, signal.reason);
+      if (signal?.aborted) { finish(null, signal.reason); return; }
+      signal?.addEventListener('abort', aborted, { once: true });
+      timer = this.clock.setTimeout(() => finish(null, expired()), STARTUP_DISCOVERY_BUDGET_MS);
+      Promise.resolve().then(() => {
+        assertActive();
+        return this.discover({ signal: controller.signal, assertActive });
+      }).then(candidate => finish(candidate), error => finish(null, error));
+    });
     return this.discovery;
+  }
+  completeActivation(expectedVersion) {
+    if ((expectedVersion && this.store.manifest.gameVersion !== expectedVersion)
+      || this.store.ready || this.readyShell()) throw Error('Activated application identity was not confirmed');
+    this.candidate = null;
+    this.available = false;
+    this.consented = false;
+    this.progress = 0;
+    this.phase = 'idle';
+    this.checkOutcome = 'installed';
+    this.discovery = Promise.resolve(this.snapshot());
+  }
+  completeRecovery() {
+    // The host has reopened and verified the preserved inventory. Consume the failed
+    // transaction so the game's memoized check cannot advertise a stale Restart.
+    if (!this.store.manifest || this.store.ready || this.readyShell()) throw Error('Recovery identity was not confirmed');
+    this.candidate = null;
+    this.available = false;
+    this.consented = false;
+    this.progress = 0;
+    this.startupError = false;
+    this.phase = 'idle';
+    this.checkOutcome = 'recovered';
+    this.discovery = Promise.resolve(this.snapshot());
+  }
+  finishSilentStartup() {
+    if (!['failed', 'timeout', 'aborted'].includes(this.checkOutcome) || this.startupError
+      || this.candidate || this.store.ready || this.readyShell()) return;
+    // Quiet fallback is not a successful freshness check: retain its diagnostic outcome.
+    this.phase = 'idle';
+    this.available = false;
+    this.discovery = Promise.resolve(this.snapshot());
   }
   download() {
     if (this.operation || !this.candidate || this.phase === 'ready' || this.candidate.component === 'shell-required') return this.operation ?? Promise.resolve(this.snapshot());

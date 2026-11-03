@@ -16,3 +16,16 @@ build/
 
 # Retired planning repository: independent Git history, local archive only.
 /planning/legacy-store/
+
+# Generated QA outputs: summaries belong in OpenSpec/docs, raw data outside Git.
+/evidence/*
+!/evidence/toy-workshop-arena/
+/evidence/toy-workshop-arena/*
+!/evidence/toy-workshop-arena/concepts/
+/evidence/toy-workshop-arena/concepts/*
+!/evidence/toy-workshop-arena/concepts/workshop.png
+/artifacts/*
+!/artifacts/ui-prototype/
+
+# Native QA/build output must remain in the external QA store.
+native/**/target/

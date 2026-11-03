@@ -15,7 +15,7 @@ class LobbyPathTests(unittest.TestCase):
                   "const paths = lobbyQaPaths(env, process.argv[2]);"
                   "console.log(JSON.stringify({paths, env}));")
         result = subprocess.run(['node', '--input-type=module', '-e', script,
-                                 json.dumps(env or {}), str(cwd)],
+                                 json.dumps({'BRICKS_QA_HOME': str(Path(cwd) / 'external-qa'), **(env or {})}), str(cwd)],
                                 capture_output=True, text=True, check=True)
         return json.loads(result.stdout)
 
@@ -64,6 +64,6 @@ class LobbyPathTests(unittest.TestCase):
             primary = self.allocate(cwd)
             worker = self.allocate(cwd, {**primary['env'], 'TEST_WORKER_INDEX': '0'})
             self.assertEqual(worker['paths'], primary['paths'])
-            self.assertEqual(len(list((Path(cwd) / 'test-results/lobby').iterdir())), 1)
+            self.assertEqual(len(list(Path(primary['paths']['runDir']).parent.iterdir())), 1)
             next_run = self.allocate(cwd, primary['env'])
             self.assertNotEqual(next_run['paths']['runDir'], primary['paths']['runDir'])

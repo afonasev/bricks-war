@@ -25,10 +25,11 @@ describe('match event presentation', () => {
     }
   });
 
-  it('keeps round start alive for its bounded engine pulse', () => {
+  it('starts play without a duplicate round-start text notice', () => {
     const engine = new MatchEngine(humanPair(), 1);
     engine.step(COUNTDOWN_MS);
-    expect(globalMatchEvent(engine.state, DEFAULT_GAME_TUNING.messages)).toMatchObject({ kind: 'round-start', hold: 'none' });
+    expect(engine.state.roundStartPulseMs).toBeGreaterThan(0);
+    expect(globalMatchEvent(engine.state, DEFAULT_GAME_TUNING.messages)).toBeNull();
     engine.step(1_100);
     expect(globalMatchEvent(engine.state, DEFAULT_GAME_TUNING.messages)).toBeNull();
   });
@@ -138,10 +139,12 @@ describe('match event presentation', () => {
         detail: 'Пояснение',
         ...definition,
       });
-      expect(markup).toContain('match-event-icon-tile');
-      expect(markup).toContain(`data-icon="${definition.icon}"`);
-      expect(markup).toContain('<strong>');
-      expect(markup).toContain('<small>Пояснение</small>');
+      expect(markup).toContain(kind === 'final-push' ? 'ready-title' : 'match-event-icon-tile');
+      if (kind === 'final-push') expect(markup).not.toContain('data-icon=');
+      else expect(markup).toContain(`data-icon="${definition.icon}"`);
+      expect(markup).toContain(kind === 'final-push' ? 'ready-label' : '<strong>');
+      if (kind === 'final-push') expect(markup).not.toContain('<small>');
+      else expect(markup).toContain('<small>Пояснение</small>');
     }
   });
 
