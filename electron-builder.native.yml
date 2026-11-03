@@ -1,0 +1,16 @@
+# Opt-in one-time migration installer; no default build/release command uses it.
+extends: ./electron-builder.yml
+extraMetadata:
+  nativeProfileProbe: 1
+nsis:
+  include: scripts/desktop/installer-native-options.nsh
+  allowToChangeInstallationDirectory: false
+  perMachine: true
+  oneClick: false
+# BRICKS_NATIVE_LAYOUT points to a verified external Windows layout containing
+# native/, installer-seed.json and native-registry.nsh. The NSIS include embeds
+# this seed into $PLUGINSDIR; it is never unpacked directly into a writable root.
+# Build this opt-in recipe with --prepackaged <layout>/legacy-app so the
+# original app entry exactly matches the signed private migration descriptor.
+# The helper atomically replaces that entry with the native root shim; existing
+# shortcuts retain their targets/arguments/icons and old-helper rollback works.
