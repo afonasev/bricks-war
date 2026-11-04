@@ -31,8 +31,8 @@ if (nativeHealth && process.env.BRICKS_BOOTSTRAP_INSTALLED === '1') {
   app.setPath('userData', profile);
 }
 const ORIGIN = 'https://bricks.afonasev.tech';
-let restoredArgs = [];
-try { const file = join(process.env.BRICKS_DESKTOP_QA_PROFILE || app.getPath('userData'),'shell-update','launch-args.json'); const saved = JSON.parse(readFileSync(file,'utf8')); if (saved.version === app.getVersion() && Array.isArray(saved.args) && saved.args.every(arg=>typeof arg === 'string')) { restoredArgs = saved.args; unlinkSync(file); } } catch { /* ordinary launch */ }
+let restoredArgs = [], resumedShellHandoff = false;
+try { const file = join(process.env.BRICKS_DESKTOP_QA_PROFILE || app.getPath('userData'),'shell-update','launch-args.json'); const saved = JSON.parse(readFileSync(file,'utf8')); if (saved.version === app.getVersion() && Array.isArray(saved.args) && saved.args.every(arg=>typeof arg === 'string')) { restoredArgs = saved.args; resumedShellHandoff = true; unlinkSync(file); } } catch { /* ordinary launch */ }
 const launchArgs = [...process.argv,...restoredArgs];
 const startupMuted = isStartupMuted(launchArgs, process.env.BRICKS_DESKTOP_QA_PROFILE);
 const initialGameUrl = gameUrl(ORIGIN, startupMuted);
@@ -207,7 +207,7 @@ app.whenReady().then(async () => {
   launcherUI = new LauncherWindow({ BrowserWindow, ipcMain, directory: here, snapshot: state,
     locale: app.getLocale(), screen, notesURL: () => releaseNotesURL(coordinator.candidate),
     openExternal: url => desktopShell.openExternal(url) });
-  const startup = new StartupLauncherSession({ coordinator, ui: launcherUI, launchGame:async()=>{await nativeShell?.acknowledgeLegacyPending();return launchGame();},
+  const startup = new StartupLauncherSession({ coordinator, ui: launcherUI, resumeLaunch: resumedShellHandoff || nativeShell?.activatingCandidate === true, launchGame:async()=>{await nativeShell?.acknowledgeLegacyPending();return launchGame();},
     activate: async () => {
       if (shell.ready) { await activation.start(); return { handoff: true }; }
       return { activated: await store.activate() };

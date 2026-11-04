@@ -1,3 +1,4 @@
+import {manifestReleaseDate,normalizeReleaseDate} from './release-date.mjs';
 /** One activity gate owns every update/history transfer. Match entry awaits drain. */
 export class TransferGate {
   allowed = true;
@@ -41,7 +42,8 @@ export class UpdateCoordinator {
     return { available: this.available, applying: false, error: this.phase.endsWith('error'), phase: this.phase,
       progress: this.progress, version: this.candidate?.manifest?.gameVersion ?? this.store.ready?.gameVersion ?? this.readyShell()?.version,
       requiresShell: this.candidate?.requiresShell ?? Boolean(this.readyShell()),
-      currentVersion: this.store.manifest.gameVersion, shellVersion: this.shellVersion, component: this.candidate?.component ?? 'content',
+      currentVersion: this.store.manifest.gameVersion, currentDate: manifestReleaseDate(this.store.manifest),
+      versionDate: manifestReleaseDate(this.candidate?.manifest ?? this.store.ready) ?? normalizeReleaseDate(this.candidate?.publishedAt), shellVersion: this.shellVersion, component: this.candidate?.component ?? 'content',
       checkOutcome: this.checkOutcome };
   }
   check({ signal } = {}) {

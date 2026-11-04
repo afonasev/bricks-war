@@ -47,7 +47,7 @@ let app,browser;
 const report={out,revision:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),source:{},scenarios:[]};
 for(const name of ['electron/main.mjs','electron/native-update.mjs','electron/native-health.mjs',...(await readdir('native/bootstrap/src')).map(name=>'native/bootstrap/src/'+name),'native/bootstrap/build.rs','native/bootstrap/Cargo.toml'])report.source[name]=hash(await readFile(name));
 async function launch(executablePath=root,extra={}){app=await electron.launch({executablePath,args:['-muted'],env:{...env,...extra},timeout:60000});app.process().stderr.on('data',data=>{void writeFile(join(out,'stderr.log'),data,{flag:'a'});});return app.firstWindow();}
-async function game(){const end=Date.now()+20000;while(Date.now()<end){const p=app.windows().find(p=>p.url().startsWith('https://bricks.afonasev.tech/'));if(p){await p.getByRole('heading',{name:'Native fixture'}).waitFor();assert.equal(new URL(p.url()).searchParams.get('muted'),'1');return p;}await new Promise(r=>setTimeout(r,100));}throw Error('No game');}
+async function game(){const end=Date.now()+20000;while(Date.now()<end){const p=app.windows().find(p=>p.url().startsWith('https://bricks.afonasev.tech/'));if(!p){const status=app.windows().find(p=>p.url().endsWith('launcher.html'));if(status && (await status.evaluate(()=>window.bricksLauncher.state()))?.kind==='status')await status.getByRole('button',{name:'Play',exact:true}).click();}if(p){await p.getByRole('heading',{name:'Native fixture'}).waitFor();assert.equal(new URL(p.url()).searchParams.get('muted'),'1');return p;}await new Promise(r=>setTimeout(r,100));}throw Error('No game');}
 try{
  // First boot the legacy client directly against the same original profile.
  await launch(join(a.client.path,a.client.manifest.entry));let page=await game();await page.evaluate(()=>localStorage.setItem('migration-marker','retain-me'));await app.close();app=null;
@@ -56,9 +56,9 @@ try{
  report.scenarios.push('native outer root/profile probe preserves original userData and localStorage');
  const archive=await createNativeArchive({...b,publicKey:key.publicKey,out:join(out,'archive'),name:'native-darwin.zip'});const envelope=await nativeReleaseEnvelope({version:'2.0.0',contentAbi:3,contentSequence:1,packages:[archive],privateKey:key.privateKey});const m=JSON.parse(envelope.payload);
  await writeFile(feed,JSON.stringify({releases:[{id:20,tag_name:'v2.0.0',draft:false,prerelease:false,assets:[{name:'native-manifest.json'},{name:archive.name,size:m.files[0].size,digest:`sha256:${m.files[0].sha256}`}]}],archive:archive.path,envelope}));
- page=await launch();await page.getByRole('button',{name:'Update and launch',exact:true}).waitFor();await page.screenshot({path:join(out,'offer-en.png')});
+ page=await launch();await page.getByRole('button',{name:'Update',exact:true}).waitFor();await page.screenshot({path:join(out,'offer-en.png')});
  await new Promise(r=>setTimeout(r,92000));assert.equal(app.windows().length,1);assert.ok(page.url().endsWith('launcher.html'));await assert.rejects(()=>readFile(env.QA_DOWNLOADS),{code:'ENOENT'});report.scenarios.push('ordinary consent remains alive beyond 90 seconds; no pre-consent archive');
- await page.getByRole('button',{name:'Update and launch',exact:true}).click();
+ await page.getByRole('button',{name:'Update',exact:true}).click();
  // The independent worker replaces the old root; attach the new real Chromium.
  const deadline=Date.now()+120000;let next;
  while(Date.now()<deadline){try{const lines=(await readFile(join(profile,'DevToolsActivePort'),'utf8')).trim().split('\n');browser=await chromium.connectOverCDP(`http://127.0.0.1:${lines[0]}`,{timeout:1000});next=browser.contexts().flatMap(c=>c.pages()).find(p=>p.url().startsWith('https://bricks.afonasev.tech/'));if(next&&await next.evaluate(async()=> (await window.bricksDesktop.check()).shellVersion)==='2.0.0')break;await browser.close();browser=null;}catch{}await new Promise(r=>setTimeout(r,500));}

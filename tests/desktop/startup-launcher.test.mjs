@@ -118,12 +118,13 @@ test('all production API pages share the original deadline rather than receiving
 
 const { StartupLauncherSession } = await import('../../electron/startup-launcher.mjs');
 function launcherFixture({ candidate = { component: 'content', manifest: { gameVersion: '2.0.0' }, envelope: {} }, choices = ['update'], failures = ['play'] } = {}) {
-  const counts = { offers: 0, progress: 0, failures: 0, installs: 0, launches: 0, quits: 0, prepares: 0, discovery: 0 };
+  const counts = { offers: 0, statuses: 0, progress: 0, failures: 0, installs: 0, launches: 0, quits: 0, prepares: 0, discovery: 0 };
   const f = coordinator(async () => { counts.discovery++; return candidate; });
   f.store.prepare = async () => { counts.prepares++; f.store.ready = { gameVersion: '2.0.0' }; };
   f.store.cancel = () => {};
   f.store.discardPrepared = async () => { f.store.ready = null; };
   const ui = {
+    status: async () => { counts.statuses++; return choices.shift() ?? 'play'; },
     offer: async () => { counts.offers++; return choices.shift(); },
     progress: async (_state, cancel) => { counts.progress++; ui.cancel = cancel; },
     failure: async () => { counts.failures++; return failures.shift(); },
@@ -135,12 +136,12 @@ function launcherFixture({ candidate = { component: 'content', manifest: { gameV
   return { ...f, session, ui, counts };
 }
 
-test('current/offline startup has no offer/progress window and repeated run calls launch once', async () => {
+test('current/offline startup presents one status choice before a single game launch', async () => {
   for (const offline of [false, true]) {
-    const f = launcherFixture({ candidate: null });
+    const f = launcherFixture({ candidate: null, choices:['play'] });
     if (offline) f.update.discover = async () => { throw Error('offline'); };
     const run = f.session.run(); assert.equal(f.session.run(), run); assert.equal(await run, 'play');
-    assert.equal(f.counts.launches, 1); assert.equal(f.counts.offers, 0); assert.equal(f.counts.progress, 0);
+    assert.equal(f.counts.launches, 1); assert.equal(f.counts.offers, 0); assert.equal(f.counts.statuses, 1); assert.equal(f.counts.progress, 0);
     const reused = await f.update.check();
     assert.equal(reused.phase, 'idle'); assert.equal(reused.error, false);
     assert.equal(reused.checkOutcome, offline ? 'failed' : 'current');
@@ -160,7 +161,7 @@ test('one consent prepares and activates before exactly one game launch', async 
   const originalLaunch = f.session.launchGame;
   f.session.launchGame = async () => { assert.equal(activated, true); await originalLaunch(); };
   assert.equal(await f.session.run(), 'play');
-  assert.deepEqual(f.counts, { offers: 1, progress: 1, failures: 0, installs: 1, launches: 1, quits: 0, prepares: 1, discovery: 1 });
+  assert.deepEqual(f.counts, { offers: 1, statuses: 0, progress: 1, failures: 0, installs: 1, launches: 1, quits: 0, prepares: 1, discovery: 1 });
   for (const state of [f.update.snapshot(), await f.update.check()]) {
     assert.equal(state.currentVersion, '2.0.0'); assert.equal(state.available, false); assert.equal(state.phase, 'idle');
     assert.equal(state.version, undefined); assert.equal(state.progress, 0); assert.equal(state.checkOutcome, 'installed');
@@ -208,8 +209,8 @@ test('activation failure requires confirmed recovery before offering the install
   }
 });
 
-test('real monotonic startup timer falls back without an offer when discovery never settles', { timeout: 5000 }, async () => {
-  const f = launcherFixture({ candidate: null });
+test('real monotonic startup timer reaches failed-check choice without an offer when discovery never settles', { timeout: 5000 }, async () => {
+  const f = launcherFixture({ candidate: null, choices:['play'] });
   f.update.clock = { now: () => performance.now(), setTimeout, clearTimeout };
   let signal;
   f.update.discover = options => { signal = options.signal; return new Promise(() => {}); };
@@ -246,4 +247,13 @@ test('previously consented ready B owns startup over compatible or unavailable n
     assert.equal(await f.session.run(), prepared === 'shell' ? 'handoff' : 'play');
     assert.equal(installedVersion, '2.0.0'); assert.equal(f.counts.discovery, 0); assert.equal(f.counts.offers, 0); assert.equal(f.counts.prepares, 0);
   }
+});
+
+test('current status waits for Play or Exit; an acknowledged candidate resumes game without another choice',async()=>{
+ const f=launcherFixture({candidate:null});let choose;f.ui.status=async()=>new Promise(resolve=>choose=resolve);const run=f.session.run();await tick();assert.equal(f.counts.launches,0);choose('quit');assert.equal(await run,'quit');assert.equal(f.counts.launches,0);assert.equal(f.counts.quits,1);
+ const resumed=launcherFixture({candidate:null});resumed.session.resumeLaunch=true;assert.equal(await resumed.session.run(),'play');assert.equal(resumed.counts.statuses,0);assert.equal(resumed.counts.launches,1);
+});
+
+test('historical failure is not presented as a newly confirmed rollback',async()=>{
+ const f=launcherFixture({candidate:null});f.update.startupError=true;f.ui.failure=async(_state,options)=>{assert.equal(options.historical,true);assert.equal(options.recovery,undefined);return 'play';};assert.equal(await f.session.run(),'play');
 });

@@ -14,7 +14,6 @@ export interface ClientUpdateState {
 export class ClientUpdate {
   private desktopStarted = false;
   private nativeCheck?: Promise<void>;
-  private pollTimer?: ReturnType<typeof setInterval>;
   private registration?: ServiceWorkerRegistration;
   private obsolete = false;
   private nativeState: DesktopUpdate = { available: false, applying: false, error: false };
@@ -152,14 +151,14 @@ export class ClientUpdate {
   }
   cancelDownload(): void { if (desktop) void desktop.cancel().then(state => { this.nativeState = state; this.refresh(); }); }
 
-  dispose(): void { clearInterval(this.pollTimer); clearTimeout(this.timeout); this.listeners.clear(); }
+  dispose(): void { clearTimeout(this.timeout); this.listeners.clear(); }
 
   startDesktop(): void {
     if (!desktop || this.desktopStarted) return;
     this.desktopStarted = true;
-    const poll = () => { void desktop!.updateState().then(state => { this.nativeState = state; this.refresh(); }); };
-    poll(); void this.check();
-    this.pollTimer = setInterval(poll, 500);
+    // Startup launcher already owns discovery and consent. The game only reads
+    // the active version once; it must not start another update UI/check loop.
+    void desktop.updateState().then(state => { this.nativeState = state; this.refresh(); });
   }
 }
 

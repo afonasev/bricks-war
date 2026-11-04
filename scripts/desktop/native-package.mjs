@@ -1,3 +1,4 @@
+import {normalizeReleaseDate,manifestReleaseDate} from '../../electron/release-date.mjs';
 /** Source packaging API; no publication, version bump or installed writes. */
 import {cp,mkdir,readdir,lstat,readFile,writeFile,readlink,realpath,chmod,stat} from 'node:fs/promises';
 import {createReadStream} from 'node:fs';
@@ -114,13 +115,15 @@ export async function assembleWindowsLayout({nativeRoot,launcher,client,publicKe
  await writeFile(join(out,'native-registry.nsh'),`!define BRICKS_NATIVE_REGISTRY "${registry}"\n!define BRICKS_LEGACY_REGISTRY "Software\\e5919a2e-5a63-5e06-80d4-8586e169f51c${info.fixture?'-QA-'+info.keyFingerprint.slice(0,16):''}"\n`);
  return{root,info,legacyApp,installerGate:'Private installer seed → exclusive protected native namespace → signature/bytes validation → fixed registration → original-user shortcut. Already-native installs use signed component updates; do not overwrite machine references with a new full installer.'};
 }
-export async function nativeReleaseEnvelope({version,contentAbi,contentSequence,packages,privateKey}){
+export async function nativeReleaseEnvelope({version,contentAbi,contentSequence,packages,privateKey,releaseDate}){
  if(!semver(version)||!Number.isSafeInteger(contentAbi)||contentAbi<3||!Number.isSafeInteger(contentSequence)||contentSequence<1||!packages.length)throw Error('Invalid native release identity');
  const files=[];
  for(const item of packages){const file=await stat(item.path);if(!file.isFile()||file.size>1024**3||!Number.isSafeInteger(item.unpackedSize)||item.unpackedSize<1||item.unpackedSize>8*1024**3||!/^[a-zA-Z0-9_.-]+\.zip$/.test(item.name))throw Error('Invalid native archive');
   files.push({platform:item.platform,arch:item.arch,minimumOS:item.platform==='darwin'?'13.0.0':'10.0.0',name:item.name,size:file.size,sha256:await hashFile(item.path),unpackedSize:item.unpackedSize,targets:item.targets.map(target=>({component:target.component,...target.identity}))});
  }
- const payload=JSON.stringify({schema:1,game:'bricks-war',component:'native-release',channel:'stable',rootAbi:1,version,contentAbi,contentSequence,files});return{payload,signature:sign(null,Buffer.from(payload),privateKey).toString('base64')};
+ if(releaseDate!==undefined&&!normalizeReleaseDate(releaseDate))throw Error('Invalid native release date');
+ const date=normalizeReleaseDate(releaseDate)??manifestReleaseDate({sequence:contentSequence});
+ const payload=JSON.stringify({schema:1,game:'bricks-war',component:'native-release',channel:'stable',rootAbi:1,version,contentAbi,contentSequence,...(date?{releaseDate:date}:{}),files});return{payload,signature:sign(null,Buffer.from(payload),privateKey).toString('base64')};
 }
 
 export async function createNativeArchive({launcher,client,publicKey,out,name}){

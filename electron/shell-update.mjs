@@ -84,7 +84,7 @@ export class ShellUpdate {
       if (manifest.version !== release.tag_name.slice(1) || !release.assets.some(a => a.name === manifest.file.name && a.size === manifest.file.size && a.digest === `sha256:${manifest.file.sha256}`)) continue;
       active();
       this.selected = { release,manifest,envelope };
-      return { component:'shell',tag:release.tag_name,requiresShell:true,manifest:{gameVersion:manifest.version}, compatibility:{abi:manifest.contentAbi ?? 2,version:manifest.version,bundledSequence:manifest.contentSequence},
+      return { component:'shell',tag:release.tag_name,publishedAt:release.published_at,requiresShell:true,manifest:{gameVersion:manifest.version,releaseDate:manifest.releaseDate,sequence:manifest.contentSequence}, compatibility:{abi:manifest.contentAbi ?? 2,version:manifest.version,bundledSequence:manifest.contentSequence},
         prepare: (progress,phase,options) => this.prepare(progress,phase,options), commit:plan=>this.commitPrepared(plan),
         cancel:() => this.controller?.abort(),discard:async()=>{ this.ready=null; await rm(join(this.root,'ready.json'),{force:true}); } };
     }

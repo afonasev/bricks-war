@@ -21,7 +21,9 @@ async function inventory(dir, prefix = '') {
 }
 await inventory('dist'); files.sort((a,b) => a.path.localeCompare(b.path));
 const pkg = JSON.parse(await readFile('package.json', 'utf8'));
-const payload = JSON.stringify({ schema: 1, game: 'bricks-war', component: 'content', channel: 'stable', sequence, gameVersion: pkg.version, minShellVersion: CONTENT_ABI, minShellRelease: MIN_SHELL_RELEASE,
+let releaseDate = new Date(sequence).toISOString();
+try { const metadata=JSON.parse(await readFile('config/deployment-build.json','utf8')); if(metadata.version===pkg.version && Number.isFinite(Date.parse(metadata.deployedAt))) releaseDate=new Date(metadata.deployedAt).toISOString(); } catch { /* Source QA or existing build without deployment metadata uses preparation time. */ }
+const payload = JSON.stringify({ schema: 1, game: 'bricks-war', component: 'content', channel: 'stable', sequence, releaseDate, gameVersion: pkg.version, minShellVersion: CONTENT_ABI, minShellRelease: MIN_SHELL_RELEASE,
   commit: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), files });
 const envelope = { payload, signature: sign(null, Buffer.from(payload), privateKey).toString('base64') };
 validateManifest(envelope, publicKey, CONTENT_ABI, pkg.version);

@@ -30,7 +30,7 @@ const build=(args,env={})=>execFileSync('node_modules/.bin/electron-builder',arg
 build(['--mac','dmg','zip','--universal','--prepackaged',assembly.darwin.built.app,'--config.directories.output='+installers,'--publish','never']);
 build(['--win','nsis','--x64','--prepackaged',assembly.win32.built.legacyApp,'--config','electron-builder.native.yml','--config.directories.output='+installers,'--publish','never'],{BRICKS_NATIVE_LAYOUT:join(out,'windows-layout')});
 for(const file of packages)await cp(file.path,join(installers,file.name));
-await writeFile(join(installers,'native-manifest.json'),JSON.stringify(await nativeReleaseEnvelope({version,contentAbi:bundled.minShellVersion,contentSequence:bundled.sequence,packages,privateKey})));
+await writeFile(join(installers,'native-manifest.json'),JSON.stringify(await nativeReleaseEnvelope({version,contentAbi:bundled.minShellVersion,contentSequence:bundled.sequence,releaseDate:bundled.releaseDate,packages,privateKey})));
 const files=[];
 for(const name of [`Bricks-War-${version}-mac-universal.dmg`,`Bricks-War-${version}-mac-universal.zip`,`Bricks-War-${version}-win-x64.exe`,...packages.map(file=>file.name),'native-manifest.json']){
  const bytes=await readFile(join(installers,name));files.push({name,size:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex')});

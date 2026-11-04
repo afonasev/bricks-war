@@ -1,3 +1,4 @@
+import {normalizeReleaseDate} from './release-date.mjs';
 import { createHash, verify } from 'node:crypto';
 import { mkdir, readFile, writeFile, rename, rm, lstat, readdir, statfs } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -20,6 +21,7 @@ export function inspectManifest(envelope, publicKey) {
   if (m.minShellVersion < 1) throw Error('Invalid shell requirement');
   compareVersions(m.gameVersion, m.gameVersion);
   if (m.minShellRelease !== undefined) compareVersions(m.minShellRelease, m.minShellRelease);
+  if (m.releaseDate !== undefined && !normalizeReleaseDate(m.releaseDate)) throw Error('Invalid release date');
   const paths = new Set(); let size = 0;
   for (const f of m.files) {
     if (!safePath(f.path) || paths.has(f.path) || !/^[a-f0-9]{64}$/.test(f.sha256)

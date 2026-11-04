@@ -90,7 +90,7 @@ export class GithubUpdates {
         || compareVersions(manifest.gameVersion,this.store.manifest.gameVersion) <= 0) continue;
       if (!manifest.files.every(f => release.assets.some(a => a.name === f.sha256 && a.size === f.size && a.digest === `sha256:${f.sha256}`))) continue;
       active();
-      const content = { component:'content', manifest, envelope, releaseId:release.id, tag:release.tag_name };
+      const content = { component:'content', manifest, envelope, releaseId:release.id, tag:release.tag_name, publishedAt:release.published_at };
       if (!requiresShell) return content;
       const shell = await this.shell?.discover(releases, options);
       active();

@@ -2,7 +2,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 afterEach(() => { vi.doUnmock('../src/platform/desktop'); vi.resetModules(); });
 async function setup() {
   vi.resetModules();
-  const bridge = { check: vi.fn(), download: vi.fn(), cancel: vi.fn(), setActivity:vi.fn(), setSafeMenu: vi.fn(), apply: vi.fn() };
+  const bridge = { updateState: vi.fn(), check: vi.fn(), download: vi.fn(), cancel: vi.fn(), setActivity:vi.fn(), setSafeMenu: vi.fn(), apply: vi.fn() };
   vi.doMock('../src/platform/desktop', () => ({ desktop: bridge }));
   const { ClientUpdate } = await import('../src/pwa/clientUpdate');
   return { bridge, client: new ClientUpdate(vi.fn(), () => false) };
@@ -27,4 +27,16 @@ it('download requires consent in a safe menu and does not recheck discovery', as
 it('cannot download a target whose required application package is unavailable',async()=>{
  const {bridge,client}=await setup();bridge.check.mockResolvedValue({available:true,error:false,applying:false,phase:'shell-required',requiresShell:true,version:'2.0.0'});
  await client.check();expect(client.apply()).toBe(false);expect(bridge.download).not.toHaveBeenCalled();expect(bridge.apply).not.toHaveBeenCalled();expect(client.snapshot().phase).toBe('shell-required');client.dispose();
+});
+
+it('game startup reads the installed identity without discovery or update polling', async () => {
+  const {bridge,client} = await setup();
+  bridge.updateState.mockResolvedValue({available:true,error:false,applying:false,phase:'available',currentVersion:'1.16.4',version:'1.16.5'});
+  client.startDesktop(); client.startDesktop(); await Promise.resolve();
+  expect(bridge.updateState).toHaveBeenCalledTimes(1);
+  expect(bridge.check).not.toHaveBeenCalled();
+  expect(bridge.download).not.toHaveBeenCalled();
+  expect(bridge.apply).not.toHaveBeenCalled();
+  expect(client.snapshot().currentVersion).toBe('1.16.4');
+  client.dispose();
 });

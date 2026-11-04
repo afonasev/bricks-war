@@ -3,19 +3,25 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'none'; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
   <title>Bricks War</title>
   <link rel="stylesheet" href="launcher.css">
-  <script src="launcher-renderer.js" defer></script>
+  <script src="launcher-renderer.js" type="module"></script>
 </head>
 <body>
   <main aria-labelledby="title">
-    <div class="brand">Bricks War</div>
-    <h1 id="title"></h1>
-    <p id="description" role="status" aria-live="polite"></p>
-    <button id="notes" class="link" hidden></button>
-    <div id="transfer" hidden><progress id="progress" max="100" value="0"></progress><p id="percent"></p></div>
-    <footer><p id="hint"></p><div id="actions"></div></footer>
+    <div class="content">
+      <img class="brand" src="assets/logo.webp" alt="Bricks War" draggable="false">
+      <section class="status" aria-live="polite" aria-atomic="true">
+        <p id="eyebrow" class="eyebrow"></p>
+        <h1 id="title"></h1>
+        <p id="description" role="status"></p>
+        <p id="version" class="version"></p>
+        <button id="notes" class="link" hidden></button>
+        <div id="transfer" hidden><progress id="progress" max="100" value="0"></progress><p id="percent"></p></div>
+      </section>
+    </div>
+    <footer><div id="actions"></div></footer>
   </main>
 </body>
 </html>

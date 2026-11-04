@@ -42,11 +42,11 @@ export class LauncherWindow {
     this.view = { id: ++this.serial, kind, actions, ...options };
     if (!this.window) {
       const area = this.screen.getPrimaryDisplay().workAreaSize;
-      const width = Math.min(620, area.width), height = Math.min(350, area.height);
+      const width = Math.min(760, area.width), height = Math.min(580, area.height);
       const win = this.window = new this.BrowserWindow({ width, height, useContentSize: true,
-        minWidth: Math.min(380, area.width), minHeight: Math.min(350, area.height),
+        minWidth: Math.min(360, area.width), minHeight: Math.min(420, area.height),
         title: 'Bricks War', show: false, resizable: true, fullscreenable: false, maximizable: false,
-        backgroundColor: '#ffffff', autoHideMenuBar: true,
+        backgroundColor: '#f5e5c5', autoHideMenuBar: true,
         webPreferences: { preload: join(this.directory, 'launcher-preload.cjs'),
           partition: 'bricks-launcher', contextIsolation: true, sandbox: true, nodeIntegration: false } });
       win.webContents.setAudioMuted(true);
@@ -67,10 +67,11 @@ export class LauncherWindow {
     await this.show(kind, actions, options);
     return result;
   }
-  offer() { return this.decision('offer', ['play', 'update']); }
+  status() { return this.decision('status', ['play', 'quit']); }
+  offer() { return this.decision('offer', ['play', 'update', 'quit']); }
   failure(_state, options) {
     return this.decision('failure', options.playable === false ? ['quit']
-      : options.retry ? ['play', 'retry'] : ['play', 'quit'], options);
+      : options.retry ? ['play', 'retry', 'quit'] : ['play', 'quit'], options);
   }
   progress(_state, cancel) {
     this.cancel = cancel;

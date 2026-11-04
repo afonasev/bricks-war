@@ -97,7 +97,7 @@ import { ScreenRouter, type AppScreen } from './screenRouter';
 import { DEFAULT_RELEASE_SETTINGS, loadReleaseSettings, saveReleaseSettings } from './releaseSettings';
 import { isMobilePlayViewport } from './mobileSettings';
 import { clientUpdate } from '../pwa/clientUpdate';
-import { nativeUpdatePresentation, updatePresentation } from '../pwa/updatePresentation';
+import { updatePresentation } from '../pwa/updatePresentation';
 import { dismissIosInstallHint, shouldShowIosInstallHint } from './pwaInstall';
 import { fromEntries } from '../runtime/compat';
 import { prepareClearPlaytest } from './clearPlaytest';
@@ -347,27 +347,11 @@ export class BricksWarApp {
     const button = this.root.querySelector<HTMLButtonElement>('.client-update-button');
     const status = this.root.querySelector<HTMLElement>('.client-update-status');
     const announcement = this.root.querySelector<HTMLElement>('.client-update-announcement');
-    if (!button) return;
     const state = clientUpdate.snapshot();
     if (desktop && state.currentVersion) { const info = this.root.querySelector('.release-build-info'); if (info) info.textContent = localeText('buildIdentity', {game:state.currentVersion}); }
+    // Native update consent and feedback belong exclusively to the startup launcher.
+    if (desktop || !button) return;
     const presentation = updatePresentation(state);
-    if (desktop) {
-      const native = nativeUpdatePresentation(state);
-      const history = this.root.querySelector<HTMLButtonElement>('.desktop-release-history');
-      if (history) {
-        history.hidden = !native.visible;
-        history.querySelector('strong')!.textContent = native.heading;
-      }
-      button.hidden = !native.visible;
-      button.disabled = native.disabled;
-      button.querySelector('strong')!.textContent = native.label;
-      const hint = button.querySelector('small')!;
-      hint.textContent = native.hint; hint.hidden = !native.hint;
-      button.setAttribute('aria-label', [native.label, native.hint].filter(Boolean).join('. '));
-      this.menuFocus.reconcileItems();
-      this.restoreHistoryFocus();
-      return;
-    }
     button.hidden = !presentation.visible;
     const download = this.root.querySelector<HTMLButtonElement>('.desktop-download');
     if (download) { download.hidden = state.available || !this.downloadUrl || isMobilePlayViewport(); }
@@ -517,7 +501,7 @@ export class BricksWarApp {
         <section class="main-menu-layout">
           <div class="main-menu-primary">
             <header class="release-brand main-menu-brand">
-              <div class="main-menu-brand-row"><h1 class="concept-brand-heading"><img class="concept-brand-logo" src="${conceptLogoUrl}" alt="BRICKS WAR" /></h1><div class="client-update-slot">${desktop ? `<button class="desktop-release-history" type="button" hidden><strong></strong><small>${tr('viewChanges')}</small></button><button class="client-update-button" type="button" hidden><strong></strong><small hidden></small></button>` : `<p class="client-update-announcement" hidden>${tr('updateAnnouncement')}</p><button class="client-update-button" type="button" hidden>${tr('updateAction')}</button><p class="client-update-status" role="status" hidden></p>`}<button type="button" class="desktop-download" data-ui-focus hidden aria-label="${tr('downloadGameAria')}" title="${tr('downloadGame')}"><span aria-hidden="true">⇩</span><span>${tr('downloadGame')}</span></button></div></div>
+              <div class="main-menu-brand-row"><h1 class="concept-brand-heading"><img class="concept-brand-logo" src="${conceptLogoUrl}" alt="BRICKS WAR" /></h1><div class="client-update-slot">${desktop ? `` : `<p class="client-update-announcement" hidden>${tr('updateAnnouncement')}</p><button class="client-update-button" type="button" hidden>${tr('updateAction')}</button><p class="client-update-status" role="status" hidden></p>`}<button type="button" class="desktop-download" data-ui-focus hidden aria-label="${tr('downloadGameAria')}" title="${tr('downloadGame')}"><span aria-hidden="true">⇩</span><span>${tr('downloadGame')}</span></button></div></div>
               ${installHint}
             </header>
             <nav class="mode-menu" aria-label="${tr('menu')}">
@@ -558,11 +542,9 @@ export class BricksWarApp {
       this.network = new NetworkApp(this.root, () => {this.router.open('main-menu'); this.renderMainMenu();}, this.audio, onClose => this.openNetworkPreferences(onClose));
     });
     this.root.querySelector('.client-update-button')?.addEventListener('click', () => {
-      if (desktop && nativeUpdatePresentation(clientUpdate.snapshot()).cancel) clientUpdate.cancelDownload();
-      else if (clientUpdate.snapshot().available) clientUpdate.apply();
+      if (clientUpdate.snapshot().available) clientUpdate.apply();
       else if (!desktop) void clientUpdate.check(true);
     });
-    this.root.querySelector('.desktop-release-history')?.addEventListener('click', event => { void this.showReleaseHistory(event.currentTarget as HTMLButtonElement); });
     this.root.querySelector('#desktop-exit')?.addEventListener('click', () => { clientUpdate.refresh(); void desktop?.exit(); });
     this.root.querySelector('.desktop-download')?.addEventListener('click', () => {
       if (!this.downloadUrl) return;

@@ -48,13 +48,13 @@ test('independent tree verification failure does not publish ready and cleans on
 }));
 test('failed digest is not offered again; per-user recovery acknowledgement binds one transaction',async()=>fixture(async root=>{
  const {native,selected}=updater(root,{blocked:['d'.repeat(64)]});await native.open();assert.equal(await native.discover([selected]),null);
- native.status=async()=>({failed:[],recoveryRequired:true,nonce:'e'.repeat(64)});await native.open();assert.equal(native.recoveryRequired,true);await native.acknowledgeRecovery();await native.open();assert.equal(native.recoveryRequired,false);
+ native.status=async()=>({failed:[],recoveryRequired:true,nonce:'e'.repeat(64)});await native.open();assert.equal(native.recoveryRequired,true);await native.acknowledgeRecovery();await native.open();assert.equal(native.recoveryRequired,false);assert.equal(native.activatingCandidate,false);
  native.status=async()=>({failed:[],recoveryRequired:true,nonce:'f'.repeat(64)});await native.open();assert.equal(native.recoveryRequired,true,'a later failed transaction is not silently acknowledged');
 }));
 
 test('candidate reaches game health through its own pending transaction; foreign and aborted decisions still recover',async()=>fixture(async root=>{
  const {native}=updater(root);const nonce='1'.repeat(64);native.context={...current,healthNonce:hash(`${nonce}:client`)};
- native.status=async()=>({failed:[],phase:'pending',recoveryRequired:true,nonce});await native.open();assert.equal(native.recoveryRequired,false);
- native.status=async()=>({failed:[],phase:'pending',recoveryRequired:true,nonce:'2'.repeat(64)});await native.open();assert.equal(native.recoveryRequired,true);
+ native.status=async()=>({failed:[],phase:'pending',recoveryRequired:true,nonce});await native.open();assert.equal(native.recoveryRequired,false);assert.equal(native.activatingCandidate,true);
+ native.status=async()=>({failed:[],phase:'pending',recoveryRequired:true,nonce:'2'.repeat(64)});await native.open();assert.equal(native.recoveryRequired,true);assert.equal(native.activatingCandidate,false);
  native.status=async()=>({failed:[],phase:'aborted',recoveryRequired:true,nonce});await native.open();assert.equal(native.recoveryRequired,true);
 }));

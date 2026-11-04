@@ -148,3 +148,9 @@ test('rejecting a failed activation retains replay protection against automatic 
   assert.equal(restarted.state.highWater, sequence); assert.equal(restarted.state.cancelledSequence, undefined);
   assert.equal(await restarted.check(), false);
 });
+
+test('release dates remain optional signed metadata and invalid calendar values fail validation',()=>{
+ const bytes=Buffer.from('game');assert.equal(validateManifest(envelope(1,bytes,{releaseDate:'2026-11-04'}),keys.publicKey,1).releaseDate,'2026-11-04');
+ assert.equal(validateManifest(envelope(1,bytes),keys.publicKey,1).releaseDate,undefined);
+ for(const releaseDate of ['2026-02-30','unknown',null])assert.throws(()=>validateManifest(envelope(1,bytes,{releaseDate}),keys.publicKey,1),/release date/);
+});

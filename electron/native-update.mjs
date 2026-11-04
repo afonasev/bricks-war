@@ -70,7 +70,7 @@ export class NativeUpdate extends ShellUpdate {
         || !release.assets.some(asset => asset.name === manifest.file.name && asset.size === manifest.file.size && asset.digest === `sha256:${manifest.file.sha256}`)) continue;
       active(); this.selected = { release, manifest, envelope };
       const client = manifest.file.targets.find(target => target.component === 'client');
-      return { component: 'shell', tag: release.tag_name, requiresShell: true, manifest: { gameVersion: client.version },
+      return { component: 'shell', tag: release.tag_name, publishedAt: release.published_at, requiresShell: true, manifest: { gameVersion: client.version, releaseDate: manifest.releaseDate, sequence: manifest.contentSequence },
         compatibility: { abi: manifest.contentAbi, version: client.version, bundledSequence: manifest.contentSequence },
         prepare: (progress, phase, options) => this.prepare(progress, phase, options), commit: plan => this.commitPrepared(plan),
         cancel: () => this.controller?.abort(), discard: () => this.discard() };
@@ -133,6 +133,7 @@ export class NativeUpdate extends ShellUpdate {
     // commit. Its own pending decision is not a previous failed startup.
     const ownPending = status.phase === 'pending' && digest(status.nonce)
       && this.context.healthNonce === hash(`${status.nonce}:client`);
+    this.activatingCandidate = ownPending;
     this.recoveryRequired = !ownPending && status.recoveryRequired === true && (!digest(status.nonce)||acknowledged?.nonce!==status.nonce);
     if(this.legacyPending){this.legacyBinding=hash(JSON.stringify({version:this.legacyPending.version,file:this.legacyPending.file}));try{const ack=JSON.parse(await readFile(join(this.root,'legacy-ack.json'),'utf8'));if(ack.binding===this.legacyBinding)this.legacyPending=null;}catch{/* unreviewed legacy package */}}
     this.ready = null;

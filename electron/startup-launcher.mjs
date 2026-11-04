@@ -1,7 +1,7 @@
 /** UI-independent ownership of one pre-game update decision and game launch. */
 export class StartupLauncherSession {
-  constructor({ coordinator, ui, activate, launchGame, quit, recoverWorking }) {
-    Object.assign(this, { coordinator, ui, activate, launchGame, quit, recoverWorking });
+  constructor({ coordinator, ui, activate, launchGame, quit, recoverWorking, resumeLaunch = false }) {
+    Object.assign(this, { coordinator, ui, activate, launchGame, quit, recoverWorking, resumeLaunch });
     this.phase = 'discovering';
     this.cancelled = false;
     this.finished = null;
@@ -21,12 +21,19 @@ export class StartupLauncherSession {
     const state = await this.coordinator.check();
     this.target = this.coordinator.candidate;
     if (state.phase === 'ready') return this.applyReady(); // Previously consented preparation.
+    // An installed candidate already has consent and must reach real game health
+    // within the unchanged helper horizon, without waiting for another click.
+    if (this.resumeLaunch) return this.finish('play');
     if (this.coordinator.startupError) {
       this.phase = 'recovery';
-      const action = await this.ui.failure(this.snapshot(), { retry: false, recovery: true });
+      const action = await this.ui.failure(this.snapshot(), { retry: false, historical: true });
       return this.finish(this.choice(action, ['play', 'quit']));
     }
-    if (!state.available) return this.finish('play');
+    if (!state.available) {
+      this.phase = 'status';
+      const action = await this.ui.status(this.snapshot());
+      return this.finish(this.choice(action, ['play', 'quit']));
+    }
     if (state.phase === 'shell-required') {
       this.phase = 'unavailable';
       const action = await this.ui.failure(this.snapshot(), { retry: false, unavailable: true });
@@ -97,7 +104,7 @@ export class StartupLauncherSession {
       await this.ui.failure(this.snapshot(), { retry: false, recovery: true, playable: false });
       return this.finish('quit');
     }
-    const action = await this.ui.failure(this.snapshot(), { retry: false, recovery: true, playable: true });
+    const action = await this.ui.failure(this.snapshot(), { retry: false, confirmedWorking: true, playable: true });
     return this.finish(this.choice(action, ['play', 'quit']));
   }
 

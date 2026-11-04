@@ -1,3 +1,4 @@
+import {manifestReleaseDate} from '../../electron/release-date.mjs';
 import { verifyNativeReceipt } from './native-receipt.mjs';
 import { withInstallerDownloads } from './download-presentation.mjs';
 import { sign, createPublicKey } from 'node:crypto';
@@ -34,7 +35,7 @@ for (const name of names) {
 if (!catalog.mac || !catalog.win || (!migration && (!names.includes('latest.yml') || !names.includes('latest-mac.yml')))) throw Error('Both platforms and updater metadata required');
 const bundled = validateManifest(JSON.parse(await readFile('build/desktop-content/manifest.json','utf8')),publicKey,CONTENT_ABI,version);
 if (bundled.gameVersion !== version || (migration && bundled.sequence !== receipt.contentSequence)) throw Error('Installer and bundled game must have one application version');
-const shellPayload = JSON.stringify({schema:1,game:'bricks-war',component:'shell',channel:'stable',updaterAbi:migration?2:1,...(migration?{installationKind:'migration'}:{}),contentAbi:CONTENT_ABI,contentSequence:bundled.sequence,version,files:shellFiles});
+const shellPayload = JSON.stringify({schema:1,game:'bricks-war',component:'shell',channel:'stable',updaterAbi:migration?2:1,...(migration?{installationKind:'migration'}:{}),contentAbi:CONTENT_ABI,contentSequence:bundled.sequence,releaseDate:manifestReleaseDate(bundled),version,files:shellFiles});
 const shellEnvelope = JSON.stringify({payload:shellPayload,signature:sign(null,Buffer.from(shellPayload),privateKey).toString('base64')});
 await writeFile(`${directory}/shell-manifest.json`,shellEnvelope); names.push('shell-manifest.json'); hashes.set('shell-manifest.json',digest(Buffer.from(shellEnvelope)));
 await writeFile(`${directory}/SHA256SUMS`, [...hashes].map(([name, hash]) => `${hash}  ${name}`).join('\n') + '\n');

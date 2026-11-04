@@ -1,30 +1,5 @@
+import {launcherPresentation} from './launcher-presentation.mjs';
 /* Local sandbox renderer: all release strings are rendered as text, never markup. */
-const copy = {
-  en: {
-    offer: 'Update Bricks War?', progress: 'Downloading update', installing: 'Installing update', cancelling: 'Cancelling update',
-    failure: 'Update interrupted', unavailable: 'Update unavailable', recovery: 'Previous version restored', blocked: 'Unable to start the game',
-    offerBody: 'A new version is available. The game will start automatically after the update.',
-    progressBody: 'The game will start automatically when the update is ready.', installingBody: 'Please wait while the verified update is applied.',
-    cancellingBody: 'Stopping the download before starting the installed game.',
-    failureBody: 'The installed game is preserved. Try again or start playing.', recoveryBody: 'The working game is ready. You can start playing.',
-    unavailableBody: 'This update cannot be installed automatically. You can play the installed version.',
-    blockedBody: 'The working version could not be confirmed. Close the launcher and repair the installation.',
-    play: 'Play now', update: 'Update and launch', retry: 'Try again', quit: 'Close', cancel: 'Cancel',
-    hint: 'Keyboard or controller · choose and confirm', verifying: 'Verifying update', version: 'Version', notes: 'What’s new on GitHub',
-  },
-  ru: {
-    offer: 'Обновить Bricks War?', progress: 'Загружаем обновление', installing: 'Устанавливаем обновление', cancelling: 'Отменяем обновление',
-    failure: 'Обновление прервалось', unavailable: 'Обновление недоступно', recovery: 'Прежняя версия восстановлена', blocked: 'Не удалось запустить игру',
-    offerBody: 'Доступна новая версия. После обновления игра запустится автоматически.',
-    progressBody: 'Когда обновление будет готово, игра откроется сама.', installingBody: 'Подождите, применяем проверенное обновление.',
-    cancellingBody: 'Останавливаем загрузку перед запуском установленной игры.',
-    failureBody: 'Установленная игра сохранена. Можно повторить или начать играть.', recoveryBody: 'Рабочая игра готова. Можно начать играть.',
-    unavailableBody: 'Это обновление нельзя установить автоматически. Можно играть в установленную версию.',
-    blockedBody: 'Не удалось подтвердить рабочую версию. Закройте лаунчер и восстановите установку.',
-    play: 'Играть сейчас', update: 'Обновить и запустить', retry: 'Повторить', quit: 'Закрыть', cancel: 'Отменить',
-    hint: 'Клавиатура или контроллер · выбор и подтверждение', verifying: 'Проверяем обновление', version: 'Версия', notes: 'Что нового на GitHub',
-  },
-};
 const $ = id => document.getElementById(id);
 let current, busy = false, held = new Set(), previousPads = new Map();
 const buttons = () => [...document.querySelectorAll('main button:not(:disabled):not([hidden])')];
@@ -44,19 +19,19 @@ async function choose(action) {
 function render(view) {
   const changed = current?.id !== view.id;
   current = view;
-  const t = copy[view.locale?.startsWith('ru') ? 'ru' : 'en'];
-  document.documentElement.lang = view.locale?.startsWith('ru') ? 'ru' : 'en';
-  const kind = view.kind === 'failure' ? view.playable === false ? 'blocked'
-    : view.unavailable ? 'unavailable' : view.recovery ? 'recovery' : 'failure' : view.kind;
-  $('title').textContent = kind === 'progress' && view.state.phase === 'verifying' ? t.verifying : t[kind];
-  $('description').textContent = t[`${kind}Body`];
+  const {kind,copy:t,title,description,version,eyebrow,locale} = launcherPresentation(view);
+  document.documentElement.lang = locale;
+  document.body.dataset.kind = kind;
+  $('title').textContent = title;
+  $('description').textContent = description;
+  $('version').textContent = version;
+  $('eyebrow').textContent = eyebrow;
   $('notes').textContent = t.notes; $('notes').hidden = !view.hasNotes;
   const transferring = kind === 'progress' || kind === 'cancelling';
   $('transfer').hidden = !transferring;
   const percent = Math.max(0, Math.min(100, Math.floor(Number(view.state.progress) || 0)));
   $('progress').value = percent;
   $('percent').textContent = `${percent}%`;
-  $('hint').textContent = kind === 'offer' && view.state.version ? `${t.version} ${view.state.version}` : view.actions.length ? t.hint : '';
   const actionKey = view.actions.join(',');
   if (changed || $('actions').dataset.key !== actionKey) {
     $('actions').dataset.key = actionKey;
@@ -66,7 +41,7 @@ function render(view) {
       b.addEventListener('click', () => { void choose(action); }); return b;
     }));
     busy = false;
-    if (changed) focus(kind === 'offer' ? buttons().findIndex(b => b.dataset.action === 'update') : 0);
+    if (changed) focus(Math.max(0,buttons().findIndex(b => b.dataset.action === 'play')));
   }
 }
 $('notes').addEventListener('click', () => { if (!busy && current?.hasNotes) void window.bricksLauncher.notes(current.id).catch(() => {}); });

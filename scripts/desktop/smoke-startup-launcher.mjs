@@ -19,7 +19,7 @@ const html = version => Buffer.from(`<!doctype html><html><head><title>Game ${ve
 const a = html('A'), b = html('B'), extra = Buffer.alloc(220, 32);
 function signed(sequence, version, files) {
   const manifest = { schema: 1, game: 'bricks-war', component: 'content', channel: 'stable', sequence, gameVersion: version,
-    minShellVersion: 3, minShellRelease: '1.13.0', files: Object.entries(files).map(([path, bytes]) => ({ path, size: bytes.length, sha256: digest(bytes) })) };
+    releaseDate:sequence===1?'2026-11-03':'2026-11-04', minShellVersion: 3, minShellRelease: '1.13.0', files: Object.entries(files).map(([path, bytes]) => ({ path, size: bytes.length, sha256: digest(bytes) })) };
   const payload = JSON.stringify(manifest);
   return { manifest, envelope: { payload, signature: sign(null, Buffer.from(payload), key.privateKey).toString('base64') } };
 }
@@ -28,7 +28,7 @@ const target = signed(2, '2.0.0', { 'index.html': b, 'extra.txt': extra });
 await writeFile(join(root, 'build/desktop-content/index.html'), a);
 await writeFile(join(root, 'build/desktop-content/manifest.json'), JSON.stringify(baseline.envelope));
 await writeFile(join(root, 'package.json'), JSON.stringify({ type: 'module', version: '1.15.0', main: 'entry.mjs' }));
-const release = { id: 9, tag_name: 'content-2', draft: false, prerelease: false, published_at: '2026-11-03',
+const release = { id: 9, tag_name: 'content-2', draft: false, prerelease: false, published_at: '2026-11-04',
   assets: [{ name: 'manifest.json' }, ...target.manifest.files.map(f => ({ name: f.sha256, size: f.size, digest: `sha256:${f.sha256}` }))] };
 await writeFile(join(root, 'fixture.json'), JSON.stringify({ release, envelope: target.envelope,
   files: { [digest(b)]: b.toString('base64'), [digest(extra)]: extra.toString('base64') } }));
@@ -36,6 +36,8 @@ await writeFile(join(root, 'entry.mjs'), `
 import {app,shell} from 'electron';
 import {readFileSync,appendFileSync} from 'node:fs';
 import {ContentStore} from './electron/content.mjs';
+import {LauncherWindow} from './electron/launcher-window.mjs';
+const choose=LauncherWindow.prototype.choose;LauncherWindow.prototype.choose=function(value){appendFileSync(process.env.QA_WITNESS+'.actions',JSON.stringify(value)+'\\n');return choose.call(this,value);};
 const fixture=JSON.parse(readFileSync(new URL('./fixture.json',import.meta.url),'utf8'));
 globalThis.qa={calls:[],windows:[],opened:[],corrupt:process.env.QA_MODE==='retry',delay:0};
 shell.openExternal=async url=>{qa.opened.push(url);};
@@ -55,8 +57,9 @@ globalThis.fetch=async(url,options={})=>{
   const hash=url.split('/').pop(), bytes=fixture.files[hash];
   if(!bytes)throw Error('Unexpected fixture request '+url);
   if(qa.corrupt){qa.corrupt=false;return new Response(Buffer.from('corrupt'));}
-  const delay=hash===${JSON.stringify(digest(extra))}?qa.delay:0;
-  if(delay)await new Promise(r=>setTimeout(r,delay));
+  const delayed=hash===${JSON.stringify(digest(extra))}?qa.delay:0;
+  if(delayed)await new Promise(r=>setTimeout(r,delayed));
+  if(delayed && process.env.QA_MODE==='update')while(!qa.releaseTransfer)await new Promise(r=>setTimeout(r,20));
   return new Response(Buffer.from(bytes,'base64'));
 };
 await import('./electron/main.mjs');
@@ -73,7 +76,8 @@ async function launch(mode, profile = mode) {
     BRICKS_BOOTSTRAP_RECEIPT: join(output, `client-${'a'.repeat(64)}.json`),
     QA_MODE: mode, QA_WITNESS: join(output, `${mode}-windows.jsonl`) } });
   app.process().stderr.on('data', data => { void writeFile(join(output, `${mode}-stderr.log`), data, { flag: 'a' }); });
-  return app.firstWindow();
+  app.context().setDefaultTimeout(15000);app.context().setDefaultNavigationTimeout(15000);
+  const first=await app.firstWindow();first.setDefaultTimeout(15000);console.log('launched '+mode);return first;
 }
 async function finish() { if (app) await app.close(); app = null; }
 async function game(version) {
@@ -114,32 +118,37 @@ async function layout(page) {
 }
 try {
   for (const mode of ['current', 'offline', 'timeout']) {
-    const start = performance.now(); await launch(mode); const page = await game('A');
+    const start = performance.now(); let page = await launch(mode); await onlyLauncher(page); await layout(page);
+    await page.getByRole('heading',{name:mode==='current'?'Latest version installed':'Could not check for updates',exact:true}).waitFor();
+    assert.equal(await app.evaluate(() => qa.windows.length),1);
+    await page.screenshot({path:join(output,mode+'-status-wide.png')});
+    await page.getByRole('button',{name:'Play',exact:true}).click(); page = await game('A');
     const check = await page.evaluate(() => window.bricksDesktop.check());
     assert.equal(check.available, false); assert.equal(check.error, false);
     assert.equal(check.checkOutcome, { current: 'current', offline: 'failed', timeout: 'timeout' }[mode]);
-    assert.equal(await app.evaluate(() => qa.windows.length), 1);
+    assert.equal(await app.evaluate(() => qa.windows.length), 2);
     report.scenarios.push({ mode, pass: true, elapsedMs: performance.now() - start }); await finish();
   }
   let page = await launch('offer', 'retained'); await onlyLauncher(page); await layout(page);
-  await page.getByRole('button', { name: 'What’s new on GitHub', exact: true }).click();
+  await page.getByRole('button', { name: 'What’s new', exact: true }).click();
   assert.deepEqual(await app.evaluate(() => qa.opened), ['https://github.com/afonasev/bricks-war/releases/tag/content-2']);
   assert.equal(await app.evaluate(() => qa.calls.filter(url => !url.includes('api.github.com') && !url.endsWith('manifest.json')).length), 0);
   report.scenarios.push({ mode: 'selected-release-changelog-without-download', pass: true });
   await page.screenshot({ path: join(output, 'offer-wide.png') });
-  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setContentSize(380, 450));
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setContentSize(360, 640));
   await layout(page); await page.screenshot({ path: join(output, 'offer-narrow.png') });
-  await page.getByRole('button', { name: 'Play now', exact: true }).click();
+  await page.getByRole('button', { name: 'Play', exact: true }).click();
   page = await game('A'); await page.evaluate(() => localStorage.setItem('qa-retained', 'yes'));
   assert.equal(await app.evaluate(() => qa.calls.filter(url => url.endsWith('manifest.json')).length), 1);
   report.scenarios.push({ mode: 'decline-no-bytes', pass: true }); await finish();
 
   page = await launch('update', 'retained'); await onlyLauncher(page);
   await app.evaluate(() => { qa.delay = 2000; });
-  await page.getByRole('button', { name: 'Update and launch', exact: true }).click();
+  console.log('click update');await page.getByRole('button', { name: 'Update', exact: true }).click();console.log('clicked update');
   await page.getByRole('heading', { name: 'Downloading update', exact: true }).waitFor();
   await page.waitForFunction(() => document.querySelector('progress').value > 0);
   await layout(page); await page.screenshot({ path: join(output, 'progress.png') });
+  await app.evaluate(()=>{qa.releaseTransfer=true;});
   page = await game('B'); assert.equal(await page.evaluate(() => localStorage.getItem('qa-retained')), 'yes');
   const state = await page.evaluate(() => window.bricksDesktop.check());
   assert.equal(state.available, false); assert.equal(state.checkOutcome, 'installed');
@@ -147,21 +156,21 @@ try {
   assert.deepEqual(JSON.parse(await readFile(join(output, `client-${'a'.repeat(64)}.json`),'utf8')), {nonce:'a'.repeat(64),digest:'b'.repeat(64),pid:app.process().pid});
   assert.equal(await app.evaluate(() => process.env.BRICKS_BOOTSTRAP_NONCE), undefined);
   report.scenarios.push({ mode: 'signed-content-update-and-retained-profile', pass: true }); await finish();
-  await launch('offline', 'retained'); page = await game('B');
+  page = await launch('offline', 'retained'); await onlyLauncher(page);await page.getByRole('button',{name:'Play',exact:true}).click(); page = await game('B');
   assert.equal(await page.evaluate(() => localStorage.getItem('qa-retained')), 'yes');
   report.scenarios.push({ mode: 'updated-offline-restart', pass: true }); await finish();
 
   page = await launch('cancel'); await onlyLauncher(page);
   await app.evaluate(() => { qa.delay = 2000; });
-  await page.getByRole('button', { name: 'Update and launch', exact: true }).click();
+  console.log('click update');await page.getByRole('button', { name: 'Update', exact: true }).click();console.log('clicked update');
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();
   await game('A'); report.scenarios.push({ mode: 'cancel-drain-launch', pass: true }); await finish();
 
   page = await launch('retry'); await onlyLauncher(page);
-  await page.getByRole('button', { name: 'Update and launch', exact: true }).click();
+  console.log('click update');await page.getByRole('button', { name: 'Update', exact: true }).click();console.log('clicked update');
   await page.getByRole('heading', { name: 'Update interrupted', exact: true }).waitFor();
   await layout(page); await page.screenshot({ path: join(output, 'failure.png') });
-  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setContentSize(380, 450));
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setContentSize(360, 640));
   await layout(page); await page.screenshot({ path: join(output, 'failure-narrow.png') });
   await page.getByRole('button', { name: 'Try again', exact: true }).click(); await game('B');
   assert.equal(await app.evaluate(() => qa.calls.filter(url => url.includes('api.github.com')).length), 1);
@@ -169,6 +178,7 @@ try {
 
   page = await launch('keyboard'); await onlyLauncher(page);
   await app.evaluate(() => { qa.delay = 2500; });
+  await page.keyboard.press('ArrowRight');
   await page.keyboard.down('Enter');
   await page.getByRole('button', { name: 'Cancel', exact: true }).waitFor();
   await page.keyboard.down('Enter'); // Repeat across a state transition must not activate Cancel.
@@ -177,7 +187,7 @@ try {
   await page.keyboard.up('Enter'); await page.keyboard.press('Escape'); await game('A');
   report.scenarios.push({ mode: 'keyboard-fresh-edge-escape-cancel', pass: true }); await finish();
 
-  page = await launch('controller'); await onlyLauncher(page);
+  page = await launch('controller'); await onlyLauncher(page); await page.keyboard.press('ArrowRight');
   await app.evaluate(() => { qa.delay = 2500; });
   await page.evaluate(() => {
     window.qaPad = { index: 0, mapping: 'standard', axes: [0, 0], buttons: Array.from({ length: 16 }, () => ({ pressed: false })) };
@@ -185,7 +195,7 @@ try {
     Object.defineProperty(navigator, 'getGamepads', { value: () => [window.qaPad] });
   });
   await page.waitForTimeout(250);
-  assert.equal(await page.getByRole('heading', { name: 'Update Bricks War?', exact: true }).count(), 1);
+  assert.equal(await page.getByRole('heading', { name: 'New version available', exact: true }).count(), 1);
   await page.evaluate(() => { window.qaPad.buttons[0].pressed = false; }); await page.waitForTimeout(100);
   await page.evaluate(() => { window.qaPad.buttons[0].pressed = true; });
   await page.getByRole('button', { name: 'Cancel', exact: true }).waitFor();
@@ -196,9 +206,9 @@ try {
 
   for (const mode of ['activation-fault-before', 'activation-fault-after']) {
     page = await launch(mode); await onlyLauncher(page);
-    await page.getByRole('button', { name: 'Update and launch', exact: true }).click();
-    await page.getByRole('heading', { name: 'Previous version restored', exact: true }).waitFor();
-    await page.getByRole('button', { name: 'Play now', exact: true }).click(); page = await game('A');
+    console.log('click update');await page.getByRole('button', { name: 'Update', exact: true }).click();console.log('clicked update');
+    await page.getByRole('heading', { name: 'Working game is ready', exact: true }).waitFor();
+    await page.getByRole('button', { name: 'Play', exact: true }).click(); page = await game('A');
     const check = await page.evaluate(() => window.bricksDesktop.check());
     assert.equal(check.available, false); assert.equal(check.phase, 'idle'); assert.equal(check.checkOutcome, 'recovered');
     assert.equal(await page.evaluate(() => window.bricksDesktop.apply()), false);
