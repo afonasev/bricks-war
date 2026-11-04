@@ -39,6 +39,7 @@ export interface CardDraft {
     typingOriginal?: string;
     typingCursor?: number;
     numericKeyboard?: boolean;
+    lowercaseKeyboard?: boolean;
 }
 /** Reserves physical slots before either controller commits. Never displaces a hidden bot. */
 export function freeLobbySlot(slots: readonly LobbySlot[], reserved: ReadonlyMap<number, CardDraft>): number {

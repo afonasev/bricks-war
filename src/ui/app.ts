@@ -767,7 +767,7 @@ export class BricksWarApp {
     this.slotTileStyles[slot] = draft.style;
     if (isManualSlot(draft.controller)) {
       this.playerNames[slot] = normalizePlayerName(draft.name, slot);
-      this.gamepadProfiles.useName(this.playerNames[slot]!);
+      this.gamepadProfiles.rememberName(this.playerNames[slot]!);
       if (isGamepadSlot(draft.controller)) {
         const live = this.liveGamepads.get(Number(draft.controller.slice(8)));
         if (live) {
@@ -1204,6 +1204,8 @@ export class BricksWarApp {
     desktop?.setSafeMenu(false);
     this.menuFocus.suspend();
     const configs = this.configs();
+    const usedAt = Date.now();
+    for (const config of configs) if (config.controller !== 'ai') this.gamepadProfiles.useName(config.label, usedAt);
     const mobileMatch = configs[0]?.controller === 'mobile-touch';
     const seed = isLocalPlaytestFlag('playtest-anomaly-arrival') ? 4217
       : isLocalPlaytestFlag('playtest-shield-impact') ? 173 : this.createSeed();

@@ -66,3 +66,37 @@ it('keeps generated Player choices out of meaningful history without deleting le
   expect(profiles.profiles.some(p => p.name === 'Игрок 1')).toBe(true);
   expect(profiles.profiles.some(p => p.name === 'Игрок 3')).toBe(false);
 });
+
+
+it('ranks all saved names by last match use rather than frequency and retains legacy names', () => {
+  const storage = memory();
+  storage.setItem(GAMEPAD_PROFILE_STORAGE_KEY, JSON.stringify([
+    {id:'legacy',device:'pad',name:'Often',uses:999},
+    {id:'other',device:'keyboard',name:'Older',uses:1,lastUsed:100},
+  ]));
+  const profiles = new GamepadProfiles(storage);
+  profiles.rememberName('New');
+  profiles.useName('Recent', 200);
+  profiles.useName('Older', 300);
+  expect(new GamepadProfiles(storage).rankedNames()).toEqual(['Older', 'Recent', 'Often', 'New']);
+});
+it('keeps previous names and their recency when a device profile is renamed', () => {
+  const storage = memory();
+  const profiles = new GamepadProfiles(storage);
+  const p = profiles.create('pad', 'First');
+  profiles.useName('First', 123);
+  profiles.rename(p.id, 'Second');
+  profiles.rename(p.id, 'Third');
+  const reloaded = new GamepadProfiles(storage);
+  expect(reloaded.rankedNames()).toEqual(['First', 'Third', 'Second']);
+  expect(reloaded.profiles.find(p => p.name === 'First')?.lastUsed).toBe(123);
+});
+
+it('retains recency when the renamed profile has a same-name history entry', () => {
+  const profiles = new GamepadProfiles(memory());
+  const pad = profiles.create('pad', 'Alice');
+  profiles.create('keyboard', 'Alice');
+  profiles.useName('Alice', 400);
+  profiles.rename(pad.id, 'Bob');
+  expect(profiles.profiles.find(p => p.name === 'Alice')?.lastUsed).toBe(400);
+});

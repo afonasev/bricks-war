@@ -55,18 +55,18 @@ describe('unified lobby run draft', () => {
         expect(lobbyAdmission('battle', ['human-1', 'ai-easy', 'off', 'off'], true, false)).toContain('Завершите');
         expect(lobbyAdmission('battle', ['human-1', 'gamepad-0', 'off', 'off'], false, true)).toContain('Подключите');
     });
-    it('persists usage totals and leaves an opened name order frozen', () => {
+    it('persists last match use and leaves an opened name order frozen', () => {
         const values = new Map<string, string>();
         const storage = { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => { values.set(key, value); } };
         const profiles = new GamepadProfiles(storage);
         profiles.rememberName('Аня');
         profiles.rememberName('Борис');
         const frozen = profiles.rankedNames();
-        profiles.useName('Борис');
-        profiles.useName('Борис');
-        profiles.useName('Аня');
+        profiles.useName('Борис', 100);
+        profiles.useName('Борис', 200);
+        profiles.useName('Аня', 300);
         expect(frozen).toEqual(['Аня', 'Борис']);
-        expect(new GamepadProfiles(storage).rankedNames()).toEqual(['Борис', 'Аня']);
+        expect(new GamepadProfiles(storage).rankedNames()).toEqual(['Аня', 'Борис']);
         profiles.profiles.filter(p => p.name === 'Борис').forEach(p => profiles.remove(p.id));
         expect(new GamepadProfiles(storage).rankedNames()).toEqual(['Аня']);
     });

@@ -356,11 +356,11 @@ export class UnifiedLobby {
     }
     private typingMarkup(d: CardDraft): string {
         if (d.owner < 0) return `<label class="lobby-physical-name">${copy('Новое имя')}<input class="lobby-typed-name" data-typing-name maxlength="18" value="${escape(d.name)}" aria-label="${copy('Новое имя')}"></label>`;
-        return `<input class="lobby-typed-name" data-typing-name maxlength="18" value="${escape(d.name)}" aria-label="${copy('Новое имя')}"><div class="lobby-name-keys">${nameKeyboardRows(getLocale() === 'ru', d.numericKeyboard).map(row => `<div class="lobby-key-row">${row.map(letter => `<button data-letter="${letter}">${letter}</button>`).join('')}</div>`).join('')}<div class="lobby-key-row lobby-key-actions">${getLocale() === 'ru' && !d.numericKeyboard ? '<button data-letter="Ё">Ё</button>' : ''}<button data-keyboard-layout>${d.numericKeyboard ? getLocale() === 'ru' ? 'АБВ' : 'ABC' : '123'}</button><button class="lobby-space" data-letter=" ">${copy('Пробел')}</button><button data-erase aria-label="${copy('Удалить символ')}">⌫</button></div></div>`;
+        return `<input class="lobby-typed-name" data-typing-name maxlength="18" value="${escape(d.name)}" aria-label="${copy('Новое имя')}"><div class="lobby-name-keys">${nameKeyboardRows(getLocale() === 'ru', d.numericKeyboard, d.lowercaseKeyboard).map(row => `<div class="lobby-key-row">${row.map(letter => `<button data-letter="${letter}">${letter}</button>`).join('')}</div>`).join('')}<div class="lobby-key-row lobby-key-actions">${getLocale() === 'ru' && !d.numericKeyboard ? `<button data-letter="${d.lowercaseKeyboard ? 'ё' : 'Ё'}">${d.lowercaseKeyboard ? 'ё' : 'Ё'}</button>` : ''}<button data-keyboard-layout>${d.numericKeyboard ? getLocale() === 'ru' ? 'АБВ' : 'ABC' : '123'}</button>${!d.numericKeyboard ? `<button data-keyboard-case aria-pressed="${!!d.lowercaseKeyboard}" aria-label="${getLocale() === 'ru' ? 'Регистр букв' : 'Letter case'}">${getLocale() === 'ru' ? 'аА' : 'aA'}</button>` : ''}<button class="lobby-space" data-letter=" ">${copy('Пробел')}</button><button data-erase aria-label="${copy('Удалить символ')}">⌫</button></div></div>`;
     }
     private beginTyping(slot: number): void {
         const d = this.editors.get(slot)!;
-        d.typingOriginal = d.name; d.typingCursor = d.cursor; d.typing = true; d.numericKeyboard = false; d.cursor = 0; d.name = isGenericPlayerName(d.name) ? '' : d.name;
+        d.typingOriginal = d.name; d.typingCursor = d.cursor; d.typing = true; d.numericKeyboard = false; d.lowercaseKeyboard = false; d.cursor = 0; d.name = isGenericPlayerName(d.name) ? '' : d.name;
         this.render();
     }
     private cancelTyping(slot: number): void {
@@ -369,6 +369,7 @@ export class UnifiedLobby {
     private applyTyping(slot: number): void {
         const d = this.editors.get(slot)!;
         if (this.nameTaken(slot, d.name)) return;
+        this.host.profiles.rememberName(d.name);
         d.typing = false; this.chooseName(slot, d.name);
     }
     private bindCards(): void {
@@ -383,6 +384,7 @@ export class UnifiedLobby {
             const card = this.root.querySelector<HTMLElement>(`[data-lobby-slot="${slot}"]`)!;
             card.querySelector('[data-cancel]')?.addEventListener('click', () => d.typing ? this.cancelTyping(slot) : this.cancel(slot));
             card.querySelector<HTMLInputElement>('[data-typing-name]')?.addEventListener('input', e => { d.name = (e.target as HTMLInputElement).value; card.querySelector<HTMLButtonElement>('[data-typed-done]')!.disabled = this.nameTaken(slot, d.name); });
+            card.querySelector('[data-keyboard-case]')?.addEventListener('click', () => { d.lowercaseKeyboard = !d.lowercaseKeyboard; this.render(); });
             card.querySelector('[data-keyboard-layout]')?.addEventListener('click', () => { d.numericKeyboard = !d.numericKeyboard; d.cursor = 0; this.render(); });
             card.querySelectorAll<HTMLElement>('[data-name]').forEach(b => b.addEventListener('click', () => this.chooseName(slot, b.dataset.name!)));
             card.querySelectorAll<HTMLElement>('[data-delete-name]').forEach(b => b.addEventListener('click', () => this.deleteName(slot, b.dataset.deleteName!)));

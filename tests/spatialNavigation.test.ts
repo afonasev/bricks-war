@@ -24,6 +24,8 @@ describe('screen-direction navigation',()=>{
     it('provides familiar Russian and Latin rows plus a separate numeric layout',()=>{
         expect(nameKeyboardRows(true).map(r=>r.join(''))).toEqual(['ЙЦУКЕНГШЩЗХЪ','ФЫВАПРОЛДЖЭ','ЯЧСМИТЬБЮ']);
         expect(nameKeyboardRows(false)[0]!.join('')).toBe('QWERTYUIOP');
+        expect(nameKeyboardRows(false,false,true)[0]!.join('')).toBe('qwertyuiop');
+        expect(nameKeyboardRows(true,false,true)[1]!.join('')).toBe('фывапролджэ');
         expect(nameKeyboardRows(true,true)[0]!.join('')).toBe('1234567890');
     });
 });
