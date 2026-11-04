@@ -8,7 +8,7 @@ files:
   - package.json
 extraMetadata:
   main: electron/main.mjs
-  version: 1.16.4
+  version: 1.16.5
 asar: true
 artifactName: Bricks-War-${version}-${os}-${arch}.${ext}
 publish:

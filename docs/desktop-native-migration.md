@@ -54,3 +54,7 @@ The 1.16.0 bridge has a 120-second archive-transfer deadline. Publication readba
 Fresh bridge 1.16.2 and native components 1.16.3 remove the fixed total payload-transfer deadline. Explicit cancel/activity cancellation, trusted redirects, byte limits, signatures/digests and atomic activation remain. Metadata keeps its bound and startup discovery keeps its separate 3-second budget. The production SDK receipt names the separately published fresh bridge and rejects a bridge version equal to or newer than the migration.
 
 Already installed 1.16.0/1.16.1 code retains its old limit until it acquires the fix; publication cannot retroactively alter that code. For a legacy installation whose bootstrap download times out, install the corrected fresh bridge once before automatic migration. An already-native installation must continue through signed component updates; do not overwrite its native namespace with the ordinary bridge installer. Windows/UAC acceptance remains explicitly deferred by the user.
+
+## Warm launcher release, 1.16.4 / 1.16.5
+
+Fresh bridge 1.16.4 and native components 1.16.5 show the branded pre-game status launcher. Desktop game menus no longer present update controls/messages or repeat discovery; version/history remain in settings. Already-consented shell/native handoff bypasses the persistent launcher once so the unchanged real-game health horizon remains automatic. Fresh downloads stay on the bridge; the native release is migration-only and non-latest.
