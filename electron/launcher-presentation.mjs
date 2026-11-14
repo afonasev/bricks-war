@@ -4,7 +4,7 @@ const copy={
   historical:'Installed game is ready',working:'Working game is ready',failure:'Update interrupted',unavailable:'Update unavailable',blocked:'Unable to start the game',
   progress:'Downloading update',verifying:'Verifying update',installing:'Installing update',cancelling:'Cancelling update',
   currentTag:'Ready to play',checkTag:'Game available',offerTag:'Update available',progressTag:'Getting ready',blockedTag:'Installation needs attention',
-  currentBody:'',checkFailedBody:'You can play the installed version.',offerBody:'',
+  currentBody:'',checkFailedBody:'GitHub could not be reached or its response could not be verified. You can play the installed version.',checkTimeoutBody:'The GitHub update check timed out. You can play the installed version.',offerBody:'',
   historicalBody:'The previous update was not applied. You can play the installed version.',workingBody:'The working game was verified. You can start playing.',
   failureBody:'You can retry or start the installed game.',unavailableBody:'This update cannot be installed automatically. You can play the installed version.',
   blockedBody:'The working version could not be confirmed. Close the launcher and repair the installation.',
@@ -14,7 +14,7 @@ const copy={
   historical:'Установленная игра готова',working:'Рабочая игра готова',failure:'Обновление прервалось',unavailable:'Обновление недоступно',blocked:'Не удалось запустить игру',
   progress:'Загружаем обновление',verifying:'Проверяем обновление',installing:'Устанавливаем обновление',cancelling:'Отменяем обновление',
   currentTag:'Всё готово к игре',checkTag:'Игра доступна',offerTag:'Доступно обновление',progressTag:'Готовимся к игре',blockedTag:'Нужна проверка установки',
-  currentBody:'',checkFailedBody:'Можно запустить установленную игру',offerBody:'',
+  currentBody:'',checkFailedBody:'GitHub недоступен или его ответ не удалось проверить. Можно играть в установленную версию.',checkTimeoutBody:'Проверка обновлений через GitHub заняла слишком много времени. Можно играть в установленную версию.',offerBody:'',
   historicalBody:'Предыдущее обновление не применено. Можно играть в установленную версию.',workingBody:'Рабочая игра проверена. Можно начать играть.',
   failureBody:'Можно повторить обновление или запустить установленную игру.',unavailableBody:'Это обновление нельзя установить автоматически. Можно играть в установленную версию.',
   blockedBody:'Не удалось подтвердить рабочую версию. Закройте лаунчер и восстановите установку.',
@@ -32,7 +32,8 @@ export function launcherPresentation(view){
  if(kind==='status')kind=['current','installed'].includes(state.checkOutcome)?'current':'checkFailed';
  if(kind==='failure')kind=view.playable===false?'blocked':view.unavailable?'unavailable':view.historical?'historical':view.confirmedWorking||view.recovery?'working':'failure';
  const title=kind==='progress'&&state.phase==='verifying'?t.verifying:t[kind];
- const description=['current','offer'].includes(kind)?datedVersion(kind==='offer'?state.version:state.currentVersion,kind==='offer'?state.versionDate:state.currentDate):t[kind+'Body'];
+ const body=kind==='checkFailed'&&state.checkOutcome==='timeout'?t.checkTimeoutBody:t[kind+'Body'];
+ const description=['current','offer'].includes(kind)?datedVersion(kind==='offer'?state.version:state.currentVersion,kind==='offer'?state.versionDate:state.currentDate):body;
  const version=kind==='current'?t.noUpdates:`${t.installed} ${datedVersion(state.currentVersion,state.currentDate)}`;
  const eyebrow=kind==='current'?t.currentTag:kind==='offer'?t.offerTag:kind==='blocked'?t.blockedTag:['progress','installing','cancelling'].includes(kind)?t.progressTag:t.checkTag;
  return{kind,copy:t,title,description,version,eyebrow,locale};

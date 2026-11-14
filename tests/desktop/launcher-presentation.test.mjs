@@ -16,6 +16,18 @@ test('failed/expired discovery cannot render latest; update dates and installed 
  const update=launcherPresentation({kind:'offer',locale:'ru',state});assert.match(update.description,/4 ноября 2026/);assert.match(update.version,/3 ноября 2026/);
  assert.match(launcherPresentation({kind:'status',state:{currentVersion:'1.0.0',checkOutcome:'current'}}).description,/Version date unavailable/);
 });
+test('the launcher explains a GitHub check failure and timeout in both languages', () => {
+ for (const locale of ['ru', 'en']) {
+  const state = { currentVersion: '1.16.6' };
+  const failed = launcherPresentation({ kind: 'status', locale, state: { ...state, checkOutcome: 'failed' } });
+  const timeout = launcherPresentation({ kind: 'status', locale, state: { ...state, checkOutcome: 'timeout' } });
+  assert.match(failed.description, /GitHub/);
+  assert.match(timeout.description, /GitHub/);
+  assert.notEqual(failed.description, timeout.description);
+  assert.match(failed.version, /1\.16\.6/);
+  assert.match(timeout.version, /1\.16\.6/);
+ }
+});
 test('failure marker is neutral and cannot claim rollback, while unverified copy remains blocked',()=>{
  const marker=launcherPresentation({kind:'failure',historical:true,state:{currentVersion:'1.0.0'}});assert.equal(marker.kind,'historical');assert.doesNotMatch(marker.title,/restored/i);
  assert.equal(launcherPresentation({kind:'failure',playable:false,recovery:true,state:{}}).kind,'blocked');

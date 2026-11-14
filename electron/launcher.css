@@ -13,3 +13,14 @@ body[data-kind='checkFailed'] .eyebrow,body[data-kind='failure'] .eyebrow,body[d
 @media(max-width:480px){main{padding:24px 22px 23px}.content{gap:26px;padding-top:24px;padding-bottom:26px}.brand{width:100%;max-width:330px;max-height:180px}.status{padding:22px 15px}h1{font-size:23px;letter-spacing:-.4px}#description{font-size:15px}.eyebrow{font-size:9px}#actions{display:grid;grid-template-columns:1fr 1fr;gap:12px}#actions button[data-action='play']{grid-column:1/-1}#actions button{min-height:50px;font-size:15px;padding:12px}#actions:has(button:only-child){grid-template-columns:1fr}#actions:has(button:nth-child(2):last-child) button:last-child{grid-column:1/-1}.version{font-size:11px}}
 @media(max-height:470px) and (min-width:481px){main{padding:18px 26px}.content{flex-direction:row;gap:23px;padding:10px 0 20px}.brand{width:36%;max-height:165px}.status{padding:17px 15px}h1{font-size:22px}#description{font-size:14px}.version{margin-top:8px}#actions button{min-height:46px}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
+@media(max-width:480px) and (max-height:470px){
+  main{padding:12px 18px}
+  .content{gap:10px;padding:0 0 10px}
+  .brand{max-height:64px}
+  .status{padding:12px}
+  h1{margin-bottom:6px}
+  .eyebrow,.version{margin-block:6px}
+  footer{padding-top:4px}
+  #actions{gap:8px}
+  #actions button{min-height:44px;padding:8px}
+}
