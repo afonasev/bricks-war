@@ -168,7 +168,7 @@ try {
 
   page = await launch('retry'); await onlyLauncher(page);
   console.log('click update');await page.getByRole('button', { name: 'Update', exact: true }).click();console.log('clicked update');
-  await page.getByRole('heading', { name: 'Update interrupted', exact: true }).waitFor();
+  await page.getByRole('heading', { name: 'Could not prepare the update', exact: true }).waitFor();
   await layout(page); await page.screenshot({ path: join(output, 'failure.png') });
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setContentSize(360, 640));
   await layout(page); await page.screenshot({ path: join(output, 'failure-narrow.png') });
@@ -207,7 +207,7 @@ try {
   for (const mode of ['activation-fault-before', 'activation-fault-after']) {
     page = await launch(mode); await onlyLauncher(page);
     console.log('click update');await page.getByRole('button', { name: 'Update', exact: true }).click();console.log('clicked update');
-    await page.getByRole('heading', { name: 'Working game is ready', exact: true }).waitFor();
+    await page.getByRole('heading', { name: 'Could not install the update', exact: true }).waitFor();
     await page.getByRole('button', { name: 'Play', exact: true }).click(); page = await game('A');
     const check = await page.evaluate(() => window.bricksDesktop.check());
     assert.equal(check.available, false); assert.equal(check.phase, 'idle'); assert.equal(check.checkOutcome, 'recovered');

@@ -67,3 +67,21 @@ test('seven language sections are bounded and legacy notes remain verbatim on ex
  const rows=await f.source.history('de');assert.equal(rows[0].text,'- Added');assert.equal(rows[0].fallback,true);
  assert.equal(rows.find(row=>row.installed).notesUnavailable,'installed');
 });
+
+
+test('a matching manual Windows installer is offered alongside compatible content and never composed for automatic installation',async t=>{
+ const f=await fixture(t);
+ f.source.store.shellRelease='1.0.0';
+ const installer={tag:'v2.0.0',name:'Bricks-War-2.0.0-win-x64.exe'};
+ const shell={component:'shell-required',tag:installer.tag,installer,manifest:{gameVersion:'2.0.0'},compatibility:{abi:3,version:'2.0.0',bundledSequence:20}};
+ f.source.shell={offersManualWindowsInstaller:true,discover:async()=>shell};
+ assert.equal(await f.source.discover(),shell);
+ f.source.shell.discover=async()=>{throw Error('Shell metadata unavailable');};
+ assert.equal((await f.source.discover()).component,'content');
+ const newer=await fixture(t,{minShellVersion:3});
+ newer.source.shell={offersManualWindowsInstaller:true,discover:async()=>({...shell,manifest:{gameVersion:'1.9.0'}})};
+ const candidate=await newer.source.discover();
+ assert.equal(candidate.component,'shell-required');
+ assert.deepEqual(candidate.installer,installer);
+ assert.equal(candidate.prepare,undefined);
+});

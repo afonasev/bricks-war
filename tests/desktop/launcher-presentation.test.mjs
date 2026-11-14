@@ -29,9 +29,24 @@ test('the launcher explains a GitHub check failure and timeout in both languages
  }
 });
 test('failure marker is neutral and cannot claim rollback, while unverified copy remains blocked',()=>{
- const marker=launcherPresentation({kind:'failure',historical:true,state:{currentVersion:'1.0.0'}});assert.equal(marker.kind,'historical');assert.doesNotMatch(marker.title,/restored/i);
+ const marker=launcherPresentation({kind:'status',historical:true,state:{currentVersion:'1.0.0',checkOutcome:'current'}});assert.equal(marker.kind,'historical');assert.doesNotMatch(marker.title,/restored/i);
  assert.equal(launcherPresentation({kind:'failure',playable:false,recovery:true,state:{}}).kind,'blocked');
 });
 test('coordinator snapshot keeps installed signed date and matching selected published date without affecting eligibility',async()=>{
  const store={manifest:{gameVersion:'1.0.0',releaseDate:'2026-11-03'},ready:null};const c=new UpdateCoordinator({store,gate:new TransferGate(),discover:async()=>({manifest:{gameVersion:'2.0.0'},publishedAt:'2026-11-04T05:00:00Z'})});await c.check();assert.equal(c.snapshot().currentDate,'2026-11-03');assert.equal(c.snapshot().versionDate,'2026-11-04');assert.equal(c.snapshot().currentVersion,'1.0.0');
+});
+
+
+test('prior failure is secondary to the current outcome and recovery guidance', () => {
+  const state = {currentVersion:'1.16.4',version:'1.16.8',versionDate:'2026-11-14'};
+  const manual = launcherPresentation({kind:'manual',locale:'ru',historical:true,state,installerOpenFailed:true});
+  assert.equal(manual.copy.installer, 'Скачать установщик');
+  assert.match(manual.description, /1\.16\.8.*EXE с GitHub/);
+  assert.match(manual.notice, /Предыдущее обновление.*Не удалось открыть ссылку/);
+  const check = launcherPresentation({kind:'status',historical:true,state:{...state,checkOutcome:'timeout'}});
+  assert.equal(check.kind, 'checkFailed');
+  assert.match(check.notice, /previous update/);
+  for (const [failureReason, message] of [['disk', /disk space/], ['permission', /permissions/], ['integrity', /verification/]]) {
+    assert.match(launcherPresentation({kind:'failure',retry:true,state:{...state,failureReason}}).description, message);
+  }
 });

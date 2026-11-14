@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
-import { LauncherWindow, releaseNotesURL } from '../../electron/launcher-window.mjs';
+import { LauncherWindow, releaseNotesURL, windowsInstallerURL } from '../../electron/launcher-window.mjs';
 
 function fixture(options = {}) {
   const handlers = new Map(), windows = [];
@@ -80,4 +80,36 @@ test('native close drains cancellation once and cannot interrupt installation; u
   const failure = f.ui.failure({}, { recovery: true, playable: false });
   assert.deepEqual(f.ui.view.actions, ['quit']);
   f.ui.nativeClose(); assert.equal(await failure, 'quit'); f.ui.close();
+});
+
+
+test('manual installer opens only the trusted asset and keeps Play available', async () => {
+  const target = {installer:{tag:'v1.16.8',name:'Bricks-War-1.16.8-win-x64.exe'}};
+  const url = 'https://github.com/afonasev/bricks-war/releases/download/v1.16.8/Bricks-War-1.16.8-win-x64.exe';
+  assert.equal(windowsInstallerURL(target), url);
+  for (const name of ['https://example.com/tool.exe','Bricks-War-1.16.7-win-x64.exe','../setup.exe']) {
+    assert.equal(windowsInstallerURL({installer:{tag:'v1.16.8',name}}), null);
+  }
+  const opened = [];
+  const f = fixture({installerTarget:() => target, openExternal:async candidate => {
+    opened.push(candidate);
+    if (opened.length === 1) throw Error('No browser');
+  }});
+  const run = f.ui.failure({}, {unavailable:true,historical:true});
+  const id = f.ui.view.id;
+  const open = f.handlers.get('launcher:installer');
+  assert.throws(() => open({}, id), /Untrusted/);
+  assert.equal(await open(f.event(), id - 1), false);
+  assert.equal(f.ui.choose({id,action:'installer'}), false);
+  assert.equal(await open(f.event(), id), false);
+  assert.equal(f.ui.state().installerOpenFailed, true);
+  assert.equal(await open(f.event(), id), true);
+  assert.deepEqual(opened, [url,url]);
+  assert.equal(f.ui.state().installerOpenFailed, false);
+  assert.equal(f.ui.state().installerURL, undefined);
+  assert.deepEqual(f.ui.view.actions, ['play','installer','quit']);
+  f.ui.choose({id,action:'play'});
+  assert.equal(await run, 'play');
+  assert.equal(await open(f.event(), id), false);
+  f.ui.close();
 });

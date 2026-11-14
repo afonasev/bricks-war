@@ -91,16 +91,28 @@ export class GithubUpdates {
       if (!manifest.files.every(f => release.assets.some(a => a.name === f.sha256 && a.size === f.size && a.digest === `sha256:${f.sha256}`))) continue;
       active();
       const content = { component:'content', manifest, envelope, releaseId:release.id, tag:release.tag_name, publishedAt:release.published_at };
-      if (!requiresShell) return content;
-      const shell = await this.shell?.discover(releases, options);
+      if (!requiresShell && !this.shell?.offersManualWindowsInstaller) return content;
+      let shell;
+      try { shell = await this.shell?.discover(releases, options); }
+      catch (error) {
+        active();
+        if (requiresShell) throw error;
+        return content; // Its signed inventory was already verified independently.
+      }
       active();
+      if (!requiresShell) {
+        if (shell?.installer && compareVersions(shell.manifest.gameVersion,manifest.gameVersion) >= 0) return shell;
+        return content;
+      }
       if (!shell?.compatibility || !supportsContent(manifest,shell.compatibility.abi,shell.compatibility.version)) {
         // Do not hide an authenticated newer game behind an older compatible release.
         return { ...content, component:'shell-required', requiresShell:true };
       }
       // A full installer already contains the same or a newer game: do not stage an older overlay.
       if (compareVersions(shell.manifest.gameVersion,manifest.gameVersion) >= 0) return shell;
-      if (shell.compatibility.bundledSequence >= manifest.sequence) return { ...content,component:'shell-required',requiresShell:true };
+      if (shell.compatibility.bundledSequence >= manifest.sequence || shell.installer) {
+        return { ...content,component:'shell-required',requiresShell:true,installer:shell.installer };
+      }
       let cancelled = false;
       return { ...content, component:'shell', requiresShell:true,
         prepare:async (progress,phase) => {
@@ -122,7 +134,7 @@ export class GithubUpdates {
     if (!shell) return null;
     if (!supportsContent(this.store.manifest,shell.compatibility?.abi ?? 2,shell.compatibility?.version)) return null;
     if (compareVersions(shell.manifest.gameVersion,this.store.manifest.gameVersion) < 0) {
-      if (shell.compatibility?.bundledSequence >= this.store.manifest.sequence) return null;
+      if (shell.installer || shell.compatibility?.bundledSequence >= this.store.manifest.sequence) return null;
       return {...shell,manifest:{...shell.manifest,gameVersion:this.store.manifest.gameVersion}};
     }
     return shell;

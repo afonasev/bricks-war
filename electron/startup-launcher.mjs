@@ -24,23 +24,19 @@ export class StartupLauncherSession {
     // An installed candidate already has consent and must reach real game health
     // within the unchanged helper horizon, without waiting for another click.
     if (this.resumeLaunch) return this.finish('play');
-    if (this.coordinator.startupError) {
-      this.phase = 'recovery';
-      const action = await this.ui.failure(this.snapshot(), { retry: false, historical: true });
-      return this.finish(this.choice(action, ['play', 'quit']));
-    }
+    const historical = Boolean(this.coordinator.startupError);
     if (!state.available) {
-      this.phase = 'status';
-      const action = await this.ui.status(this.snapshot());
+      this.phase = historical ? 'recovery' : 'status';
+      const action = await this.ui.status(this.snapshot(), { historical });
       return this.finish(this.choice(action, ['play', 'quit']));
     }
     if (state.phase === 'shell-required') {
       this.phase = 'unavailable';
-      const action = await this.ui.failure(this.snapshot(), { retry: false, unavailable: true });
+      const action = await this.ui.failure(this.snapshot(), { retry: false, unavailable: true, historical });
       return this.finish(this.choice(action, ['play', 'quit']));
     }
     this.phase = 'offer';
-    const action = this.choice(await this.ui.offer(this.snapshot()), ['update', 'play', 'quit']);
+    const action = this.choice(await this.ui.offer(this.snapshot(), { historical }), ['update', 'play', 'quit']);
     if (action !== 'update') return this.finish(action);
     return this.prepareTarget();
   }
@@ -66,7 +62,7 @@ export class StartupLauncherSession {
       if (this.cancelled) return this.finish('play');
       if (this.coordinator.snapshot().phase === 'ready') return this.applyReady();
       this.phase = 'error';
-      const action = this.choice(await this.ui.failure(this.snapshot(), { retry: true }), ['retry', 'play', 'quit']);
+      const action = this.choice(await this.ui.failure(this.snapshot(), { retry: true, historical: Boolean(this.coordinator.startupError) }), ['retry', 'play', 'quit']);
       if (action !== 'retry') return this.finish(action);
     }
   }

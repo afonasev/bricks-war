@@ -206,6 +206,7 @@ app.whenReady().then(async () => {
   };
   launcherUI = new LauncherWindow({ BrowserWindow, ipcMain, directory: here, snapshot: state,
     locale: app.getLocale(), screen, notesURL: () => releaseNotesURL(coordinator.candidate),
+    installerTarget: () => coordinator.candidate,
     openExternal: url => desktopShell.openExternal(url) });
   const startup = new StartupLauncherSession({ coordinator, ui: launcherUI, resumeLaunch: resumedShellHandoff || nativeShell?.activatingCandidate === true, launchGame:async()=>{await nativeShell?.acknowledgeLegacyPending();return launchGame();},
     activate: async () => {

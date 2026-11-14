@@ -120,7 +120,7 @@ export class ContentStore {
     const name = `release-${m.sequence}`, stage = join(this.root, `${name}.staging`);
     await mkdir(stage, { recursive: true });
     const space = await statfs(this.root); const required = m.files.reduce((total,f) => total + f.size,0);
-    if (space.bavail * space.bsize < required + 1024 * 1024) throw Error('Not enough space');
+    if (space.bavail * space.bsize < required + 1024 * 1024) throw Object.assign(Error('Not enough space'), {code:'ENOSPC'});
     let completed = 0;
     try {
       this.onProgress('downloading');
@@ -130,7 +130,7 @@ export class ContentStore {
         try { const bytes = await readFile(existing); if (bytes.length === f.size && digest(bytes) === f.sha256) { completed += f.size; onBytes(required ? completed / required * 100 : 100); continue; } } catch { /* incomplete file */ }
         const bytes = await this.download(`${m.sequence}/${f.path}`, f.size, { sequence: m.sequence, sha256: f.sha256, ...(signal ? {signal} : {}) });
         signal?.throwIfAborted();
-        if (bytes.length !== f.size || digest(bytes) !== f.sha256) throw Error('Content hash mismatch');
+        if (bytes.length !== f.size || digest(bytes) !== f.sha256) throw Object.assign(Error('Content hash mismatch'), {code:'UPDATE_INTEGRITY'});
         const path = join(stage, f.path); await mkdir(join(path, '..'), { recursive: true }); await writeFile(path, bytes);
         completed += f.size; onBytes(required ? completed / required * 100 : 100);
       }

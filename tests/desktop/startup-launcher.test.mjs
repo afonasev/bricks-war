@@ -255,5 +255,21 @@ test('current status waits for Play or Exit; an acknowledged candidate resumes g
 });
 
 test('historical failure is not presented as a newly confirmed rollback',async()=>{
- const f=launcherFixture({candidate:null});f.update.startupError=true;f.ui.failure=async(_state,options)=>{assert.equal(options.historical,true);assert.equal(options.recovery,undefined);return 'play';};assert.equal(await f.session.run(),'play');
+ const f=launcherFixture({candidate:null});f.update.startupError=true;f.ui.status=async(_state,options)=>{assert.equal(options.historical,true);assert.equal(options.recovery,undefined);return 'play';};assert.equal(await f.session.run(),'play');
+});
+
+
+test('historical failure keeps a newly discovered update actionable', async () => {
+  const f = launcherFixture();
+  f.update.startupError = true;
+  const offer = f.ui.offer;
+  f.ui.offer = async (state, options) => {
+    assert.equal(state.version, '2.0.0');
+    assert.equal(options.historical, true);
+    return offer();
+  };
+  assert.equal(await f.session.run(), 'play');
+  assert.equal(f.counts.offers, 1);
+  assert.equal(f.counts.prepares, 1);
+  assert.equal(f.counts.failures, 0);
 });

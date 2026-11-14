@@ -91,3 +91,28 @@ test('Windows shell packages require a signed protected rollback capability',()=
  assert.throws(()=>validateShell(envelope({updaterAbi:2,files:[file]}),keys.publicKey,'win32','x64','1.0.0','10.0.0'),/protected rollback/);
  assert.equal(validateShell(envelope({updaterAbi:2,files:[{...file,protectedRollbackAbi:1}]}),keys.publicKey,'win32','x64','1.0.0','10.0.0').file.protectedRollbackAbi,1);
 });
+
+
+test('legacy Windows discovers a matching signed installer for manual use without preparing it', async t => {
+  const root = await mkdtemp(join(tmpdir(),'bricks-windows-manual-'));
+  t.after(() => rm(root,{recursive:true,force:true}));
+  const name = 'Bricks-War-2.0.0-win-x64.exe';
+  const file = {name,platform:'win32',arch:'x64',minimumOS:'0.0.0',size:100,sha256:'a'.repeat(64)};
+  const release = {tag_name:'v2.0.0',assets:[{name:'shell-manifest.json'},{name,size:file.size,digest:`sha256:${file.sha256}`}]};
+  const shell = new ShellUpdate({root,platform:'win32',arch:'x64',version:'1.0.0',publicKey:keys.publicKey});
+  let signed = envelope({updaterAbi:1,files:[file]});
+  shell.bytes = async (_tag,asset) => {
+    assert.equal(asset,'shell-manifest.json');
+    return Buffer.from(JSON.stringify(signed));
+  };
+  const manual = await shell.discover([release]);
+  assert.equal(manual.component,'shell-required');
+  assert.deepEqual(manual.installer,{tag:'v2.0.0',name});
+  assert.equal(manual.prepare, undefined);
+  assert.equal(shell.ready, undefined);
+  signed = envelope({updaterAbi:2,files:[{...file,protectedRollbackAbi:1}]});
+  assert.equal((await shell.discover([release])).component,'shell');
+  await recordShellFailure(root,'2.0.0');
+  assert.equal((await shell.discover([release])).component,'shell-required');
+  assert.equal(await shell.discover([{...release,assets:[release.assets[0],{...release.assets[1],digest:'sha256:wrong'}]}]),null);
+});

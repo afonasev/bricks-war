@@ -44,7 +44,7 @@ export class UpdateCoordinator {
       requiresShell: this.candidate?.requiresShell ?? Boolean(this.readyShell()),
       currentVersion: this.store.manifest.gameVersion, currentDate: manifestReleaseDate(this.store.manifest),
       versionDate: manifestReleaseDate(this.candidate?.manifest ?? this.store.ready) ?? normalizeReleaseDate(this.candidate?.publishedAt), shellVersion: this.shellVersion, component: this.candidate?.component ?? 'content',
-      checkOutcome: this.checkOutcome };
+      checkOutcome: this.checkOutcome, failureReason: this.failureReason };
   }
   check({ signal } = {}) {
     if (this.discovery) return this.discovery;
@@ -136,13 +136,19 @@ export class UpdateCoordinator {
   download() {
     if (this.operation || !this.candidate || this.phase === 'ready' || this.candidate.component === 'shell-required') return this.operation ?? Promise.resolve(this.snapshot());
     this.consented = true;
+    this.failureReason = undefined;
     this.phase = this.inMenu ? 'downloading' : 'paused';
     this.operation = (async () => {
       try {
         if (this.candidate.component === 'shell') await this.candidate.prepare(value => { this.progress = value; }, phase=>{if(this.consented)this.phase=phase;});
         else await this.store.prepare(this.candidate.envelope, value => { this.progress = value; });
         if (this.consented) { this.progress = 100; this.phase = 'ready'; }
-      } catch (error) { if (this.consented) this.phase = error.name === 'AbortError' ? 'available' : 'download-error'; }
+      } catch (error) {
+        if (this.consented) {
+          this.failureReason = { ENOSPC:'disk', EACCES:'permission', EPERM:'permission', UPDATE_INTEGRITY:'integrity' }[error?.code];
+          this.phase = error?.name === 'AbortError' ? 'available' : 'download-error';
+        }
+      }
       finally { this.operation = null; }
       return this.snapshot();
     })();

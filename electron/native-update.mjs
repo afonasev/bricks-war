@@ -57,6 +57,7 @@ export class NativeUpdate extends ShellUpdate {
     this.verifyTree = options.verifyTree ?? (async (component, path) => JSON.parse((await exec(this.context.executable, ['verify-tree', component, path], { windowsHide: true, maxBuffer: 65536 })).stdout));
     this.status = options.status ?? (async () => JSON.parse((await exec(this.context.executable, ['native-status'], { windowsHide: true, maxBuffer: 65536 })).stdout));
   }
+  get offersManualWindowsInstaller() { return false; }
   legacyCandidate(){return {component:'shell-required',requiresShell:true,manifest:{gameVersion:this.legacyPending.version},tag:`v${this.legacyPending.version}`};}
   async discover(releases, options = {}) {
     const active = () => { options.signal?.throwIfAborted(); options.assertActive?.(); }; active();
@@ -82,11 +83,11 @@ export class NativeUpdate extends ShellUpdate {
     const { manifest, release, envelope } = this.selected;
     await mkdir(this.root, { recursive: true });
     const space = await statfs(this.root);
-    if (space.bavail * space.bsize < manifest.file.unpackedSize * 2 + manifest.file.size + 64 * 1024 ** 2) throw Error('Not enough space for native update');
+    if (space.bavail * space.bsize < manifest.file.unpackedSize * 2 + manifest.file.size + 64 * 1024 ** 2) throw Object.assign(Error('Not enough space for native update'), {code:'ENOSPC'});
     this.progress = progress;
     const bytes = await this.bytes(release.tag_name, manifest.file.name, manifest.file.size, signal, {payload:true});
     phase('verifying');
-    if (bytes.length !== manifest.file.size || hash(bytes) !== manifest.file.sha256) throw Error('Native package hash mismatch');
+    if (bytes.length !== manifest.file.size || hash(bytes) !== manifest.file.sha256) throw Object.assign(Error('Native package hash mismatch'), {code:'UPDATE_INTEGRITY'});
     signal.throwIfAborted();
     const stage = join(this.root, `prepared-${randomBytes(16).toString('hex')}`); await mkdir(stage); this.staging=stage;
     try {
@@ -96,11 +97,11 @@ export class NativeUpdate extends ShellUpdate {
     for (const target of manifest.file.targets) {
       const path = join(payload, target.component); const verified = await this.verifyTree(target.component, path); signal.throwIfAborted();
       if (!identity(verified.identity) || verified.identity.digest !== target.digest || verified.identity.sequence !== target.sequence || verified.identity.version !== target.version
-        || !Number.isSafeInteger(verified.unpackedSize) || verified.unpackedSize < 0) throw Error('Native tree identity mismatch');
+        || !Number.isSafeInteger(verified.unpackedSize) || verified.unpackedSize < 0) throw Object.assign(Error('Native tree identity mismatch'), {code:'UPDATE_INTEGRITY'});
       unpacked += verified.unpackedSize;
       if (manifest.changed.some(changed => changed.component === target.component)) sources.push({ component: target.component, path, digest: target.digest });
     }
-    if (unpacked > manifest.file.unpackedSize) throw Error('Native unpacked size mismatch');
+    if (unpacked > manifest.file.unpackedSize) throw Object.assign(Error('Native unpacked size mismatch'), {code:'UPDATE_INTEGRITY'});
     const plan = { schema: 1, sources, profile: this.context.profile, parent_pid: process.pid, root_pid: this.context.rootPid,
       args: this.args, relaunch: false };
     await writeFile(join(stage, 'native-manifest.json'), JSON.stringify(envelope));

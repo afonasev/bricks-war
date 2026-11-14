@@ -12,6 +12,12 @@ function move(delta) { const list = buttons(); focus(Math.max(0, list.indexOf(do
 async function choose(action) {
   if (busy || !current?.actions.includes(action)) return;
   busy = true;
+  if (action === 'installer') {
+    try { await window.bricksLauncher.installer(current.id); } catch { /* Window closed during the request. */ }
+    finally { busy = false; }
+    await refresh();
+    return;
+  }
   buttons().forEach(b => { b.disabled = true; });
   try { await window.bricksLauncher.choose(current.id, action); } catch { /* Main process may already be closing this window. */ }
   await refresh();
@@ -19,12 +25,14 @@ async function choose(action) {
 function render(view) {
   const changed = current?.id !== view.id;
   current = view;
-  const {kind,copy:t,title,description,version,eyebrow,locale} = launcherPresentation(view);
+  const {kind,copy:t,title,description,version,eyebrow,locale,notice} = launcherPresentation(view);
   document.documentElement.lang = locale;
   document.body.dataset.kind = kind;
   $('title').textContent = title;
   $('description').textContent = description;
   $('version').textContent = version;
+  $('notice').textContent = notice;
+  $('notice').hidden = !notice;
   $('eyebrow').textContent = eyebrow;
   $('notes').textContent = t.notes; $('notes').hidden = !view.hasNotes;
   const transferring = kind === 'progress' || kind === 'cancelling';
@@ -37,7 +45,7 @@ function render(view) {
     $('actions').dataset.key = actionKey;
     $('actions').replaceChildren(...view.actions.map(action => {
       const b = document.createElement('button'); b.textContent = t[action]; b.dataset.action = action;
-      if (action === 'update' || action === 'retry') b.className = 'primary';
+      if (['update', 'retry', 'installer'].includes(action)) b.className = 'primary';
       b.addEventListener('click', () => { void choose(action); }); return b;
     }));
     busy = false;

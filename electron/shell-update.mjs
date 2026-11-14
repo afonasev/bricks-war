@@ -66,6 +66,7 @@ export class ShellUpdate {
       throw Error('Shell download redirect limit');
     },signal);
   }
+  get offersManualWindowsInstaller() { return this.platform === 'win32'; }
   async discover(releases, options = {}) {
     const active = () => { options.signal?.throwIfAborted(); options.assertActive?.(); };
     active();
@@ -75,16 +76,43 @@ export class ShellUpdate {
     const candidates = releases.filter(r => /^v\d+\.\d+\.\d+$/.test(r.tag_name) && r.assets?.some(a => a.name === 'shell-manifest.json'));
     candidates.sort((a,b) => compareVersions(b.tag_name.slice(1),a.tag_name.slice(1)));
     for (const release of candidates) {
-      if (compareVersions(release.tag_name.slice(1),this.version) <= 0 || blocked.includes(release.tag_name.slice(1))) continue;
+      if (compareVersions(release.tag_name.slice(1),this.version) <= 0) continue;
+      const failedBefore = blocked.includes(release.tag_name.slice(1));
+      if (failedBefore && !this.offersManualWindowsInstaller) continue;
       active();
       const bytes = await this.bytes(release.tag_name,'shell-manifest.json',512000,options.signal);
       active();
       const envelope = JSON.parse(bytes);
-      let manifest;try{manifest=validateShell(envelope,this.publicKey,this.platform,this.arch,this.version);}catch(error){if(error.code==='INCOMPATIBLE')continue;throw error;}
+      let manifest, manual = failedBefore;
+      try {
+        manifest = validateShell(envelope,this.publicKey,this.platform,this.arch,this.version,undefined,{activation:!manual});
+      } catch (error) {
+        if (error.code !== 'INCOMPATIBLE') throw error;
+        if (!this.offersManualWindowsInstaller) continue;
+        try {
+          manifest = validateShell(envelope,this.publicKey,this.platform,this.arch,this.version,undefined,{activation:false});
+        } catch (manualError) {
+          if (manualError.code === 'INCOMPATIBLE') continue;
+          throw manualError;
+        }
+        manual = true;
+      }
       if (manifest.version !== release.tag_name.slice(1) || !release.assets.some(a => a.name === manifest.file.name && a.size === manifest.file.size && a.digest === `sha256:${manifest.file.sha256}`)) continue;
       active();
+      const candidate = {
+        tag: release.tag_name,
+        publishedAt: release.published_at,
+        requiresShell: true,
+        manifest: {gameVersion:manifest.version,releaseDate:manifest.releaseDate,sequence:manifest.contentSequence},
+        compatibility: {abi:manifest.contentAbi ?? 2,version:manifest.version,bundledSequence:manifest.contentSequence},
+      };
+      if (manual) {
+        if (!/^Bricks-War-\d+\.\d+\.\d+-win-(x64|arm64|ia32)\.exe$/.test(manifest.file.name)
+          || manifest.file.name !== `Bricks-War-${manifest.version}-win-${this.arch}.exe`) continue;
+        return { ...candidate, component:'shell-required', installer:{tag:release.tag_name,name:manifest.file.name} };
+      }
       this.selected = { release,manifest,envelope };
-      return { component:'shell',tag:release.tag_name,publishedAt:release.published_at,requiresShell:true,manifest:{gameVersion:manifest.version,releaseDate:manifest.releaseDate,sequence:manifest.contentSequence}, compatibility:{abi:manifest.contentAbi ?? 2,version:manifest.version,bundledSequence:manifest.contentSequence},
+      return { ...candidate, component:'shell',
         prepare: (progress,phase,options) => this.prepare(progress,phase,options), commit:plan=>this.commitPrepared(plan),
         cancel:() => this.controller?.abort(),discard:async()=>{ this.ready=null; await rm(join(this.root,'ready.json'),{force:true}); } };
     }
@@ -94,11 +122,11 @@ export class ShellUpdate {
     this.controller = new AbortController();
     const {release,manifest,envelope} = this.selected;
     await mkdir(this.root,{recursive:true});
-    const space = await statfs(this.root); if (space.bavail * space.bsize < manifest.file.size * 4) throw Error('Not enough space');
+    const space = await statfs(this.root); if (space.bavail * space.bsize < manifest.file.size * 4) throw Object.assign(Error('Not enough space'), {code:'ENOSPC'});
     this.controller.signal.throwIfAborted(); this.progress = progress;
     const bytes = await this.bytes(release.tag_name,manifest.file.name,manifest.file.size,this.controller.signal,{payload:true});
     phase('verifying');
-    if (bytes.length !== manifest.file.size || createHash('sha256').update(bytes).digest('hex') !== manifest.file.sha256) throw Error('Shell hash mismatch');
+    if (bytes.length !== manifest.file.size || createHash('sha256').update(bytes).digest('hex') !== manifest.file.sha256) throw Object.assign(Error('Shell hash mismatch'), {code:'UPDATE_INTEGRITY'});
     this.controller.signal.throwIfAborted();
     const file = join(this.root,manifest.file.name); await writeFile(file,bytes);
     await writeFile(join(this.root,'shell-manifest.json'),JSON.stringify(envelope));
