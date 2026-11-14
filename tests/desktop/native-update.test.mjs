@@ -15,10 +15,10 @@ const manifest=()=>({schema:1,game:'bricks-war',component:'native-release',chann
  files:[{platform:process.platform,arch:process.arch,minimumOS:process.platform==='darwin'?'13.0.0':'10.0.0',name:'native.zip',sha256:hash(archive),size:archive.length,unpackedSize:100,targets:[{component:'launcher',...id('c',2,'2.0.0')},{component:'client',...id('d',2,'2.0.0')}]}]});
 const envelope=value=>{const payload=JSON.stringify(value);return{payload,signature:sign(null,Buffer.from(payload),keys.privateKey).toString('base64')}};
 async function fixture(fn){const root=await mkdtemp(join(tmpdir(),'bricks-native-update-'));try{await fn(root);}finally{await rm(root,{recursive:true,force:true});}}
-function updater(root,{badTree=false,blocked=[],release=manifest()}={}){
+function updater(root,{badTree=false,blocked=[],release=manifest(),fetchArchive=()=>new Response(archive)}={}){
  const calls=[];const signed=envelope(release);
  const selected={tag_name:'v2.0.0',assets:[{name:'native-manifest.json'},{name:'native.zip',size:archive.length,digest:`sha256:${hash(archive)}`}]};
- const native=new NativeUpdate({root,context:current,version:'1.0.0',publicKey:keys.publicKey,gate:new TransferGate(),fetcher:async url=>{calls.push(url);return new Response(url.endsWith('/native-manifest.json')?JSON.stringify(signed):archive);},args:['-muted'],status:async()=>({failed:blocked,recoveryRequired:false}),
+ const native=new NativeUpdate({root,context:current,version:'1.0.0',publicKey:keys.publicKey,gate:new TransferGate(),fetcher:async url=>{calls.push(url);return url.endsWith('/native-manifest.json') ? new Response(JSON.stringify(signed)) : fetchArchive();},args:['-muted'],status:async()=>({failed:blocked,recoveryRequired:false}),
  extract:async(_platform,_archive,path)=>{await mkdir(join(path,'launcher'));await mkdir(join(path,'client'));},
  verifyTree:async component=>({identity:id(badTree?'f':component==='launcher'?'c':'d',2,'2.0.0'),unpackedSize:40})});
  return{native,calls,selected};
@@ -58,3 +58,59 @@ test('candidate reaches game health through its own pending transaction; foreign
  native.status=async()=>({failed:[],phase:'pending',recoveryRequired:true,nonce:'2'.repeat(64)});await native.open();assert.equal(native.recoveryRequired,true);assert.equal(native.activatingCandidate,false);
  native.status=async()=>({failed:[],phase:'aborted',recoveryRequired:true,nonce});await native.open();assert.equal(native.recoveryRequired,true);
 }));
+
+test('native discovery keeps the metadata deadline while consented payload preparation has no fixed deadline', async t => {
+ const deadlines = [];
+ t.mock.method(AbortSignal, 'timeout', ms => {
+  deadlines.push(ms);
+  return new AbortController().signal;
+ });
+ await fixture(async root => {
+  const {native, selected} = updater(root);
+  const target = await native.discover([selected]);
+  assert.deepEqual(deadlines, [30000]);
+  deadlines.length = 0;
+  await target.prepare(() => {});
+  assert.deepEqual(deadlines, []);
+  assert.ok(native.ready);
+ });
+});
+
+test('cancelling a stalled native transfer cancels the reader and leaves no ready receipt', {timeout: 5000}, async () => {
+ let enteredRead;
+ const reading = new Promise(resolve => { enteredRead = resolve; });
+ let readerCancelled = false;
+ await fixture(async root => {
+  const {native, selected} = updater(root, {
+   fetchArchive: () => new Response(new ReadableStream({
+    pull() { enteredRead(); },
+    cancel() { readerCancelled = true; },
+   }, {highWaterMark: 0})),
+  });
+  await native.open();
+  const target = await native.discover([selected]);
+  const preparation = target.prepare(() => {});
+  await Promise.race([reading, preparation]);
+  target.cancel();
+  await assert.rejects(preparation, {name: 'AbortError'});
+  assert.equal(readerCancelled, true);
+  assert.equal(native.ready, null);
+  assert.deepEqual(await readdir(root), []);
+ });
+});
+
+test('native corrupt and oversized payloads leave no ready receipt or staging tree', async () => {
+ for (const [bytes, error] of [
+  [Buffer.alloc(archive.length), /Native package hash mismatch/],
+  [Buffer.alloc(archive.length + 1), /Oversized shell package/],
+ ]) {
+  await fixture(async root => {
+   const {native, selected} = updater(root, {fetchArchive: () => new Response(bytes)});
+   await native.open();
+   const target = await native.discover([selected]);
+   await assert.rejects(target.prepare(() => {}), error);
+   assert.equal(native.ready, null);
+   assert.deepEqual(await readdir(root), []);
+  });
+ }
+});

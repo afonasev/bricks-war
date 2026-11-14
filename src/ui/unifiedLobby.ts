@@ -23,6 +23,7 @@ import './unifiedLobby.css';
 import { LobbyYGesture, nextLobbyPosition, ownsLobby, type LobbyMenuOwner } from './lobbyInput';
 const escape = (s: string): string => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
 const modeName = (mode: LobbyMode): string => mode === 'survival' ? text('survival') : mode === 'battle' ? text('battle') : text('team');
+const styles: TileStyleSelection[] = ['random', ...TILE_STYLES.map(style => style.id)];
 const levels: AiDifficulty[] = ['easy', 'medium', 'hard', 'expert'];
 const levelName = (level: AiDifficulty): string => text(({ easy: 'difficultyEasy', medium: 'difficultyMedium', hard: 'difficultyHard', expert: 'difficultyExpert' } as const)[level]);
 const styleName = (style: TileStyleSelection): string => style === 'random' ? text('tileRandom') : text(({ classic: 'tileClassic', 'sea-crystals': 'tileClassic', 'construction-bricks': 'tileBricks', 'pixel-adventure': 'tilePixel', 'stone-fortress': 'tileStone', marmalade: 'tileMarmalade', 'forest-mosaic': 'tileForest' } as const)[style]);
@@ -48,7 +49,7 @@ export interface LobbyHost {
     commit(slot: number, draft: CardDraft): void;
     remove(slot: number): void;
     move(from: number, to: number): void;
-    start(): void;
+    start(): boolean;
     back(): void;
     validate(): void;
     settings(): string;
@@ -57,7 +58,7 @@ export interface LobbyHost {
 }
 /** Owns only lobby editing/presentation. Match state and physical device identities stay with the app. */
 export class UnifiedLobby {
-    readonly editors = new Map<number, CardDraft>();
+    private readonly editors = new Map<number, CardDraft>();
     private readonly selections = new Map<number, number>();
     private readonly held = new Map<number, string>();
     private readonly deleteSince = new Map<number, number>();
@@ -220,7 +221,15 @@ export class UnifiedLobby {
         }, true);
     }
     active(): boolean { return !!this.root.querySelector('.unified-lobby'); }
-    editing(): boolean { return this.editors.size > 0; }
+    blocksStart(): boolean {
+        return [...this.editors.values()].some(draft => draft.step !== 'style' || !isLobbyHuman(draft.controller));
+    }
+    pendingPlayers(): ReadonlyMap<number, CardDraft> {
+        return new Map([...this.editors].flatMap(([slot, draft]) =>
+            draft.isNew && draft.step === 'style' && isLobbyHuman(draft.controller)
+                ? [[slot, { ...draft, style: styles[draft.cursor]! }] as const]
+                : []));
+    }
     leave(): void { this.cancelMouseDrag(); this.editors.clear(); this.overlay = null; this.removeHold.clear(); this.deleteSince.clear(); this.yGesture.clear(); }
     private indices(): number[] {
         const h = this.host;
@@ -244,8 +253,10 @@ export class UnifiedLobby {
                     this.held.set(pad.index, this.padAction(pad));
         }
         const h = this.host, mode = h.mode(), indices = this.indices();
-        const people = h.slots.filter(slot => isLobbyHuman(slot)).length;
-        const beside = mode === 'survival' && ratingBesideRoster(innerWidth - 2 * Math.min(64, Math.max(24, innerWidth * .04)), people, Math.max(...indices) + 1) && !isMobilePlayViewport() && innerHeight >= 960;
+        const people = h.slots.filter(isLobbyHuman).length + this.pendingPlayers().size;
+        const padding = innerHeight <= 600 ? 24 : Math.min(64, Math.max(24, innerWidth * .04));
+        const beside = mode === 'survival' && !isMobilePlayViewport()
+            && ratingBesideRoster(innerWidth - 2 * padding, people, Math.max(...indices) + 1);
         this.lastWidth = innerWidth;
         this.lastHeight = innerHeight;
         this.root.innerHTML = `<main class="unified-lobby" data-screen="${mode}" data-mode="${mode}" data-menu-owner="${this.menuOwner.kind === 'pointer' ? 'pointer' : `gamepad-${this.menuOwner.index}`}">
@@ -336,14 +347,15 @@ export class UnifiedLobby {
         return `<div class="lobby-style-preview ${editing ? 'lobby-wheel lobby-theme-wheel' : ''}" ${editing ? `data-editor-options="${slot}"` : ''}>${editing ? this.wheelArrow('up') : '<span class="lobby-arrow-space" aria-hidden="true"></span>'}${editing ? `<button data-wheel-center data-style="${style}" data-default-choice="true" class="lobby-style-content lobby-theme-current" aria-label="${escape(styleName(style))}">${content}</button>` : `<div class="lobby-style-content">${content}</div>`}${editing ? this.wheelArrow('down') : '<span class="lobby-arrow-space" aria-hidden="true"></span>'}</div>`;
     }
     private styleMarkup(d: CardDraft, slot: number): string {
-        const styles = ['random', ...TILE_STYLES.map(s => s.id)] as TileStyleSelection[];
-        d.cursor=(d.cursor+styles.length)%styles.length;
         return this.stylePreview(styles[d.cursor]!, slot);
     }
     private turnWheel(slot: number, delta: number): void {
         const d=this.editors.get(slot); if (!d) return;
-        const count=d.step==='name'?this.nameOptions(slot,d).length:1+TILE_STYLES.length;
-        d.cursor=(d.cursor+delta+count)%count;
+        const count = d.step === 'name' ? this.nameOptions(slot, d).length : styles.length;
+        d.cursor = (d.cursor + delta + count) % count;
+        if (d.step === 'style' && !d.isNew && isLobbyHuman(d.controller)) {
+            this.host.styles[slot] = styles[d.cursor]!;
+        }
         this.render();
         this.root.querySelector(`[data-lobby-slot="${slot}"] .lobby-wheel`)?.animate([{opacity:.4,transform:`translateY(${delta*6}px)`},{opacity:1,transform:'translateY(0)'}],{duration:140});
     }
@@ -396,8 +408,8 @@ export class UnifiedLobby {
             card.querySelectorAll<HTMLElement>('[data-create-name]').forEach(b=>b.addEventListener('click',()=>this.beginTyping(slot)));
             card.querySelector('[data-wheel-up]')?.addEventListener('click',()=>this.turnWheel(slot,-1));
             card.querySelector('[data-wheel-down]')?.addEventListener('click',()=>this.turnWheel(slot,1));
-            card.querySelectorAll<HTMLElement>('[data-level]').forEach(b => b.addEventListener('click', () => { d.difficulty = b.dataset.level as AiDifficulty; if (d.isNew) { d.style = 'random'; this.commit(slot); return; } d.step = 'style'; d.cursor = ['random', ...TILE_STYLES.map(s => s.id)].indexOf(d.style); this.render(); }));
-            card.querySelectorAll<HTMLElement>('[data-style]').forEach(b => b.addEventListener('click', () => { d.style = b.dataset.style as TileStyleSelection; this.commit(slot); }));
+            card.querySelectorAll<HTMLElement>('[data-level]').forEach(b => b.addEventListener('click', () => { d.difficulty = b.dataset.level as AiDifficulty; if (d.isNew) { d.style = 'random'; this.commit(slot); return; } d.step = 'style'; d.cursor = Math.max(0, styles.indexOf(d.style)); this.render(); }));
+            card.querySelectorAll<HTMLElement>('[data-style]').forEach(b => b.addEventListener('click', () => this.commit(slot)));
         }
     }
     private joinPointer(slot: number): void {
@@ -447,11 +459,11 @@ export class UnifiedLobby {
             return;
         const isNew = h.slots[slot] === 'off';
         const step = value.startsWith('ai-') ? 'difficulty' : isNew ? 'name' : 'style';
-        const cursor = step === 'difficulty' ? levels.indexOf(value.slice(3) as AiDifficulty) : step === 'style' ? ['random', ...TILE_STYLES.map(s => s.id)].indexOf(h.styles[slot]!) : 1;
+        const cursor = step === 'difficulty' ? levels.indexOf(value.slice(3) as AiDifficulty) : step === 'style' ? Math.max(0, styles.indexOf(h.styles[slot]!)) : 1;
         this.editors.set(slot, { owner, token: h.pads().get(owner)?.token ?? 0, controller: value, isNew, step, name: isNew && isLobbyHuman(value) && this.nameTaken(slot, h.names[slot]!) ? '' : h.names[slot]!, style: h.styles[slot]!, difficulty: value.startsWith('ai-') ? value.slice(3) as AiDifficulty : 'medium', names: h.profiles.rankedNames(), cursor });
         this.render();
     }
-    private chooseName(slot: number, name: string): void { const d = this.editors.get(slot)!; const normalized = normalizePlayerName(name, slot); if (this.nameTaken(slot, normalized)) return; d.name = normalized; d.step = 'style'; d.cursor = ['random', ...TILE_STYLES.map(s => s.id)].indexOf(d.style); this.render(); }
+    private chooseName(slot: number, name: string): void { const d = this.editors.get(slot)!; const normalized = normalizePlayerName(name, slot); if (this.nameTaken(slot, normalized)) return; d.name = normalized; d.step = 'style'; d.cursor = Math.max(0, styles.indexOf(d.style)); this.render(); }
     private deleteName(slot: number, name: string): void {
         this.host.profiles.profiles.filter(p => p.name === name).forEach(p => this.host.profiles.remove(p.id));
         const d = this.editors.get(slot)!;
@@ -470,9 +482,17 @@ export class UnifiedLobby {
         if (d.isNew && isLobbyHuman(value) && this.nameTaken(slot, d.name)) { d.step = 'name'; d.cursor = 0; this.render(); return; }
         this.editors.delete(slot);
         this.returnSlot=slot;
-        this.host.commit(slot, { ...d, controller: value });
+        this.host.commit(slot, { ...d, controller: value, style: d.step === 'style' ? styles[d.cursor]! : d.style });
     }
-    private cancel(slot: number): void { this.editors.delete(slot); this.returnSlot=slot; this.render(); }
+    private cancel(slot: number): void {
+        const draft = this.editors.get(slot);
+        if (draft?.step === 'style' && !draft.isNew && isLobbyHuman(draft.controller)) {
+            this.host.styles[slot] = draft.style;
+        }
+        this.editors.delete(slot);
+        this.returnSlot = slot;
+        this.render();
+    }
     private padAction(pad: Gamepad): string {
         const down = (i: number): boolean => pad.buttons[i]?.pressed ?? false;
         return down(3) ? 'join' : down(1) ? 'back' : down(0) ? 'confirm' : down(9) ? 'start' : down(2) ? 'x' : down(12) || (pad.axes[1] ?? 0) < -.62 ? 'previous' : down(13) || (pad.axes[1] ?? 0) > .62 ? 'next' : down(14) || (pad.axes[0] ?? 0) < -.62 ? 'decrease' : down(15) || (pad.axes[0] ?? 0) > .62 ? 'increase' : '';
@@ -508,6 +528,11 @@ export class UnifiedLobby {
                 const buttons=Array.from(this.root.querySelectorAll<HTMLElement>('.lobby-overlay button:not([disabled])'));
                 if(['previous','next','decrease','increase'].includes(action)){this.modalPadCursor=spatialElementIndex(buttons,this.modalPadCursor,action as GridDirection);buttons[this.modalPadCursor]?.focus();}
                 if(action==='confirm')this.padClick(pad.index,buttons[this.modalPadCursor]);
+                continue;
+            }
+            if (action === 'start' && action !== previous && this.isMenuPad(pad.index)) {
+                this.root.dataset.inputMode = 'gamepad';
+                if (this.host.start()) return;
                 continue;
             }
             if(entry){
@@ -547,7 +572,6 @@ export class UnifiedLobby {
             }
             if(!action||action===previous||action==='join')continue;
             this.root.dataset.inputMode='gamepad';
-            if(action==='start'){this.host.start();continue;}
             if(action==='back'){if(!this.back(pad.index))this.host.back();continue;}
             if(['previous','next','increase','decrease'].includes(action)){const rects=targets.map(t=>(['increase','decrease'].includes(action)?t.closest<HTMLElement>('.lobby-card')??t:t).getBoundingClientRect());const next=spatialIndex(rects,cursor,action as GridDirection);this.selections.set(pad.index,next);this.highlight(pad.index,next);}
             if(action==='confirm'){

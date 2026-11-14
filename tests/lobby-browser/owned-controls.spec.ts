@@ -79,3 +79,67 @@ test('held X through the rules overlay cannot remove a card or add a bot on retu
  for(let i=0;i<4;i++)await pulse(page,0,15);await pulse(page,0,0);await expect(page.getByRole('dialog')).toBeVisible();
  await button(page,0,2,true);await page.waitForTimeout(150);await pulse(page,0,1);await expect(page.getByRole('dialog')).toHaveCount(0);await page.waitForTimeout(900);await expect(page.locator('[data-edit]')).toHaveCount(2);await expect(page.locator('.is-editing')).toHaveCount(0);await button(page,0,2,false);
 });
+
+for (const viewport of [{ width: 1440, height: 960 }, { width: 390, height: 844 }]) {
+ test(`lobby owner starts with both human themes open at ${viewport.width}px`, async ({ page }) => {
+  await page.setViewportSize(viewport);
+  await boot(page);
+  await pulse(page, 0, 0);
+  await expect(page.locator('.unified-lobby')).toHaveAttribute('data-menu-owner', 'gamepad-0');
+  const owner = page.locator('[data-lobby-slot="0"]');
+  const guest = page.locator('[data-lobby-slot="1"]');
+  await button(page, 0, 3, true);
+  await expect(owner).toHaveClass(/is-style-editing/);
+  await button(page, 0, 3, false);
+  await page.waitForTimeout(110);
+  await pulse(page, 0, 13);
+  await expect(owner.locator('[data-style]')).toHaveAttribute('data-style', 'classic');
+
+  await pulse(page, 1, 3);
+  await expect(page.locator('#start-match')).toBeDisabled();
+  await pulse(page, 0, 9);
+  await expect(page.locator('.hud-card')).toHaveCount(0);
+  await pulse(page, 1, 0);
+  await expect(guest.locator('[data-style]')).toHaveAttribute('data-style', 'random');
+  await expect(page.locator('#start-match')).toBeEnabled();
+  await pulse(page, 1, 12);
+  await expect(guest.locator('[data-style]')).toHaveAttribute('data-style', 'forest-mosaic');
+
+  await pulse(page, 1, 9);
+  await expect(page.locator('.is-style-editing')).toHaveCount(2);
+  await expect(page.locator('.hud-card')).toHaveCount(0);
+  await page.screenshot({ path: `${evidence}/live-themes-lobby-${viewport.width}.png`, fullPage: true });
+
+  await pulse(page, 0, 9);
+  await expect(page.locator('.arena-screen')).toHaveAttribute('data-tile-styles', 'classic,forest-mosaic');
+  const players = page.locator('.hud-card');
+  await expect(players).toHaveCount(2);
+  await expect(players.nth(0).locator('.hud-identity strong')).toHaveText('Игрок 1');
+  await expect(players.nth(0)).toHaveAttribute('data-tile-style', 'classic');
+  await expect(players.nth(1).locator('.hud-identity strong')).toHaveText('Игрок 2');
+  await expect(players.nth(1)).toHaveAttribute('data-tile-style', 'forest-mosaic');
+  await expect(page.locator('.match-loading')).toHaveCount(0);
+  await expect(page.locator('#countdown')).toBeHidden();
+  await page.screenshot({ path: `${evidence}/live-themes-match-${viewport.width}.png`, fullPage: true });
+ });
+}
+
+test('B restores the old theme and A keeps the current theme', async ({ page }) => {
+ await boot(page);
+ await pulse(page, 0, 0);
+ const owner = page.locator('[data-lobby-slot="0"]');
+ await holdY(page, 0);
+ await pulse(page, 0, 13);
+ await expect(owner.locator('[data-style]')).toHaveAttribute('data-style', 'classic');
+ await pulse(page, 0, 1);
+ await expect(owner).not.toHaveClass(/is-editing/);
+
+ await holdY(page, 0);
+ await expect(owner.locator('[data-style]')).toHaveAttribute('data-style', 'random');
+ await pulse(page, 0, 12);
+ await expect(owner.locator('[data-style]')).toHaveAttribute('data-style', 'forest-mosaic');
+ await pulse(page, 0, 0);
+ await expect(owner).not.toHaveClass(/is-editing/);
+ await holdY(page, 0);
+ await expect(owner.locator('[data-style]')).toHaveAttribute('data-style', 'forest-mosaic');
+});

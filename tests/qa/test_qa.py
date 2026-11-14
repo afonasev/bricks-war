@@ -169,7 +169,9 @@ class BrowserPortTests(unittest.TestCase):
 
             args = ['qa.py', 'ui', '--reason', 'automatic origin contract', '--output', directory]
             environment = {key: value for key, value in os.environ.items() if key != 'BRICKS_LOCAL_QA_PORT'}
-            with patch.dict(os.environ, environment, clear=True), patch.object(sys, 'argv', args), patch.object(qa, 'run_command', side_effect=run):
+            with (patch.dict(os.environ, environment, clear=True), patch.object(sys, 'argv', args),
+                  patch.object(qa, 'run_command', side_effect=run),
+                  patch.object(qa, 'tool_versions', return_value={})):
                 with redirect_stdout(io.StringIO()):
                     self.assertEqual(qa.main(), 0)
             result = json.loads(next(Path(directory).glob('*/result.json')).read_text())
@@ -205,6 +207,20 @@ class BrowserPortTests(unittest.TestCase):
                         connection, _ = listener.accept()
                         connection.close()
 
+    def test_dependency_preflight_records_failure_before_launching_tests(self):
+        with tempfile.TemporaryDirectory() as directory:
+            args = ['qa.py', 'unit-ui', '--reason', 'missing dependency', '--output', directory]
+            with (patch.object(sys, 'argv', args),
+                  patch.object(qa, 'tool_versions', side_effect=FileNotFoundError('vitest/package.json')),
+                  patch.object(qa, 'run_command') as run,
+                  redirect_stdout(io.StringIO())):
+                self.assertEqual(qa.main(), 1)
+            run.assert_not_called()
+            result = json.loads(next(Path(directory).glob('*/result.json')).read_text())
+            self.assertFalse(result['passed'])
+            self.assertEqual(result['checks'], [])
+            self.assertIn('QA dependency preflight failed: vitest/package.json', result['error'])
+
 
 class LoadReportTests(unittest.TestCase):
     def test_rejects_missing_and_invalid_json(self):
@@ -222,7 +238,8 @@ class LoadReportTests(unittest.TestCase):
             (output_parent / 'unit.json').write_text(json.dumps({'success': True}))
             args = ['qa.py', 'unit-ui', '--reason', 'contract', '--output', str(output_parent)]
             with patch.object(sys, 'argv', args), patch.object(
-                    qa, 'run_command', return_value={'exit_code': 0, 'wall_seconds': 0.01}):
+                    qa, 'run_command', return_value={'exit_code': 0, 'wall_seconds': 0.01}), patch.object(
+                        qa, 'tool_versions', return_value={}):
                 with redirect_stdout(io.StringIO()):
                     self.assertEqual(qa.main(), 1)
             run_dirs = [path for path in output_parent.iterdir() if path.is_dir()]

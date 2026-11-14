@@ -2,7 +2,7 @@ import { MatchBackgroundSelection, applyMatchBackground } from './matchBackgroun
 import { lobbyModeGuideMarkup } from './lobbyModeGuide';
 import { lobbyText } from '../i18n/lobbyCopy';
 import { UnifiedLobby } from './unifiedLobby';
-import { freshBattleSetup, lobbyAdmission, LobbyRosterMemory, type CardDraft } from './lobbyState';
+import { freshBattleSetup, lobbyAdmission, LobbyRosterMemory, type CardDraft, type LobbySlot } from './lobbyState';
 import { suspendOtherDialogs } from './modalSemantics';
 import { localizedTuningMessage } from './localizedTuningMessage';
 import { LAB_SCALAR_COPY_KEYS, LAB_AI_COPY_KEYS, LAB_BATTLE_COPY_KEYS, LAB_TILT_COPY_KEYS, LAB_MESSAGE_COPY_KEYS } from '../i18n/labCatalogs';
@@ -305,7 +305,10 @@ export class BricksWarApp {
       onInputMode: (mode) => { this.root.dataset.inputMode = mode; this.refreshPadHints(); },
       onSelectionChange: (selected) => this.updateMainMenuShowcase(selected),
       onGamepadConfirm: (gamepadIndex, selected) => this.handleGamepadConfirm(gamepadIndex, selected),
-      onGamepadsSnapshot: (pads) => { this.syncLiveGamepads(pads); this.lobby.poll(pads); },
+      onGamepadsSnapshot: (pads) => {
+        this.syncLiveGamepads(pads);
+        if (!this.matchLoading) this.lobby.poll(pads);
+      },
       onGamepadStart: () => this.startSetupFromGamepad(),
       acceptsGamepad: () => !this.lobby.active(),
     });
@@ -763,6 +766,12 @@ export class BricksWarApp {
   }
 
   private commitLobbyCard(slot: number, draft: CardDraft): void {
+    this.applyLobbyCard(slot, draft);
+    this.audio.playUiSelect();
+    this.renderSetup();
+  }
+
+  private applyLobbyCard(slot: number, draft: CardDraft): void {
     this.slots[slot] = draft.controller;
     this.slotTileStyles[slot] = draft.style;
     if (isManualSlot(draft.controller)) {
@@ -783,8 +792,6 @@ export class BricksWarApp {
       }
       savePlayerNames(this.playerNames);
     }
-    this.audio.playUiSelect();
-    this.renderSetup();
   }
 
   private disconnectPlayerNameResizeObserver(): void {
@@ -1132,27 +1139,23 @@ export class BricksWarApp {
     }
   }
 
-  private gamepadFor(controller: GamepadController): ConnectedGamepad | null {
+  private gamepadFor(controller: GamepadController, pendingToken?: number): ConnectedGamepad | null {
     const index = Number(controller.slice(8));
-    if (this.liveGamepads.get(index)?.token !== this.slotPadTokens.get(index)) return null;
+    const token = pendingToken ?? this.slotPadTokens.get(index);
+    if (token === undefined || this.liveGamepads.get(index)?.token !== token) return null;
     return connectedGamepads().find((gamepad) => gamepad.controller === controller) ?? null;
   }
 
-  private gamepadAvailabilityErrors(configs: readonly ParticipantConfig[] = this.configs()): Array<{ message: string }> {
-    return configs.some((config) => isGamepadController(config.controller) && !this.gamepadFor(config.controller))
-      ? [{ message: localeText('gamepadUnavailable') }]
-      : [];
-  }
-
-  private configs(): ParticipantConfig[] {
-    return this.slots.flatMap((value, index): ParticipantConfig[] => {
+  private configs(slots: readonly LobbySlot[] = this.slots, pending?: ReadonlyMap<number, CardDraft>): ParticipantConfig[] {
+    return slots.flatMap((value, index): ParticipantConfig[] => {
       if (value === 'off' || (this.selectedMode === 'survival' && !isManualSlot(value))) return [];
       const teamId = this.selectedMode === 'team-battle' ? teamIdForSlot(index) ?? undefined : undefined;
+      const draft = pending?.get(index);
       if (isManualSlot(value)) {
-        const gamepad = isGamepadSlot(value) ? this.gamepadFor(value) : null;
-        return [{ id: `player-${index + 1}`, label: this.playerNameForSlot(index),
+        const gamepad = isGamepadSlot(value) ? this.gamepadFor(value, draft?.token) : null;
+        return [{ id: `player-${index + 1}`, label: draft?.name ?? this.playerNameForSlot(index),
           controller: isMobilePlayViewport() && value === 'human-1' ? 'mobile-touch' : value,
-          controllerLabel: gamepad?.label, tileStyle: this.slotTileStyles[index] ?? DEFAULT_TILE_STYLE_SELECTION, teamId }];
+          controllerLabel: gamepad?.label, tileStyle: draft?.style ?? this.slotTileStyles[index] ?? DEFAULT_TILE_STYLE_SELECTION, teamId }];
       }
       return [{ id: `player-${index + 1}`, label: 'ИИ', controller: 'ai', difficulty: value.slice(3) as AiDifficulty,
         tileStyle: this.slotTileStyles[index] ?? DEFAULT_TILE_STYLE_SELECTION, teamId }];
@@ -1163,13 +1166,14 @@ export class BricksWarApp {
     return this.playerNames[index] ?? `Игрок ${index + 1}`;
   }
 
-  private showValidation(): boolean {
-    const configs = this.configs();
-    const admission = lobbyAdmission(this.selectedMode, this.slots, this.lobby.editing(), this.gamepadAvailabilityErrors(configs).length > 0);
+  private showValidation(pending = this.lobby.pendingPlayers()): boolean {
+    const slots = this.slots.map((value, index) => pending.get(index)?.controller ?? value);
+    const configs = this.configs(slots, pending);
+    const disconnected = configs.some(config => isGamepadController(config.controller) && !config.controllerLabel);
+    const admission = lobbyAdmission(this.selectedMode, slots, this.lobby.blocksStart(), disconnected);
     const errors = [
       ...(admission ? [{ message: admission }] : []),
       ...(this.selectedMode === 'survival' ? validateSurvivalParticipants(configs) : validateParticipants(configs)),
-      ...this.gamepadAvailabilityErrors(configs),
       ...validateDurationMinutes(this.durationMinutes),
       ...validateMatchOptions(configs, this.pacing),
     ];
@@ -1180,8 +1184,12 @@ export class BricksWarApp {
     return errors.length === 0;
   }
 
-  private startMatch(): void {
-    if (this.matchLoading || !this.showValidation() || this.root.querySelector('.lobby-overlay:not([hidden])')) return;
+  private startMatch(): boolean {
+    if (this.matchLoading || this.root.querySelector('.lobby-overlay:not([hidden])')) return false;
+    const pending = this.lobby.pendingPlayers();
+    if (!this.showValidation(pending)) return false;
+    for (const [slot, draft] of pending) this.applyLobbyCard(slot, draft);
+    this.lobby.leave();
     const loading = new MatchLoading(this.root, () => this.destroyGame(), () => this.navigateBack());
     this.matchLoading = loading;
     // Keep Web Audio unlock inside the initiating user gesture.
@@ -1193,6 +1201,7 @@ export class BricksWarApp {
       this.destroyGame();
       window.dispatchEvent(new ErrorEvent('error', { error, message: String(error) }));
     });
+    return true;
   }
 
   private async prepareMatch(loading: MatchLoading): Promise<void> {

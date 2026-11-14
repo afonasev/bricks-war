@@ -24,8 +24,9 @@ const receipt = migration ? await verifyNativeReceipt(directory,publicKey,versio
 const catalog = {}, hashes = new Map(); const shellFiles = [];
 for (const name of names) {
   if (!name.includes(version) && !name.endsWith('.yml') && !(migration && ['native-manifest.json','migration-only.json'].includes(name))) throw Error(`Stale build asset: ${name}`);
-  const hash = digest(await readFile(`${directory}/${name}`)); hashes.set(name, hash);
-  if ((name.endsWith('.zip') || name.endsWith('.exe')) && name.startsWith('Bricks-War-')) shellFiles.push({name,sha256:hash,size:(await readFile(`${directory}/${name}`)).length,platform:name.endsWith('.zip')?'darwin':'win32',arch:name.endsWith('.zip')?'universal':'x64',minimumOS:name.endsWith('.zip')?'13.0.0':'10.0.0',...(migration && name.endsWith('.exe')?{protectedRollbackAbi:1}:{})});
+  const bytes = await readFile(`${directory}/${name}`);
+  const hash = digest(bytes); hashes.set(name, hash);
+  if ((name.endsWith('.zip') || name.endsWith('.exe')) && name.startsWith('Bricks-War-')) shellFiles.push({name,sha256:hash,size:bytes.length,platform:name.endsWith('.zip')?'darwin':'win32',arch:name.endsWith('.zip')?'universal':'x64',minimumOS:name.endsWith('.zip')?'13.0.0':'10.0.0',...(migration && name.endsWith('.exe')?{protectedRollbackAbi:1}:{})});
   const platform = name.endsWith('.dmg') ? 'mac' : name.endsWith('.exe') ? 'win' : null;
   if (platform) {
     if (catalog[platform]) throw Error('Multiple installers for platform');

@@ -110,6 +110,17 @@ def artifact_parent():
     return Path(home).expanduser().resolve() / f'{ROOT.name}-{key}' / 'qa'
 
 
+def tool_versions():
+    packages = ['vitest', '@playwright/test', 'vite']
+    return {
+        'node_version': subprocess.check_output(['node', '--version'], text=True).strip(),
+        'package_versions': {
+            name: load_report(ROOT / 'node_modules' / name / 'package.json')['version']
+            for name in packages
+        },
+    }
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('route', choices=['unit-ui', 'ui', 'focused', 'full'])
@@ -130,8 +141,6 @@ def main():
              'git_status': subprocess.check_output(['git', 'status', '--porcelain'], cwd=ROOT, text=True),
              'tracked_diff_sha256': hashlib.sha256(diff).hexdigest(),
              'untracked_source_sha256': {f: hashlib.sha256((ROOT / f).read_bytes()).hexdigest() for f in subprocess.check_output(['git', 'ls-files', '--others', '--exclude-standard'], cwd=ROOT, text=True).splitlines() if not f.startswith('evidence/') and (ROOT / f).is_file()},
-             'node_version': subprocess.check_output(['node', '--version'], text=True).strip(),
-             'package_versions': {k: json.loads((ROOT / 'node_modules' / k / 'package.json').read_text())['version'] for k in ['vitest', '@playwright/test', 'vite']},
              'selected_files': files, 'checks': [], 'passed': False,
              'host_wait_seconds': None}
     (directory / 'plan.json').write_text(json.dumps(state, indent=2))
@@ -142,7 +151,11 @@ def main():
             state['browser_origin'] = f'http://127.0.0.1:{port}'
             check_browser_port(port)
             state['browser_port_preflight'] = 'passed'
-            (directory / 'plan.json').write_text(json.dumps(state, indent=2))
+        try:
+            state.update(tool_versions())
+        except (OSError, ValueError, KeyError, TypeError, subprocess.CalledProcessError) as error:
+            raise ValueError(f'QA dependency preflight failed: {error}') from error
+        (directory / 'plan.json').write_text(json.dumps(state, indent=2))
         report_path = directory / 'unit.json'
         cmd = ['node', 'node_modules/vitest/vitest.mjs', 'run', '--config', 'vitest.config.ts', *files,
                '--reporter=default', '--reporter=json', '--outputFile=' + str(report_path)]

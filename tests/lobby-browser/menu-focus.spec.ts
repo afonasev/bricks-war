@@ -10,7 +10,17 @@ async function boot(page:Page){
   Object.defineProperty(navigator,'getGamepads',{value:()=>[null,null,null,null,pad,guest]});Object.assign(window,{focusPad:pad,focusGuest:guest});
  });await page.goto('/?muted=1');await expect(page.locator('[data-play-entry]')).toBeVisible();
 }
-async function pulse(page:Page,button:number,guest=false){await page.evaluate(({button,guest})=>{(window as any)[guest?'focusGuest':'focusPad'].buttons[button].pressed=true},{button,guest});await page.waitForTimeout(110);await page.evaluate(({button,guest})=>{(window as any)[guest?'focusGuest':'focusPad'].buttons[button].pressed=false},{button,guest});await page.waitForTimeout(110);}
+async function pulse(page: Page, button: number, guest = false) {
+ const key = guest ? 'focusGuest' : 'focusPad';
+ for (const pressed of [true, false]) {
+  await page.evaluate(async ({key, button, pressed}) => {
+   (window as any)[key].buttons[button].pressed = pressed;
+   // Keep each edge visible through a menu poll even if the next frame is delayed.
+   await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+  }, {key, button, pressed});
+  await page.waitForTimeout(110);
+ }
+}
 async function focus(_page:Page,control:Locator,fill=sage){
  const position=()=>control.evaluate(e=>{const r=e.getBoundingClientRect();return {x:r.x+scrollX,y:r.y+scrollY,width:r.width,height:r.height}});
  const before=await position();await control.press('Shift');await expect(control).toBeFocused();

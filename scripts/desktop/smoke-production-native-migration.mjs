@@ -1,9 +1,9 @@
-/** Exact packaged bridge 1.16.0 → native 1.16.1 witness; isolated profiles, muted, no publication.
+/** Exact packaged bridge → native witness; isolated profiles, muted, no publication.
  * Production migration success plus controlled startup-failure recovery, full 90-second health horizon.
  * Local preparation uses the existing signing key. This is not public transport or Windows acceptance.
  */
 import assert from 'node:assert/strict';
-import {readFile,writeFile,mkdir,cp,access,rm,appendFile,stat} from 'node:fs/promises';
+import {readFile,writeFile,mkdir,mkdtemp,access,appendFile,stat,constants} from 'node:fs/promises';
 import {join} from 'node:path';
 import {homedir} from 'node:os';
 import {createHash,sign} from 'node:crypto';
@@ -11,16 +11,23 @@ import {execFile,spawn,execFileSync} from 'node:child_process';
 import {promisify} from 'node:util';
 import {createRequire} from 'node:module';
 import {createServer} from 'node:net';
-const repo=process.cwd(),require=createRequire(join(repo,'package.json')),{chromium}=require('@playwright/test');
+const repo=process.cwd(),require=createRequire(join(repo,'package.json'));
 const {ShellUpdate,validateShell}=await import(join(repo,'electron/shell-update.mjs'));
 const {TransferGate}=await import(join(repo,'electron/update-coordinator.mjs'));
 const exec=promisify(execFile),sleep=ms=>new Promise(r=>setTimeout(r,ms));
-const [bridgeZip,native,bridgeVersion='1.16.0',nativeVersion='1.16.1']=process.argv.slice(2);if(!bridgeZip||!native)throw Error('Pass published bridge ZIP and external SDK assembly directory');
+const args=process.argv.slice(2),[bridgeZip,native,bridgeVersion,nativeVersion]=args;
 const q=process.env.BRICKS_QA_HOME??join(homedir(),'.local/state/bricks-war/qa');await mkdir(q,{recursive:true});
-const output=join(q,'production-native-witness-'+Date.now());await mkdir(output);console.log(output);
-const privateKey=await readFile(join(homedir(),'.config/bricks-war/content-private-key.pem')),publicKey=await readFile(join(repo,'electron/content-public-key.pem'));
+const output=await mkdtemp(join(q,'production-native-witness-'));console.log(output);
 const digest=b=>createHash('sha256').update(b).digest('hex');
-let browser,page,profile,installed,port,child;const report={source:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),output,status:'RUNNING',scenarios:[],limitations:['Isolated writable macOS install; no /Applications/Gatekeeper acceptance','Local signed preparation transport; public download readback remains separate','Windows/UAC: NotRun, explicitly deferred']};
+let browser,page,profile,installed,port,child,chromium,privateKey,publicKey;const report={source:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),output,status:'RUNNING',scenarios:[],limitations:['Isolated writable macOS install; no /Applications/Gatekeeper acceptance','Local signed preparation transport; public download readback remains separate','Windows/UAC: NotRun, explicitly deferred']};
+async function requireArchive(label,path){
+ try {
+  if(!(await stat(path)).isFile())throw Error('Expected a regular file');
+  await access(path,constants.R_OK);
+ } catch(error){
+  throw Error(`${label} ZIP is unavailable: ${path} (${error.message})`,{cause:error});
+ }
+}
 async function prepare(scenario){
  const base=join(output,scenario);await mkdir(base);installed=join(base,'Bricks War.app');profile=join(base,'profile');await mkdir(profile);
  await exec('/usr/bin/ditto',['-x','-k',bridgeZip,base]);
@@ -33,8 +40,18 @@ async function marker(){await page.evaluate(()=>{localStorage.setItem('qa-native
 async function retained(){assert.equal(await page.evaluate(()=>localStorage.getItem('qa-native-retained')),'preserved');}
 async function stage(zip){const bytes=await readFile(zip),name=`Bricks-War-${nativeVersion}-mac-universal.zip`;const payload=JSON.stringify({schema:1,game:'bricks-war',component:'shell',channel:'stable',updaterAbi:2,installationKind:'migration',contentAbi:3,contentSequence:JSON.parse(JSON.parse(await readFile('build/desktop-content/manifest.json')).payload).sequence,version:nativeVersion,files:[{name,platform:'darwin',arch:'universal',minimumOS:'13.0.0',size:bytes.length,sha256:digest(bytes)}]});const envelope={payload,signature:sign(null,Buffer.from(payload),privateKey).toString('base64')};const shell=new ShellUpdate({root:join(profile,'shell-update'),gate:new TransferGate(),fetcher:async()=>new Response(bytes),publicKey,version:bridgeVersion,platform:'darwin',arch:'arm64',executable:join(installed,'Contents/MacOS/Bricks War'),args:['-muted','--remote-debugging-port='+port],helper:join(repo,'electron/shell-helper.mjs')});shell.selected={release:{tag_name:`v${nativeVersion}`},manifest:validateShell(envelope,publicKey,'darwin','arm64',bridgeVersion,'13.0.0'),envelope};await shell.prepare();}
 try{
+ const version=/^\d+\.\d+\.\d+$/;
+ if(args.length!==4||!bridgeZip||!native||!version.test(bridgeVersion)||!version.test(nativeVersion)){
+  throw Error('Pass <published bridge ZIP> <external SDK assembly directory> <bridge version> <native version>');
+ }
+ const zip=join(native,`installers/Bricks-War-${nativeVersion}-mac-universal.zip`);
+ await requireArchive('Bridge',bridgeZip);
+ await requireArchive('Native',zip);
+ ({chromium}=require('@playwright/test'));
+ privateKey=await readFile(join(homedir(),'.config/bricks-war/content-private-key.pem'));
+ publicKey=await readFile(join(repo,'electron/content-public-key.pem'));
  await prepare('production-success');report.native=false;launch();await connect(bridgeVersion);await marker();await quit();
- const zip=join(native,`installers/Bricks-War-${nativeVersion}-mac-universal.zip`);report.installer={path:zip,sha256:digest(await readFile(zip))};await stage(zip);launch();await connect(nativeVersion,90000);report.native=true;await retained();
+ report.installer={path:zip,sha256:digest(await readFile(zip))};await stage(zip);launch();await connect(nativeVersion,90000);report.native=true;await retained();
  const state=JSON.parse(await readFile(join(profile,'native/client/state.json'))),assembly=JSON.parse(await readFile(join(native,'assembly.json')));assert.equal(state.active.digest,assembly.assembly.darwin.client.identity.digest);assert.equal(await readFile(join(profile,'shell-update/healthy-version'),'utf8'),nativeVersion);
  for(let i=0;i<100;i++){try{await access(installed+'.previous-'+nativeVersion);await sleep(100);}catch{break;}}await assert.rejects(access(installed+'.previous-'+nativeVersion));await assert.rejects(access(join(profile,'shell-update/ready.json')));
  await page.screenshot({path:join(output,`native-${nativeVersion}-en.png`)});report.scenarios.push(`Exact production bridge ${bridgeVersion} → exact production native ZIP ${nativeVersion}: real helper replacement, game health, matching signed client, retained localStorage, cleared backup/ready`);await quit();launch();await connect(nativeVersion);await retained();await quit();report.scenarios.push('Production immutable native root offline restart with same original profile');

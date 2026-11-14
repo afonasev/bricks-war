@@ -9,11 +9,20 @@ export async function expectDesktopFit(page: Page): Promise<void> {
     const scope = overlay ?? document.querySelector('main')!;
     const nodes = [...scope.querySelectorAll<HTMLElement>('button,input,textarea,h1,h2,h3,label,li,.release-footer-action,.release-guidance-footer small,.hud-header,.hud-identity')].filter(visible);
     const rects = nodes.map(el => ({ el, r: el.getBoundingClientRect(), name: el.getAttribute('aria-label') || el.textContent?.trim().slice(0,80) }));
-    // Laboratory fields intentionally share a vertical scroll region; their full reachability is checked below.
-    const offscreen = rects.filter(({el,r}) => r.left < -1 || r.right > innerWidth + 1 || (!el.closest('.laboratory-single-page .debug-lab-content') && (r.top < -1 || r.bottom > innerHeight + 1))).map(({name}) => name);
+    // Laboratory fields and sidebar records have their own scroll regions.
+    const scrollBounds = (el: HTMLElement) => {
+      const region = el.closest('.laboratory-single-page .debug-lab-content, aside.lobby-rating > :is(.rating-local-content,.rating-global-content)');
+      return region && ['auto', 'scroll'].includes(getComputedStyle(region).overflowY) ? region.getBoundingClientRect() : null;
+    };
+    const offscreen = rects.filter(({el,r}) => {
+      const scroll = scrollBounds(el);
+      const top = scroll ? Math.max(r.top, scroll.top) : r.top;
+      const bottom = scroll ? Math.min(r.bottom, scroll.bottom) : r.bottom;
+      return r.left < -1 || r.right > innerWidth + 1 || top <= bottom && (top < -1 || bottom > innerHeight + 1);
+    }).map(({name}) => name);
     const controls = rects.filter(({el,r}) => {
       if (!el.matches('button,input,textarea') || el.matches('[type="range"]')) return false;
-      const scroll = el.closest('.laboratory-single-page .debug-lab-content')?.getBoundingClientRect();
+      const scroll = scrollBounds(el);
       return !scroll || (r.top >= scroll.top && r.bottom <= scroll.bottom);
     });
     const overlap = controls.flatMap((a,i) => controls.slice(i+1).filter(b => !a.el.contains(b.el) && !b.el.contains(a.el) && Math.min(a.r.right,b.r.right)>Math.max(a.r.left,b.r.left)+1 && Math.min(a.r.bottom,b.r.bottom)>Math.max(a.r.top,b.r.top)+1).map(b => [a.name,b.name]));

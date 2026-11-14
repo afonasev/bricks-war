@@ -10,6 +10,7 @@ on:
       - 'SOURCE_REVISION'
       - 'source-snapshot.json'
       - '.github/scripts/installer_downloads.py'
+      - '.github/scripts/test_installer_downloads.py'
       - '.github/workflows/installer-downloads.yml'
   workflow_dispatch:
     inputs:
@@ -36,6 +37,28 @@ jobs:
           ref: ${{ github.event.repository.default_branch }}
           persist-credentials: false
           sparse-checkout: .github/scripts
+      - name: Record reconciliation revision
+        id: revision
+        run: |
+          revision=$(git rev-parse HEAD)
+          echo "sha=$revision" >> "$GITHUB_OUTPUT"
+          echo "Reconciliation revision: $revision"
+      - name: Check out the push revision if the branch advanced
+        if: github.event_name == 'push' && steps.revision.outputs.sha != github.sha
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+          path: .installer-push
+      - name: Check push revision contracts if the branch advanced
+        if: github.event_name == 'push' && steps.revision.outputs.sha != github.sha
+        working-directory: .installer-push
+        run: |
+          revision=$(git rev-parse HEAD)
+          echo "Checking push revision: $revision"
+          test "$revision" = "$GITHUB_SHA"
+          python3 -m unittest discover -s .github/scripts -p test_installer_downloads.py
       - name: Check updater contracts
         run: python3 -m unittest discover -s .github/scripts -p test_installer_downloads.py
       - name: Refresh installer download links

@@ -1,3 +1,4 @@
+import { GLOBAL_RATING_RULESET } from '../../src/domain/globalRating';
 import {chooseLobbyStyle} from '../helpers/lobbyStyle';
 import { openLocalLobby } from '../helpers/localLobby';
 import { test, expect, type Page } from '@playwright/test';
@@ -173,7 +174,7 @@ test('real ranking local/global, ten rows plus own, retry, modal return and resp
     await page.route('**/api/network/rating**', async (route) => { if (offline) {
         await route.abort();
         return;
-    } await route.fulfill({ json: { top: Array.from({ length: 10 }, (_, i) => ({ name: `Лидер ${i + 1}`, rank: i + 1, lineScore: 48000 - i * 2000, elapsedMs: 600000, finishedAt: 1792880400000 })), own: [{ name: 'Саша', rank: 24, lineScore: 15400, elapsedMs: 600000, finishedAt: 1792880400000 }] } }); });
+    } await route.fulfill({ json: { ruleset: GLOBAL_RATING_RULESET, top: Array.from({ length: 10 }, (_, i) => ({ name: `Лидер ${i + 1}`, rank: i + 1, lineScore: 48000 - i * 2000, elapsedMs: 600000, finishedAt: 1792880400000 })), own: [{ name: 'Саша', rank: 24, lineScore: 15400, elapsedMs: 600000, finishedAt: 1792880400000 }] } }); });
     await open(page, 'Кто больше', true);
     await expect(page.locator('.lobby-body.with-rating')).toBeVisible();
     await expect(page.locator('.lobby-rating-list li')).toHaveCount(10);
@@ -193,6 +194,15 @@ test('real ranking local/global, ten rows plus own, retry, modal return and resp
     offline = false;
     await page.locator('[data-rating-retry]').click();
     await expect(page.locator('.global-rating-list li')).toHaveCount(11);
+    await page.setViewportSize({ width: 1280, height: 480 });
+    const ownRank = page.locator('aside .rating-separated');
+    await expect(ownRank).toHaveText(/#24/);
+    await ownRank.scrollIntoViewIfNeeded();
+    await expect(ownRank).toBeInViewport();
+    await expect(page.locator('aside [data-rating="global"]')).toBeInViewport();
+    await expect(page.locator('#start-match')).toBeInViewport();
+    await page.screenshot({ path: `${evidence}/rating-short-global.png` });
+
     await page.setViewportSize({ width: 1000, height: 800 });
     await expect(page.locator('aside.lobby-rating')).toHaveCount(0);
     await page.locator('[data-open-rating]').click();
@@ -602,4 +612,57 @@ for(const width of [1440,390])test(`selected occupied card shows full blue fill 
     await pulse(page,0,0);await expect(card.locator('[data-level="hard"]')).toHaveAttribute('data-default-choice','true');
     await pulse(page,0,1);await expect(card.locator('h2')).toContainText('сложная');
     await card.hover();await expect(card).toHaveAttribute('data-edit','1');await expect(card.locator('.lobby-card-hint')).toBeVisible();
+});
+
+test('Survival keeps the rating beside one or two players in short desktop windows', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 800 });
+    await open(page, 'survival', true);
+
+    const sidebar = page.locator('aside.lobby-rating');
+    await page.screenshot({ path: `${evidence}/rating-one-player.png` });
+    await expect(sidebar).toBeVisible();
+    await expect(sidebar.locator('.lobby-rating-list li')).toHaveCount(10);
+
+    await page.setViewportSize({ width: 1280, height: 480 });
+    await expect(sidebar).toBeVisible();
+    const records = sidebar.locator('.rating-local-content');
+    const lastRecord = records.locator('li').last();
+    await expect(lastRecord).not.toBeInViewport();
+    await lastRecord.scrollIntoViewIfNeeded();
+    await expect(lastRecord).toBeInViewport();
+    await expect(sidebar.locator('[data-rating="local"]')).toBeInViewport();
+    await expect(page.locator('#start-match')).toBeInViewport();
+    await expect.poll(() => page.locator('.lobby-body').evaluate(body => {
+        const rating = body.querySelector('aside')!.getBoundingClientRect();
+        const footer = body.nextElementSibling!.getBoundingClientRect();
+        const cards = [...body.querySelectorAll('.lobby-card')].map(card => card.getBoundingClientRect());
+        return rating.bottom <= footer.top && cards.every(card => card.right < rating.left);
+    })).toBe(true);
+    await page.screenshot({ path: `${evidence}/rating-short-desktop.png` });
+
+    await page.setViewportSize({ width: 1800, height: 900 });
+    await pulse(page, 0, 3);
+    await expect(page.locator('[data-generic-name]')).toBeVisible();
+    await pulse(page, 0, 0);
+    await expect(page.locator('[data-lobby-slot="1"] .lobby-theme-wheel')).toBeVisible();
+    await expect(sidebar).toBeVisible();
+    await pulse(page, 0, 0);
+    await expect(page.locator('.lobby-card:not(.is-empty)')).toHaveCount(2);
+    await expect(sidebar).toBeVisible();
+    await assertLayout(page);
+    await page.screenshot({ path: `${evidence}/rating-two-players.png` });
+
+    await pulse(page, 1, 3);
+    await expect(page.locator('[data-generic-name]')).toBeVisible();
+    await pulse(page, 1, 0);
+    await expect(page.locator('[data-lobby-slot="2"] .lobby-theme-wheel')).toBeVisible();
+    await expect(sidebar).toHaveCount(0);
+    await pulse(page, 1, 0);
+    await expect(page.locator('.lobby-card:not(.is-empty)')).toHaveCount(3);
+    await expect(sidebar).toHaveCount(0);
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.locator('[data-open-rating]').click();
+    await expect(page.getByRole('dialog').locator('.lobby-rating-list li')).toHaveCount(10);
+    await page.screenshot({ path: `${evidence}/rating-phone-dialog.png` });
 });

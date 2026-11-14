@@ -1606,7 +1606,19 @@
 #app .unified-lobby .lobby-card { grid-column:calc(var(--slot) + 1); grid-row:1; z-index:1; }
 #app .unified-lobby .lobby-team { grid-column:1/span 2; grid-row:1; position:relative; align-self:stretch; min-width:0; min-height:0; height:auto; margin:-8px; padding:0; border:0; border-radius:22px; box-shadow:inset 0 0 0 2px #32839b; background:#63bdd8; pointer-events:none; }
 #app .unified-lobby .lobby-team.team-1 { grid-column:3/span 2; background:#ec9a70; box-shadow:inset 0 0 0 2px #b96543; }
-#app .unified-lobby .lobby-body.with-rating > aside.lobby-rating { position:absolute; top:8px; right:0; width:430px; }
+#app .unified-lobby:has(.lobby-body.with-rating) { height:100dvh; min-height:0; }
+#app .unified-lobby .lobby-body.with-rating > aside.lobby-rating {
+  position:absolute;
+  top:8px;
+  right:0;
+  width:430px;
+  max-height:calc(100% - 16px);
+}
+#app .unified-lobby aside.lobby-rating > :is(.lobby-rating-heading,.rating-switch) { flex-shrink:0; }
+#app .unified-lobby aside.lobby-rating > :is(.rating-local-content,.rating-global-content) {
+  min-height:0;
+  overflow:auto;
+}
 /* Pointer never inherits the navigation contour, including stale controller classes. */
 #app .unified-lobby .lobby-cycle { position:relative; isolation:isolate; }
 #app .unified-lobby .lobby-cycle::before { content:""; position:absolute; inset:0; border-radius:8px; background:#f5ead2; box-shadow:-4px 0 0 4px #f5ead2,4px 0 0 4px #f5ead2; opacity:0; z-index:-1; pointer-events:none; }
@@ -1942,7 +1954,7 @@
 }
 #app[data-layout] .unified-lobby .lobby-style-content {
   display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px;
-  width:100%; min-height:0; margin:0; padding:0; border:0; border-radius:0; background:transparent;
+  width:100%; min-height:0; margin:0; padding:16px 0 0; border:0; border-radius:0; background:transparent;
 }
 #app[data-layout] .unified-lobby .lobby-style-preview .lobby-well {
   display:flex; align-items:center; justify-content:center; width:100%; height:96px;
